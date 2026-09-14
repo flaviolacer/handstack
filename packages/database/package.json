@@ -1,0 +1,23 @@
+{
+  "name": "@handstack/database",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint src tests",
+    "test": "vitest run",
+    "test:mongodb-portable": "vitest run --config vitest.mongodb.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@handstack/config": "file:../config",
+    "@handstack/database-mongodb": "file:./mongodb",
+    "@handstack/database-typeorm": "file:./typeorm",
+    "@handstack/domain": "file:../domain"
+  }
+}

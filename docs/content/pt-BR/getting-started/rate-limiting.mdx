@@ -1,0 +1,67 @@
+---
+id: getting-started/rate-limiting
+title: Aplique limites de taxa por escopo
+description: Configure limites de taxa com isolamento de tenant nas dimensões de organização, usuário, chave de API, modelo e capability.
+audience: [platform-operator, ai-admin]
+permissions: []
+features: [rate-limiting, gateway, governance]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.37.0
+lastReviewedAt: 2026-09-10
+owner: platform-team
+tags: [rate-limiting, gateway, governance, quotas]
+---
+
+# Aplique limites de taxa por escopo
+
+O HandStack aplica controle de admissão por meio do pacote `@handstack/rate-limiting`. Os limites
+são escopados por organização, grupo, usuário, chave de API, agente, modelo ou capability e são
+medidos em requisições por minuto, tokens por minuto, requisições concorrentes ou requisições
+diárias. Todo contador é indexado pelo identificador da organização, de modo que um limite de um
+tenant nunca consome capacidade de outro. Uma negação vira o erro tipado `RateLimitError` (HTTP
+`429`) com o escopo, a métrica excedidos e os segundos de retry.
+
+## Prerequisites
+
+- Uma instalação do HandStack usando o pacote `@handstack/rate-limiting`.
+- Os identificadores das entidades que você deseja proteger, por exemplo o id de um modelo ou de
+  uma chave de API.
+
+## Steps
+
+1. Importe o limitador e o store em memória padrão:
+   `import { ScopedRateLimiter, InMemoryRateLimitStore } from "@handstack/rate-limiting";`
+2. Construa o limitador com uma regra por dimensão. Cada regra declara um `scope`, o `scopeId` da
+   entidade, uma `metric` e um `limit` inteiro não negativo:
+   `new ScopedRateLimiter(new InMemoryRateLimitStore(), [{ scope: "organization", scopeId: "acme", metric: "requests_per_minute", limit: 600 }])`.
+3. Adicione mais regras com `addRule`, por exemplo um limite `tokens_per_minute` por usuário e um
+   limite `concurrent_requests` por modelo.
+4. Antes de executar uma operação cara, chame `check` com o contexto da requisição:
+   `const decision = await limiter.check({ organizationId: "acme", userId: "u-1", tokens: 120 });`
+5. Para regras de concorrência, use `await limiter.acquire(context)` antes da operação e
+   `await limiter.release(context)` em um bloco `finally` para sempre devolver a vaga.
+6. Quando a decisão for negada, exponha ao chamador com `raiseRateLimitError(decision)`.
+
+## Verify
+
+```text
+decision.allowed === false
+decision.exceededScope === "organization"
+decision.exceededMetric === "requests_per_minute"
+decision.retryAfterSeconds > 0
+```
+
+Confirme que a terceira requisição no mesmo minuto é negada, que uma requisição com outro
+`organizationId` permanece permitida, que deltas de tokens acumulam contra a regra de tokens e que
+uma vaga de concorrência volta a ficar disponível após `release`.
+
+## Troubleshooting
+
+- Um `429` significa que uma regra correspondente foi excedida; leia o valor `Retry-After` e tente
+  novamente após a janela reiniciar.
+- `Rate limit rule limit must be a non-negative integer` significa que uma regra foi configurada com
+  limite negativo ou fracionário; corrija a regra e recrie o limitador.
+- `Rate limit context organizationId is required` significa que o contexto omitiu o tenant; toda
+  verificação deve carregar um id de organização não vazio.
+- No perfil distribuído, substitua o store em memória por um store compartilhado para que as
+  réplicas coordenem os mesmos contadores em vez de impor limites independentes.

@@ -1,0 +1,49 @@
+---
+id: getting-started/model-routing
+title: Configure model routing
+description: Select published model candidates with tenant-scoped routing policies.
+audience: [platform-operator, developer]
+permissions: [models.manage, models.execute]
+features: [models, routing]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.38.0
+lastReviewedAt: 2026-09-11
+owner: ai-platform-team
+tags: [models, routing, reliability]
+---
+
+# Configure model routing
+
+## Purpose and expected outcome
+
+Route an execution to one of several published model candidates using a deterministic policy that remains isolated to the organization.
+
+## Prerequisites
+
+- Published model definitions and enabled providers in the same organization.
+- `models.manage` to create policies and `models.execute` to use them.
+
+## Steps
+
+1. Create a policy with unique model/provider candidate IDs and choose `fallback`, `round_robin`, `least_cost`, `least_latency`, `weighted`, `priority`, `random`, `custom`, or `semantic`.
+2. Add optional priorities, weights, cost/latency observations, and capability tags.
+3. Require tags or provide a bounded custom scorer when the policy needs semantic selection.
+4. Resolve the policy immediately before model execution and pass the returned internal model ID to the model runtime.
+
+## Verify
+
+Confirm that disabled or untagged candidates are skipped, round-robin advances per policy, weighted selection honors its random source, and a missing custom scorer fails closed.
+
+## Troubleshooting
+
+- `NO_ROUTE` means no enabled candidate matched the required tags.
+- `CUSTOM_SCORER_REQUIRED` means `custom` or `semantic` needs a scorer.
+- A scope error means the policy organization does not match the execution organization.
+
+## Security, budget, and audit implications
+
+Routing never accepts provider credentials or vendor model IDs. Callers still pass the selected internal model through the normal authorization, budget, audit, and classification checks.
+
+## Rollback
+
+Disable the policy or remove the affected candidate; historical decisions are immutable application observations.

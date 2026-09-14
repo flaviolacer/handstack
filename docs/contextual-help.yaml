@@ -1,0 +1,14 @@
+version: 1
+targets:
+  - surface: apps/web/app/chat/page.tsx
+    route: /chat
+    articleId: user/chat-workspace
+  - surface: apps/web/app/page.tsx
+    route: /
+    articleId: getting-started/overview
+  - surface: apps/web/app/help/page.tsx
+    route: /help
+    articleId: user/help-center
+  - surface: apps/web/app/help/search/page.tsx
+    route: /help/search
+    articleId: user/help-center

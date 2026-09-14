@@ -1,0 +1,40 @@
+---
+id: getting-started/feature-flags
+title: Operar feature flags por tenant
+description: Resolva overrides globais, de organização e de usuário com segurança.
+audience: [developer, platform-operator]
+permissions: [feature-flags.manage, feature-flags.read]
+features: [feature-flags, configuration]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.16.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [feature-flags, rollout, tenants]
+---
+
+# Operar feature flags por tenant
+
+Feature flags são resolvidas do padrão mais amplo ao override mais específico: global,
+organização e depois usuário. Um `false` explícito é override, não ausência de valor.
+
+## Prerequisites
+
+- Registre o serviço de flags na API e carregue valores pelo adapter de persistência configurado.
+- Exija contexto de organização autenticado para avaliações de organização e usuário.
+
+## Steps
+
+1. Defina o padrão global da chave.
+2. Adicione overrides de organização para rollout gradual.
+3. Adicione overrides de usuário somente com organização e identidade.
+4. Avalie usando o tenant autenticado em toda requisição.
+
+## Verify
+
+Teste precedência, valores false explícitos e reutilização de user-id entre organizações. Chaves
+desconhecidas devem ficar desabilitadas e registros globais não devem ter ids de tenant.
+
+## Troubleshooting
+
+- Override de usuário sem organização é rejeitado para evitar colisões entre tenants.
+- Remova overrides antigos após o rollout; não aceite flags em headers fornecidos pelo cliente.

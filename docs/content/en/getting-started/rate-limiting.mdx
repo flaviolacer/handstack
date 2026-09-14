@@ -1,0 +1,66 @@
+---
+id: getting-started/rate-limiting
+title: Enforce scoped rate limits
+description: Configure tenant-scoped rate limits across organization, user, API key, model and capability dimensions.
+audience: [platform-operator, ai-admin]
+permissions: []
+features: [rate-limiting, gateway, governance]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.37.0
+lastReviewedAt: 2026-09-10
+owner: platform-team
+tags: [rate-limiting, gateway, governance, quotas]
+---
+
+# Enforce scoped rate limits
+
+HandStack enforces admission control through the `@handstack/rate-limiting` package. Limits are
+scoped to organization, group, user, API key, agent, model or capability and are measured as
+requests per minute, tokens per minute, concurrent requests or daily requests. Every counter is
+keyed by the organization identifier, so a limit configured for one tenant can never consume
+capacity from another. A denial surfaces as the typed `RateLimitError` (HTTP `429`) with the
+exceeded scope, metric and retry seconds.
+
+## Prerequisites
+
+- A running HandStack installation using the `@handstack/rate-limiting` package.
+- The identifiers of the scoped entities you want to protect, for example a model id or API key id.
+
+## Steps
+
+1. Import the limiter and the default in-memory store:
+   `import { ScopedRateLimiter, InMemoryRateLimitStore } from "@handstack/rate-limiting";`
+2. Construct a limiter with one rule per dimension. Each rule declares a `scope`, the entity
+   `scopeId`, a `metric` and a non-negative integer `limit`:
+   `new ScopedRateLimiter(new InMemoryRateLimitStore(), [{ scope: "organization", scopeId: "acme", metric: "requests_per_minute", limit: 600 }])`.
+3. Add further rules with `addRule`, for example a per-user `tokens_per_minute` limit and a per-model
+   `concurrent_requests` limit.
+4. Before executing an expensive operation, call `check` with the request context:
+   `const decision = await limiter.check({ organizationId: "acme", userId: "u-1", tokens: 120 });`
+5. For concurrency rules, pair `await limiter.acquire(context)` before the operation with
+   `await limiter.release(context)` in a `finally` block so the slot is always returned.
+6. When a decision is denied, surface it to the caller with `raiseRateLimitError(decision)`.
+
+## Verify
+
+```text
+decision.allowed === false
+decision.exceededScope === "organization"
+decision.exceededMetric === "requests_per_minute"
+decision.retryAfterSeconds > 0
+```
+
+Confirm that a third request within the same minute is denied, that a request carrying a different
+`organizationId` remains allowed, that token deltas accumulate against a token rule, and that a
+concurrency slot becomes available again after `release`.
+
+## Troubleshooting
+
+- A `429` means a matching rule was exceeded; read the `Retry-After` value and retry after the
+  window resets.
+- `Rate limit rule limit must be a non-negative integer` means a rule was configured with a negative
+  or fractional limit; correct the rule and recreate the limiter.
+- `Rate limit context organizationId is required` means the request context omitted the tenant;
+  every check must carry a non-empty organization id.
+- In the distributed profile, replace the in-memory store with a shared store so replicas coordinate
+  on the same counters instead of enforcing independent limits.

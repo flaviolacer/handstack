@@ -1,0 +1,59 @@
+---
+id: user/chat-workspace
+title: Usar o workspace de chat
+description: Inicie uma conversa multimodal governada e acompanhe a resposta do modelo com segurança.
+audience: [end-user]
+permissions: [chat.use]
+features: [chat, models]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.4.0
+lastReviewedAt: 2026-09-08
+owner: ai-platform-team
+tags: [chat, streaming, attachments]
+---
+
+# Usar o workspace de chat
+
+## Purpose and expected outcome
+
+Crie uma conversa isolada por tenant, selecione um modelo publicado, anexe arquivos suportados e acompanhe uma resposta persistente por streaming que pode reconectar sem duplicar conteúdo.
+
+## Prerequisites
+
+- Uma conta ativa com `chat.use` na organização.
+- Pelo menos um modelo avaliado e publicado.
+- Navegador suportado e acesso de rede à API HandStack.
+
+## Steps
+
+1. Abra **Chat** e informe o ID da organização e o bearer token de curta duração. O navegador mantém ambos somente em memória e os limpa ao recarregar.
+2. Selecione **New chat** e escolha um modelo publicado na barra superior.
+3. Digite uma mensagem. Opcionalmente, anexe PNG, JPEG, WebP, MP3, WAV, PDF, texto ou Markdown. Cada anexo passa por limite de tamanho e scan de malware antes de ser aceito.
+4. Selecione **Send**. O HandStack persiste a mensagem do usuário antes de iniciar o modelo e renderiza como Markdown os eventos confirmados do stream.
+5. Use **Stop** para cancelar uma resposta ativa. Uma interrupção de rede reconecta a partir do último cursor confirmado e ignora eventos duplicados.
+6. Use **Edit** em mensagem do usuário, ou **Regenerate** e **Retry** em mensagens elegíveis do assistente. Essas ações criam um branch substituto e preservam o histórico original; regenerate e retry executam imediatamente o modelo governado selecionado e transmitem a resposta substituta.
+7. Arquive conversas inativas, restaure-as quando necessário ou exclua-as após confirmação. A exclusão remove mensagens e attachments e preserva somente evidência de auditoria sem conteúdo.
+
+## Verify
+
+Confirme que a conversa permanece na barra lateral, o modelo selecionado está publicado, o texto aparece incrementalmente e recarregar limpa o token. Interrompa e restaure a rede durante uma resposta e confirme que deltas já renderizados não são duplicados.
+
+## Troubleshooting
+
+- Se não houver modelos, nenhum modelo está publicado nessa organização ou o provider está indisponível.
+- Uma resposta `403` indica divergência entre a organização do token e da rota ou ausência de `chat.use`.
+- Rejeição de anexo indica combinação MIME/extensão não suportada, limite de tamanho, nome inseguro ou malware.
+- Falha redigida do provider é intencional; solicite ao operador a telemetria privada pelo trace ID.
+
+## Security, budget, and audit implications
+
+O access token nunca entra em URLs nem no armazenamento do navegador. Anexos e leituras são vinculados à organização e ao participante. O uso do modelo registra tokens, custo normalizado em USD, latência e trace; o enforcement futuro de budget usará o mesmo registro durável.
+
+## Rollback
+
+Cancele a resposta ativa e retorne ao branch anterior. Exclua um anexo para remover seus bytes mantendo um tombstone de metadados para integridade histórica.
+
+## Related articles
+
+- [Registrar e avaliar modelos](/help/getting-started/model-registry)
+- [Autenticação e sessões](/help/getting-started/authentication-sessions)

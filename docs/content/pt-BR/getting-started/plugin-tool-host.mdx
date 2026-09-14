@@ -1,0 +1,39 @@
+---
+id: getting-started/plugin-tool-host
+title: Conectar tools de plugins ao host
+description: Encaminhe registros tipados de tools pelo ciclo de vida governado do PluginHost.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, tools, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.52.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, tools, host]
+---
+
+# Conectar tools de plugins ao host
+
+## Prerequisites
+
+- Uma definição de plugin com handler de tool tipado.
+- Um callback do host que aplique política e registre o handler no limite de execução de capabilities.
+
+## Steps
+
+1. Passe `registerTool` ao `PluginHost`.
+2. Registre a tool no `setup` por `context.tools.register`.
+3. Aplique autorização, rate limits, budgets, guardrails, auditoria e telemetria antes do handler.
+
+## Expected results
+
+Tools são publicadas somente durante o setup de plugin habilitado e atravessam o mesmo limite de lifecycle e isolamento das demais capabilities.
+
+## Verify
+
+Execute os testes do Plugin SDK e confirme que o callback recebe cada tool uma vez quando o plugin é habilitado.
+
+## Troubleshooting
+
+- Sem callback, o plugin não foi habilitado ou o runner isolado está indisponível.
+- O callback não deve invocar o handler diretamente sem o limite comum de execução de capabilities.

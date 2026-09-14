@@ -1,0 +1,51 @@
+---
+id: getting-started/plugin-sandbox
+title: Execute código não confiável no sandbox seguro
+description: Execute plugins da comunidade, código gerado e ferramentas stdio pela fronteira SandboxProvider com limites de recursos, rede deny-by-default e secret handles.
+audience: [platform-operator, security-admin, plugin-developer]
+permissions: [sandbox.execute]
+features: [sandbox, security, plugins]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.34.0
+lastReviewedAt: 2026-09-10
+owner: security-platform-team
+tags: [sandbox, security, plugins, isolation]
+---
+
+# Execute código não confiável no sandbox seguro
+
+Execução não confiável — plugins da comunidade, código gerado, ferramentas locais e comandos MCP
+stdio — passa por um `SandboxProvider`. Um provider expõe `prepare`, `execute` e `terminate` sobre um
+`SandboxProfile` que limita CPU, memória, processos e tempo de execução, exige root filesystem
+somente leitura com mounts graváveis explícitos, nega tráfego de rede salvo destino na allowlist,
+aplica proteção SSRF, escopa e expira secret handles, limita tamanho de saída e log e registra a
+identidade de tenant e execução.
+
+## Prerequisites
+
+Tenha a permissão `sandbox.execute` e selecione a organização cujos sandbox profiles você gerencia.
+Anexe um provider concreto (`ProcessIsolatedSandboxProvider` para desenvolvimento ou
+`ContainerSandboxProvider` para produção) antes de habilitar execução isolada.
+
+## Steps
+
+1. Construa um `SandboxProfile` com `executionTimeoutMs`, `maxOutputBytes` e `maxLogBytes` positivos.
+2. Configure `network.policy` como `deny-all` ou `allow-listed` e liste apenas os destinos
+   necessários.
+3. Provisione secret handles vinculados à organização do profile com expiração explícita.
+4. Chame `provider.prepare(profile)` para obter um `SandboxHandle`.
+5. Chame `provider.execute(handle, request)` com o comando ou imagem e os secret scopes e alvos de
+   rede solicitados; depois `provider.terminate(handle)` ao concluir.
+
+## Verify
+
+Execução com alvos permitidos e secrets provisionados tem sucesso; um alvo fora da allowlist, um
+destino privado ou de metadata, um secret scope não provisionado ou expirado, ou execução após
+término falha fechada com `SandboxError`. A saída é truncada aos limites configurados e sinalizada.
+
+## Troubleshooting
+
+Um resultado `sandbox_denied` significa que a requisição viola a allowlist, o secret scope, a
+expiração ou o ciclo de vida do profile; revise profile e requisição juntos. Um resultado
+`sandbox_unavailable` significa que nenhum executor concreto está anexado; configure um provider de
+processo ou container e nunca caia em execução in-process para código não confiável.

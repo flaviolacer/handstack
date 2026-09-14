@@ -1,0 +1,39 @@
+---
+id: getting-started/plugin-ui-authorization
+title: Resolver extensões UI de plugins autorizadas
+description: Filtre extensões UI pelo limite de permissão e capability atual antes de renderizá-las.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, ui, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.50.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, ui, authorization]
+---
+
+# Resolver extensões UI de plugins autorizadas
+
+## Prerequisites
+
+- Um `PluginUiRegistry` com descritores de extensão validados.
+- A lista de permissões efetivas do principal obtida pelo limite normal de autorização.
+
+## Steps
+
+1. Passe a lista efetiva de permissões a `listAuthorized`.
+2. Opcionalmente passe a capability exigida pela superfície atual do host.
+3. Renderize ou invoque somente os descritores retornados e valide autorização novamente no limite da ação.
+
+## Expected results
+
+Extensões sem a permissão declarada não são retornadas. O filtro de capability reduz o resultado sem conceder novas permissões.
+
+## Verify
+
+Execute os testes do Plugin SDK com administrador e principal sem a permissão; somente a extensão autorizada deve aparecer.
+
+## Troubleshooting
+
+- Resultado vazio indica que nenhuma extensão atende à permissão e capability opcional.
+- Este resolver não concede autorização; o limite do servidor/ação ainda deve aplicar a política.

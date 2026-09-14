@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "product": "handstack",
+  "securityPolicy": {
+    "defaultDecision": "deny",
+    "tenantScopeField": "organizationId",
+    "secretStorage": "external-secret-provider",
+    "forbiddenArtifactFields": ["password", "tokenValue", "privateKey", "clientSecretValue"],
+    "requiredRedactions": [
+      "authorization",
+      "cookie",
+      "set-cookie",
+      "x-api-key",
+      "signature",
+      "secret"
+    ]
+  },
+  "integrations": [
+    {
+      "id": "tenant-webhooks",
+      "kind": "webhook",
+      "boundaryPackage": "@handstack/webhooks",
+      "implementation": "apps/api/src/webhooks/webhook-runtime.service.ts",
+      "controller": "apps/api/src/webhooks/webhook.controller.ts",
+      "authentication": "hmac-sha256",
+      "secretStorage": "SecretProvider",
+      "timeoutMs": 10000,
+      "maxAttempts": 3,
+      "deadLetter": true,
+      "idempotency": "delivery-id",
+      "tenantScoped": true,
+      "transport": "replaceable"
+    },
+    {
+      "id": "incident-notifications",
+      "kind": "notification",
+      "boundaryPackage": "@handstack/notifications",
+      "implementation": "apps/api/src/notifications/notification-runtime.service.ts",
+      "controller": "apps/api/src/notifications/notification.controller.ts",
+      "channels": ["in-memory", "webhook", "pagerduty", "statuspage"],
+      "secretStorage": "external-secret-provider",
+      "timeoutMs": 10000,
+      "maxAttempts": 3,
+      "deadLetter": true,
+      "idempotency": "event-id",
+      "tenantScoped": true,
+      "transport": "replaceable"
+    },
+    {
+      "id": "oidc-identity",
+      "kind": "identity-provider",
+      "boundaryPackage": "@handstack/plugin-oidc",
+      "implementation": "packages/plugin-oidc/src/index.ts",
+      "controller": "apps/api/src/auth/oidc.controller.ts",
+      "authentication": "oidc-state-nonce-pkce",
+      "secretStorage": "SecretProvider",
+      "timeoutMs": 10000,
+      "maxAttempts": 1,
+      "deadLetter": false,
+      "idempotency": "state-nonce",
+      "tenantScoped": true,
+      "transport": "replaceable"
+    }
+  ]
+}

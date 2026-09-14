@@ -1,0 +1,62 @@
+---
+id: user/help-center
+title: Usar o Help Center
+description: Encontre orientações versionadas e offline dentro do HandStack.
+audience:
+  - end-user
+  - organization-admin
+permissions: []
+features:
+  - help-center
+deploymentProfiles:
+  - compact
+  - distributed
+introducedIn: 0.1.0
+lastReviewedAt: 2026-08-31
+owner: docs-team
+tags:
+  - help
+  - documentation
+---
+
+# Usar o Help Center
+
+O Help Center interno renderiza a mesma fonte canônica do portal público e permanece disponível em instalações self-hosted sem acesso à internet.
+
+## Purpose and expected outcome
+
+Use o Help Center para localizar orientação adequada ao seu idioma e tarefa sem sair da instalação atual do HandStack.
+
+## Prerequisites
+
+- Acesso à aplicação Web do HandStack.
+- Nenhuma permissão especial é necessária para artigos públicos de fundação.
+
+## Steps
+
+1. Abra **Help Center** na navegação da aplicação. Espere que o catálogo documental apareça.
+2. Escolha seu idioma. Espere que IDs e posições de navegação permaneçam estáveis.
+3. Selecione um artigo. Espere visualizar título, procedimento, verificação e troubleshooting.
+4. Use o link de ajuda contextual em uma página compatível. Espere que o artigo correspondente abra sem perder o estado da aplicação.
+
+## Verify
+
+Desconecte o navegador da internet pública e recarregue uma aplicação self-hosted já instalada. Os artigos empacotados devem continuar legíveis.
+
+## Troubleshooting
+
+- Se um artigo estiver ausente, confirme se a feature e a versão do produto correspondem ao metadata do artigo.
+- Se um link contextual estiver quebrado, informe o ID estável do artigo e a página onde o link apareceu.
+- Se aparecer o idioma incorreto, altere o seletor de locale e tente novamente.
+
+## Security, budget, and audit implications
+
+Ler documentação empacotada não consome budget de modelo. Navegação sensível ao papel não deve revelar conteúdo operacional restrito. Telemetria documental é opt-in e não pode incluir prompts, secrets ou texto sensível digitado.
+
+## Rollback
+
+Trocar o idioma ou navegar por artigos não altera dados de negócio. Feche o painel do Help Center para retornar ao estado anterior da aplicação.
+
+## Related articles
+
+- [Visão geral do HandStack](/help/getting-started/overview)

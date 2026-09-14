@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "deploymentProfile": { "const": "distributed" },
+    "database": {
+      "type": "object",
+      "properties": {
+        "adapter": { "enum": ["postgresql", "mysql", "mariadb", "mssql", "mongodb"] },
+        "url": { "type": "string" }
+      },
+      "required": ["adapter", "url"]
+    },
+    "objectStorage": {
+      "type": "object",
+      "properties": {
+        "endpoint": { "type": "string" },
+        "bucket": { "type": "string", "minLength": 1 }
+      },
+      "required": ["endpoint", "bucket"]
+    },
+    "queue": {
+      "type": "object",
+      "properties": {
+        "redisUrl": { "type": "string" },
+        "topology": { "enum": ["sentinel", "cluster", "managed"] }
+      },
+      "required": ["redisUrl", "topology"]
+    },
+    "externalSecrets": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "createSecret": { "type": "boolean" },
+        "secretName": { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled", "createSecret", "secretName"]
+    }
+  },
+  "required": ["deploymentProfile", "database", "objectStorage", "queue", "externalSecrets"]
+}

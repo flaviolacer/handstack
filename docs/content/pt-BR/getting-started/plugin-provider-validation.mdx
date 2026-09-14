@@ -1,0 +1,39 @@
+---
+id: getting-started/plugin-provider-validation
+title: Validar metadados de provider antes do registro
+description: Rejeite descritores inválidos antes que alcancem um registry de domínio ou limite de execução.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, providers, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.56.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, providers, validation]
+---
+
+# Validar metadados de provider antes do registro
+
+## Prerequisites
+
+- Um host de plugins com callback de registro de provider.
+- Um descritor com ID minúsculo estável, nome, capability e schema de configuração não vazio.
+
+## Steps
+
+1. Registre o provider no setup do plugin.
+2. Faça o host chamar `validateProviderRegistration` antes de encaminhar o descritor.
+3. Resolva o descritor no registry de domínio correto somente após validação e política.
+
+## Expected results
+
+IDs, nomes/capabilities vazios ou schemas vazios falham antes do callback e não criam efeito de registro.
+
+## Verify
+
+Execute os testes do Plugin SDK e confirme que metadados inválidos falham fechados.
+
+## Troubleshooting
+
+- `Provider id is invalid` indica identificador instável ou não minúsculo.
+- `Provider configuration schema is required` indica que o provider não pode ser configurado com segurança.

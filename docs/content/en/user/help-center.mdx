@@ -1,0 +1,62 @@
+---
+id: user/help-center
+title: Use the Help Center
+description: Find versioned, offline-capable guidance inside HandStack.
+audience:
+  - end-user
+  - organization-admin
+permissions: []
+features:
+  - help-center
+deploymentProfiles:
+  - compact
+  - distributed
+introducedIn: 0.1.0
+lastReviewedAt: 2026-08-31
+owner: docs-team
+tags:
+  - help
+  - documentation
+---
+
+# Use the Help Center
+
+The in-product Help Center renders the same canonical content as the public documentation portal and remains available in self-hosted installations without internet access.
+
+## Purpose and expected outcome
+
+Use the Help Center to locate guidance appropriate to your language and task without leaving your current HandStack installation.
+
+## Prerequisites
+
+- Access to the HandStack Web application.
+- No special permission is required for public foundation articles.
+
+## Steps
+
+1. Open **Help Center** in the application navigation. Expect the documentation catalog to appear.
+2. Choose your language. Expect article IDs and navigation positions to remain stable.
+3. Select an article. Expect its title, procedure, verification, and troubleshooting sections to appear.
+4. Use the contextual help link on a supported page. Expect the matching article to open without losing application state.
+
+## Verify
+
+Disconnect the browser from the public internet and reload an already installed self-hosted application. Packaged Help Center articles must remain readable.
+
+## Troubleshooting
+
+- If an article is missing, confirm that the feature and product version match the article metadata.
+- If a contextual link is broken, report the stable article ID and page where the link appeared.
+- If the wrong language appears, change the locale selector and retry.
+
+## Security, budget, and audit implications
+
+Reading packaged documentation consumes no model budget. Role-aware navigation must not reveal restricted operational content. Documentation telemetry is opt-in and must not include prompts, secrets, or user-entered sensitive text.
+
+## Rollback
+
+Changing language or navigating articles does not mutate business data. Close the Help Center panel to return to the previous application state.
+
+## Related articles
+
+- [HandStack overview](/help/getting-started/overview)

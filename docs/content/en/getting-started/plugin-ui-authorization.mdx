@@ -1,0 +1,39 @@
+---
+id: getting-started/plugin-ui-authorization
+title: Resolve authorized plugin UI extensions
+description: Filter plugin UI extensions by the current permission and capability boundary before rendering them.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, ui, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.50.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, ui, authorization]
+---
+
+# Resolve authorized plugin UI extensions
+
+## Prerequisites
+
+- A `PluginUiRegistry` containing validated extension descriptors.
+- The current principal's effective permissions from the normal authorization boundary.
+
+## Steps
+
+1. Pass the effective permission list to `listAuthorized`.
+2. Optionally pass the required capability for the current host surface.
+3. Render or invoke only the returned descriptors and re-check authorization at the action boundary.
+
+## Expected results
+
+Extensions whose declared permission is absent are not returned. A capability filter narrows the result without granting any additional permission.
+
+## Verify
+
+Run the Plugin SDK contract tests with an administrator and a principal lacking the declared permission; only the authorized extension should be visible.
+
+## Troubleshooting
+
+- An empty result means no extension matches both the permission and optional capability.
+- This resolver is not an authorization grant; the server/action boundary must still enforce policy.

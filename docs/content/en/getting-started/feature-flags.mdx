@@ -1,0 +1,40 @@
+---
+id: getting-started/feature-flags
+title: Operate tenant-aware feature flags
+description: Resolve global, organization and user feature flag overrides safely.
+audience: [developer, platform-operator]
+permissions: [feature-flags.manage, feature-flags.read]
+features: [feature-flags, configuration]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.16.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [feature-flags, rollout, tenants]
+---
+
+# Operate tenant-aware feature flags
+
+Feature flags are resolved from the broadest default to the most specific override: global,
+organization and then user. An explicit `false` is an override, not a missing value.
+
+## Prerequisites
+
+- Register the flag service in the API and load values from the configured persistence adapter.
+- Require an authenticated organization context for organization and user evaluations.
+
+## Steps
+
+1. Define a global default for the flag key.
+2. Add organization overrides for staged rollouts.
+3. Add user overrides only with both organization and user identity.
+4. Evaluate with the authenticated tenant context on every request.
+
+## Verify
+
+Test precedence, explicit false values and cross-organization user-id reuse. Unknown keys must be
+disabled by default, and global records must not contain tenant identifiers.
+
+## Troubleshooting
+
+- A user override without an organization is rejected to prevent ID collisions across tenants.
+- Remove stale overrides when a rollout ends; do not encode flags in client-provided headers.

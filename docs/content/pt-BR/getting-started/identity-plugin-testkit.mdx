@@ -1,0 +1,39 @@
+---
+id: getting-started/identity-plugin-testkit
+title: Validar plugins de identidade com o kit de contratos
+description: Execute contratos estáveis e focados em segurança antes de habilitar um plugin de identidade.
+audience: [platform-operator, developer]
+permissions: [identity.manage]
+features: [identity, plugins, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.45.0
+lastReviewedAt: 2026-09-11
+owner: identity-team
+tags: [identity, plugins, testing]
+---
+
+# Validar plugins de identidade com o kit de contratos
+
+## Prerequisites
+
+- Um manifesto do plugin com `apiVersion`, permissões, schema de configuração e capabilities.
+- Um dublê de teste para sistemas externos; os testes não devem exigir um IdP ou diretório real.
+
+## Steps
+
+1. Crie um probe que implemente os contratos de segurança de `@handstack/plugin-testkit`.
+2. Chame `verifyIdentityPluginContract` com manifesto e probe.
+3. Adicione probes específicos de OIDC callback/state/nonce/PKCE, SAML, LDAP, SCIM, provisionamento, mapeamento e revogação conforme aplicável.
+
+## Expected results
+
+O relatório inclui manifesto, isolamento de tenant, timeout, fail-closed, vazamento de segredo e checks de protocolo opcionais. Uma falha lança `PluginContractError` e impede a ativação do plugin.
+
+## Verify
+
+Execute typecheck, lint e testes de contrato focais do plugin. Repita para cada adapter de runtime; conformance offline não certifica um provedor externo.
+
+## Troubleshooting
+
+- `manifest` ou `apiVersion` indica contrato inválido.
+- `tenantIsolation`, `failClosed` ou `secretLeakage` exigem correção de segurança antes da publicação.

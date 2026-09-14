@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "release": "0.0.0",
+  "previousStableMinors": 2,
+  "status": "offline-validated",
+  "databaseWindows": [
+    {
+      "from": "0.0.0-2",
+      "to": "0.0.0",
+      "status": "offline-validated",
+      "evidence": "helm:release:validate; migration contracts"
+    },
+    {
+      "from": "0.0.0-1",
+      "to": "0.0.0",
+      "status": "offline-validated",
+      "evidence": "portable schema and adapter contract gates"
+    }
+  ],
+  "eventWindows": [
+    {
+      "from": "0.0.0-2",
+      "to": "0.0.0",
+      "status": "offline-validated",
+      "evidence": "event envelope compatibility tests"
+    },
+    {
+      "from": "0.0.0-1",
+      "to": "0.0.0",
+      "status": "offline-validated",
+      "evidence": "event envelope compatibility tests"
+    }
+  ],
+  "limitations": "Offline contract evidence does not certify a live rolling upgrade across every supported database or cluster topology."
+}

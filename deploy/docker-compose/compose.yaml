@@ -1,0 +1,97 @@
+name: handstack
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: docker/api.Dockerfile
+    environment:
+      HANDSTACK_API_PORT: '3001'
+      HANDSTACK_DATABASE_ADAPTER: ${HANDSTACK_DATABASE_ADAPTER:-sqlite}
+      HANDSTACK_DATABASE_URL: ${HANDSTACK_DATABASE_URL:-file:/data/handstack.db}
+      HANDSTACK_TELEMETRY_ENABLED: 'false'
+    ports:
+      - '3001:3001'
+    volumes:
+      - handstack-data:/data
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/health/ready').then(r=>{if(!r.ok)process.exit(1)})",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  web:
+    build:
+      context: ../..
+      dockerfile: docker/web.Dockerfile
+    environment:
+      HANDSTACK_API_URL: http://api:3001
+    ports:
+      - '3000:3000'
+    depends_on:
+      api:
+        condition: service_healthy
+
+  docs:
+    profiles: [docs]
+    build:
+      context: ../..
+      dockerfile: docker/docs.Dockerfile
+    ports:
+      - '3002:3002'
+
+  postgres:
+    profiles: [postgres]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: handstack
+      POSTGRES_USER: handstack
+      POSTGRES_PASSWORD: handstack-dev-only
+    ports:
+      - '5432:5432'
+    volumes:
+      - handstack-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U handstack -d handstack']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo:
+    profiles: [mongodb]
+    image: mongo:7
+    ports:
+      - '27017:27017'
+    volumes:
+      - handstack-mongo:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', 'db.runCommand({ ping: 1 }).ok']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    profiles: [distributed]
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    volumes:
+      - handstack-redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  handstack-data:
+  handstack-postgres:
+  handstack-mongo:
+  handstack-redis:

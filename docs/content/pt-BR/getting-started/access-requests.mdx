@@ -1,0 +1,39 @@
+---
+id: getting-started/access-requests
+title: Governar acesso temporário
+description: Solicite, aprove e revogue grants temporários isolados por tenant.
+audience: [developer, platform-operator]
+permissions: [access.request, access.approve]
+features: [governance, notifications]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.27.0
+lastReviewedAt: 2026-09-09
+owner: security-team
+tags: [access, governance, notifications]
+---
+
+# Governar acesso temporário
+
+Envie um pedido com recurso, motivo, duração e referência opcional de ticket. Um aprovador autorizado
+cria um grant de `1h`, `4h`, `24h`, `7d` ou `permanent`; toda operação é isolada por organização e
+emite evento de notificação in-app.
+
+## Prerequisites
+
+- Principal do tenant e aprovador com permissões explícitas de acesso.
+
+## Steps
+
+1. Envie o pedido e inclua a referência do incidente ou ticket.
+2. Aprove somente a duração e o recurso mínimos necessários.
+3. Revogue o grant quando o trabalho terminar.
+
+## Verify
+
+Confirme que outra organização não consegue resolver o pedido ou grant ativo e que revogar remove o
+acesso imediatamente.
+
+## Troubleshooting
+
+- Pedido ausente para id de outro tenant é comportamento intencional.
+- Grants expirados saem do acesso ativo sem apagar evidências.

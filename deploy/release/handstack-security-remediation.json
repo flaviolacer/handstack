@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "release": "0.0.0",
+  "severitySla": [
+    {
+      "severity": "critical",
+      "remediateWithinDays": 7,
+      "affectedVersionsPolicy": "publish advisory and identify all supported versions"
+    },
+    {
+      "severity": "high",
+      "remediateWithinDays": 30,
+      "affectedVersionsPolicy": "publish advisory and identify all supported versions"
+    },
+    {
+      "severity": "medium",
+      "remediateWithinDays": 90,
+      "affectedVersionsPolicy": "record affected and fixed versions"
+    },
+    {
+      "severity": "low",
+      "remediateWithinDays": 180,
+      "affectedVersionsPolicy": "record affected and fixed versions"
+    }
+  ],
+  "disclosureProcess": "security intake, triage, coordinated disclosure, advisory, and post-release review",
+  "penetrationTesting": "annual and pre-major-release threat-model and penetration-test review; evidence is pipeline/external-provider supplied"
+}

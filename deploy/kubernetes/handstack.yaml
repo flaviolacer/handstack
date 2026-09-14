@@ -1,0 +1,414 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: handstack
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: handstack-config
+  namespace: handstack
+data:
+  HANDSTACK_DEPLOYMENT_PROFILE: distributed
+  HANDSTACK_API_PORT: '3001'
+  HANDSTACK_DATABASE_ADAPTER: postgresql
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: handstack-api
+  namespace: handstack
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: handstack-api } }
+  template:
+    metadata: { labels: { app: handstack-api } }
+    spec:
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app: handstack-api } }
+      containers:
+        - name: api
+          image: ghcr.io/handstack/api:latest
+          ports: [{ containerPort: 3001 }]
+          envFrom: [{ configMapRef: { name: handstack-config } }]
+          readinessProbe: { httpGet: { path: /health/ready, port: 3001 }, periodSeconds: 10 }
+          livenessProbe: { httpGet: { path: /health/live, port: 3001 }, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: '1', memory: 1Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: handstack-api, namespace: handstack }
+spec:
+  selector: { app: handstack-api }
+  ports: [{ port: 3001, targetPort: 3001 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: handstack-web
+  namespace: handstack
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: handstack-web } }
+  template:
+    metadata: { labels: { app: handstack-web } }
+    spec:
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app: handstack-web } }
+      containers:
+        - name: web
+          image: ghcr.io/handstack/web:latest
+          ports: [{ containerPort: 3000 }]
+          env: [{ name: HANDSTACK_API_URL, value: http://handstack-api:3001 }]
+          readinessProbe: { httpGet: { path: /, port: 3000 }, periodSeconds: 10 }
+          livenessProbe: { httpGet: { path: /, port: 3000 }, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: handstack-mcp
+  namespace: handstack
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: handstack-mcp } }
+  template:
+    metadata: { labels: { app: handstack-mcp } }
+    spec:
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app: handstack-mcp } }
+      containers:
+        - name: mcp
+          image: ghcr.io/handstack/api:latest
+          args: ['mcp-server']
+          ports: [{ containerPort: 3001 }]
+          envFrom: [{ configMapRef: { name: handstack-config } }]
+          readinessProbe: { httpGet: { path: /health/ready, port: 3001 }, periodSeconds: 10 }
+          livenessProbe: { httpGet: { path: /health/live, port: 3001 }, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: '1', memory: 1Gi } }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: handstack-api, namespace: handstack }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: handstack-api }
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    [
+      {
+        type: Resource,
+        resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } },
+      },
+    ]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: handstack-web, namespace: handstack }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: handstack-web }
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    [
+      {
+        type: Resource,
+        resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } },
+      },
+    ]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: handstack-mcp, namespace: handstack }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: handstack-mcp }
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    [
+      {
+        type: Resource,
+        resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } },
+      },
+    ]
+---
+# Worker Deployments use the same contract and are independently scalable.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: worker-agents, namespace: handstack }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: worker-agents } }
+  template:
+    metadata: { labels: { app: worker-agents } }
+    spec:
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+        [
+          {
+            maxSkew: 1,
+            topologyKey: topology.kubernetes.io/zone,
+            whenUnsatisfiable: ScheduleAnyway,
+            labelSelector: { matchLabels: { app: worker-agents } },
+          },
+        ]
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:latest
+          args: ['agents']
+          readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
+          livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }
+---
+# KEDA ScaledObjects are enabled in the distributed profile when KEDA is installed.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: worker-agents, namespace: handstack }
+spec:
+  scaleTargetRef: { name: worker-agents }
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  triggers:
+    [{ type: redis, metadata: { addressFromEnv: REDIS_URL, listName: agents, listLength: '20' } }]
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: worker-knowledge, namespace: handstack }
+spec:
+  scaleTargetRef: { name: worker-knowledge }
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  triggers:
+    [
+      {
+        type: redis,
+        metadata: { addressFromEnv: REDIS_URL, listName: embeddings, listLength: '20' },
+      },
+    ]
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: worker-integrations, namespace: handstack }
+spec:
+  scaleTargetRef: { name: worker-integrations }
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  triggers:
+    [{ type: redis, metadata: { addressFromEnv: REDIS_URL, listName: plugins, listLength: '20' } }]
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: worker-webhooks, namespace: handstack }
+spec:
+  scaleTargetRef: { name: worker-webhooks }
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  triggers:
+    [{ type: redis, metadata: { addressFromEnv: REDIS_URL, listName: webhooks, listLength: '20' } }]
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: worker-audit-billing, namespace: handstack }
+spec:
+  scaleTargetRef: { name: worker-audit-billing }
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  triggers:
+    [{ type: redis, metadata: { addressFromEnv: REDIS_URL, listName: audit, listLength: '20' } }]
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: worker-maintenance, namespace: handstack }
+spec:
+  scaleTargetRef: { name: worker-maintenance }
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  triggers:
+    [{ type: redis, metadata: { addressFromEnv: REDIS_URL, listName: cleanup, listLength: '20' } }]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: handstack-api, namespace: handstack }
+spec: { minAvailable: 1, selector: { matchLabels: { app: handstack-api } } }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: handstack-web, namespace: handstack }
+spec: { minAvailable: 1, selector: { matchLabels: { app: handstack-web } } }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: handstack-mcp, namespace: handstack }
+spec: { minAvailable: 1, selector: { matchLabels: { app: handstack-mcp } } }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: handstack-default-deny, namespace: handstack }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: handstack-api-ingress, namespace: handstack }
+spec:
+  podSelector: { matchLabels: { app: handstack-api } }
+  policyTypes: [Ingress]
+  ingress:
+    [
+      {
+        from:
+          [
+            { podSelector: { matchLabels: { app: handstack-web } } },
+            { podSelector: { matchLabels: { app: handstack-mcp } } },
+          ],
+        ports: [{ protocol: TCP, port: 3001 }],
+      },
+    ]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: worker-knowledge, namespace: handstack }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: worker-knowledge } }
+  template:
+    metadata: { labels: { app: worker-knowledge } }
+    spec:
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+        [
+          {
+            maxSkew: 1,
+            topologyKey: topology.kubernetes.io/zone,
+            whenUnsatisfiable: ScheduleAnyway,
+            labelSelector: { matchLabels: { app: worker-knowledge } },
+          },
+        ]
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:latest
+          args: ['knowledge']
+          readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
+          livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: worker-integrations, namespace: handstack }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: worker-integrations } }
+  template:
+    metadata: { labels: { app: worker-integrations } }
+    spec:
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+        [
+          {
+            maxSkew: 1,
+            topologyKey: topology.kubernetes.io/zone,
+            whenUnsatisfiable: ScheduleAnyway,
+            labelSelector: { matchLabels: { app: worker-integrations } },
+          },
+        ]
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:latest
+          args: ['integrations']
+          readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
+          livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: worker-webhooks, namespace: handstack }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: worker-webhooks } }
+  template:
+    metadata: { labels: { app: worker-webhooks } }
+    spec:
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+        [
+          {
+            maxSkew: 1,
+            topologyKey: topology.kubernetes.io/zone,
+            whenUnsatisfiable: ScheduleAnyway,
+            labelSelector: { matchLabels: { app: worker-webhooks } },
+          },
+        ]
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:latest
+          args: ['webhooks']
+          readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
+          livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: worker-audit-billing, namespace: handstack }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: worker-audit-billing } }
+  template:
+    metadata: { labels: { app: worker-audit-billing } }
+    spec:
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+        [
+          {
+            maxSkew: 1,
+            topologyKey: topology.kubernetes.io/zone,
+            whenUnsatisfiable: ScheduleAnyway,
+            labelSelector: { matchLabels: { app: worker-audit-billing } },
+          },
+        ]
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:latest
+          args: ['audit-billing']
+          readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
+          livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: worker-maintenance, namespace: handstack }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: worker-maintenance } }
+  template:
+    metadata: { labels: { app: worker-maintenance } }
+    spec:
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+        [
+          {
+            maxSkew: 1,
+            topologyKey: topology.kubernetes.io/zone,
+            whenUnsatisfiable: ScheduleAnyway,
+            labelSelector: { matchLabels: { app: worker-maintenance } },
+          },
+        ]
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:latest
+          args: ['maintenance']
+          readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
+          livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }

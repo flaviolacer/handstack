@@ -1,0 +1,39 @@
+---
+id: getting-started/plugin-capability-validation
+title: Validate capability metadata before registration
+description: Fail closed on malformed capability IDs, versions, descriptions or permissions before host registration.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, capabilities, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.55.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, capabilities, validation]
+---
+
+# Validate capability metadata before registration
+
+## Prerequisites
+
+- A plugin host with a capability registration callback.
+- A descriptor with a lowercase stable ID, major.minor version, description and unique permission list.
+
+## Steps
+
+1. Register the capability from plugin setup.
+2. Let the host call `validateCapabilityRegistration` before forwarding the descriptor.
+3. Send only valid descriptors to the capability registry and common execution engine.
+
+## Expected results
+
+Malformed IDs, versions, empty descriptions and empty or duplicate permissions fail before the callback is called.
+
+## Verify
+
+Run the Plugin SDK contract tests and confirm an invalid descriptor produces no host registration side effect.
+
+## Troubleshooting
+
+- `Capability id is invalid` requires a lowercase ID using letters, digits, dots or hyphens.
+- `Capability permissions must be unique and non-empty` requires explicit authorization metadata.

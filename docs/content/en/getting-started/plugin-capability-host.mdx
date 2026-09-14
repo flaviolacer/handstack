@@ -1,0 +1,39 @@
+---
+id: getting-started/plugin-capability-host
+title: Connect capability registration to the host
+description: Forward versioned, permissioned capability descriptors through the governed PluginHost lifecycle.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, capabilities, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.54.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, capabilities, host]
+---
+
+# Connect capability registration to the host
+
+## Prerequisites
+
+- A plugin definition with a versioned capability descriptor.
+- A host callback that validates permissions and connects the capability to the common execution engine.
+
+## Steps
+
+1. Pass a typed `registerCapabilities` implementation to `PluginHost`.
+2. Register a capability ID, version, description and permissions from plugin `setup`.
+3. Apply authentication, authorization, rate limits, budgets, guardrails, audit and telemetry before execution.
+
+## Expected results
+
+Capability metadata reaches the host only during enabled plugin setup and remains separate from arbitrary executable plugin code.
+
+## Verify
+
+Run the Plugin SDK contract tests and confirm the host receives the versioned capability descriptor exactly once.
+
+## Troubleshooting
+
+- A missing callback means the host did not configure capability registration.
+- Registration is discovery, not authorization; the common execution engine remains mandatory.

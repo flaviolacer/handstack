@@ -1,0 +1,50 @@
+---
+id: getting-started/resilience-and-capacity
+title: Validar resiliência e capacidade
+description: Execute verificações offline de resiliência e planeje drills externos de falha.
+audience: [platform-operator, security-admin]
+permissions: [deployment.manage]
+features: [resilience, capacity, disaster-recovery]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.28.0
+lastReviewedAt: 2026-09-10
+owner: platform-team
+tags: [resilience, load, capacity, disaster-recovery]
+---
+
+# Validar resiliência e capacidade
+
+Execute `npm run resilience:validate` antes de um release. O gate offline verifica admissão limitada
+durante picos, chaves de idempotência estáveis e retenção de jobs aceitos na dead-letter queue.
+
+## Prerequisites
+
+- Instale as dependências com Node 22 ou 24 e npm 11.19.0.
+- Para drills externos, provisione as dependências do perfil distribuído e um tenant de teste isolado.
+
+## Steps
+
+1. Execute `npm run resilience:validate` e guarde a saída como evidência do release.
+2. Execute os cenários externos do relatório de capacidade e registre topologia, tráfego e versões.
+3. Interrompa o release se houver perda de jobs aceitos, duplicação de efeitos ou falha de isolamento.
+
+## Drills externos de release
+
+Registre ambiente e resultados de carga, pico, soak, saturação de filas, término de pod durante
+streams, crash de worker, failover de Redis/banco, partição de rede, indisponibilidade de zona,
+restore de backup e failover regional. A recuperação regional deve cumprir RPO de cinco minutos e
+RTO de quinze minutos.
+
+Use `docs/operations/capacity-report-0.1.md` como modelo. Não declare os SLOs sem hardware,
+topologia, dataset e medições de tráfego reproduzíveis.
+
+## Verify
+
+Confirme o gate offline verde, a profundidade da fila limitada e os valores p95/p99 dentro das metas.
+Anexe os logs dos drills externos ao registro do release.
+
+## Troubleshooting
+
+- Falha de backpressure indica que o limite funciona; inspecione os consumidores antes de aumentá-lo.
+- Falha de transporte não deve ser ignorada; restaure Redis/banco e tente novamente.
+- Drill externo falho bloqueia o release até haver evidência de recuperação e isolamento.

@@ -1,0 +1,49 @@
+---
+id: getting-started/pricing
+title: Configurar pricing versionado de modelos
+description: Registre preços tenant-scoped de providers e modelos e estime o custo governado do uso.
+audience: [platform-operator, developer]
+permissions: [models.manage, budget.manage]
+features: [models, budgets, pricing]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.39.0
+lastReviewedAt: 2026-09-11
+owner: ai-platform-team
+tags: [pricing, models, usage]
+---
+
+# Configurar pricing versionado de modelos
+
+## Purpose and expected outcome
+
+Mantenha preços de providers e modelos isolados por organização e reproduza o histórico resolvendo a versão vigente no momento do uso.
+
+## Prerequisites
+
+- Uma organização com providers e definições de modelos registrados.
+- `models.manage` para registrar preços e `budget.manage` para reconciliar uso.
+
+## Steps
+
+1. Registre `ProviderPricing` ou `ModelPricing` com data de início e moeda.
+2. Defina preços de input, output, input em cache, imagem, áudio e request nas unidades documentadas.
+3. Adicione uma nova versão com data efetiva quando o provider mudar o preço; não reescreva históricos.
+4. Resolva o pricing no timestamp do uso e envie a estimativa ao pipeline normal de settlement do budget.
+
+## Verify
+
+Resolva antes e depois de uma mudança de preço e confirme que cada timestamp seleciona a versão correta. Confirme que uma organização não resolve o preço de outra e que uso negativo é rejeitado.
+
+## Troubleshooting
+
+- Ausência de preço efetivo indica que não há registro anterior ou igual ao timestamp.
+- Erro de versão duplicada indica que a mesma organização/recurso/data já existe.
+- Erro de validação indica dimensão de preço ou uso negativa ou não finita.
+
+## Security, budget, and audit implications
+
+Pricing é isolado por organização e não contém credenciais. Estimativas alimentam reserva/settlement de budget; o catálogo não contorna autorização, budget ou auditoria.
+
+## Rollback
+
+Registre uma nova versão com data efetiva. Preserve os registros anteriores para manter a reconciliação histórica reproduzível.

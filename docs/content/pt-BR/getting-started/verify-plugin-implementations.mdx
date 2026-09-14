@@ -1,0 +1,47 @@
+---
+id: getting-started/verify-plugin-implementations
+title: Verificar pacotes built-in de plugins
+description: Verifique se os pacotes core das extensoes oficiais estao disponiveis em runtime.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, security, operations]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.60.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, contracts, runtime]
+---
+
+# Verificar pacotes built-in de plugins
+
+O mapeamento oficial so e util quando os pacotes core estao presentes no deploy ativo.
+Use o resolvedor injetado para verificar disponibilidade sem importar codigo de pacote
+durante operacoes de catalogo ou API.
+
+## Prerequisites
+
+- O mapeamento de implementacoes oficiais foi carregado.
+- Um resolvedor responde se um pacote esta disponivel no runtime.
+- A descoberta nao executa codigo de plugins nao confiaveis.
+
+## Steps
+
+1. Implemente `OfficialPluginImplementationResolver` para o runtime do deploy.
+2. Passe-o para `verifyOfficialBuiltInImplementations`.
+3. Mantenha o resultado como evidencia de conformidade da release.
+4. Bloqueie a ativacao quando faltar qualquer pacote core.
+
+## Expected results
+
+Todas as suites oficiais resolvem com sucesso. Um pacote ausente lanca
+`PluginContractError` com o check `built-in-implementation`.
+
+## Verify
+
+Execute typecheck, build e testes focais do plugin test kit. Exercite um resolvedor em
+que todos os pacotes existem e outro que rejeita um pacote.
+
+## Troubleshooting
+
+Verifique o artefato de deploy e o manifesto de pacotes. Nao faca o resolvedor importar
+ou executar codigo de plugins de terceiros como contorno.

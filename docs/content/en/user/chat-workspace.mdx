@@ -1,0 +1,59 @@
+---
+id: user/chat-workspace
+title: Use the chat workspace
+description: Start a governed multimodal conversation and follow model output safely.
+audience: [end-user]
+permissions: [chat.use]
+features: [chat, models]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.4.0
+lastReviewedAt: 2026-09-08
+owner: ai-platform-team
+tags: [chat, streaming, attachments]
+---
+
+# Use the chat workspace
+
+## Purpose and expected outcome
+
+Create a tenant-isolated conversation, select a published model, attach supported files, and follow a durable streaming response that can reconnect without duplicating content.
+
+## Prerequisites
+
+- An active account with `chat.use` in the organization.
+- At least one evaluated and published model.
+- A supported browser and network access to the HandStack API.
+
+## Steps
+
+1. Open **Chat** and enter the organization ID and short-lived bearer token. The browser keeps both only in memory and clears them on reload.
+2. Select **New chat**, then choose a published model in the top bar.
+3. Enter a message. Optionally attach a PNG, JPEG, WebP, MP3, WAV, PDF, text, or Markdown file. Each attachment is size-checked and malware-scanned before the message is accepted.
+4. Select **Send**. HandStack persists the user message before starting the model and renders committed stream events as Markdown.
+5. Use **Stop** to cancel an active response. A network interruption reconnects with the last committed event cursor and ignores duplicate events.
+6. Use **Edit** on a user message, or **Regenerate** and **Retry** on eligible assistant messages. These actions create a replacement branch and preserve the original history; regenerate and retry immediately execute the selected governed model and stream the replacement response.
+7. Archive inactive conversations, restore them when needed, or delete them after confirmation. Delete removes messages and attachments while retaining content-free audit evidence.
+
+## Verify
+
+Confirm the conversation remains in the sidebar, the selected model is published, streamed text appears incrementally, and reloading clears the token. Disconnect and reconnect the network during a response and confirm already rendered deltas are not duplicated.
+
+## Troubleshooting
+
+- No model choices means no model is published for this organization or the provider is unavailable.
+- A `403` response means the token organization does not match the route or `chat.use` is missing.
+- An attachment rejection indicates an unsupported MIME/extension pair, size limit, unsafe name, or malware finding.
+- A redacted provider failure is intentional; ask an operator to inspect private telemetry using the trace ID.
+
+## Security, budget, and audit implications
+
+The access token never enters URLs or browser storage. Attachments and conversation reads are bound to both organization and participant. Model usage records tokens, normalized USD cost, latency, and trace metadata; future budget enforcement builds on the same durable execution record.
+
+## Rollback
+
+Cancel the active response and return to the prior branch. Delete an uploaded attachment to remove its bytes while retaining a metadata tombstone for historical integrity.
+
+## Related articles
+
+- [Register and evaluate models](/help/getting-started/model-registry)
+- [Authentication and sessions](/help/getting-started/authentication-sessions)

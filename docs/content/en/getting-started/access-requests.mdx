@@ -1,0 +1,39 @@
+---
+id: getting-started/access-requests
+title: Govern temporary access
+description: Request, approve and revoke tenant-scoped temporary grants.
+audience: [developer, platform-operator]
+permissions: [access.request, access.approve]
+features: [governance, notifications]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.27.0
+lastReviewedAt: 2026-09-09
+owner: security-team
+tags: [access, governance, notifications]
+---
+
+# Govern temporary access
+
+Submit an access request with a resource, reason, duration and optional ticket reference. An
+authorized approver creates a grant for `1h`, `4h`, `24h`, `7d` or `permanent`; every operation is
+organization scoped and emits an in-app notification event.
+
+## Prerequisites
+
+- A tenant principal and an approver with explicit access permissions.
+
+## Steps
+
+1. Submit the request and attach the incident or ticket reference.
+2. Approve only the minimum duration and resource required.
+3. Revoke the grant when the work finishes.
+
+## Verify
+
+Confirm another organization cannot resolve the request or active grant and that revocation removes
+it from active access immediately.
+
+## Troubleshooting
+
+- A missing request is returned for a cross-tenant id by design.
+- Expired grants are excluded from active access without deleting evidence.

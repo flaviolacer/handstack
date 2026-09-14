@@ -1,0 +1,12 @@
+apiVersion: v2
+name: handstack
+description: Production-ready distributed deployment for HandStack
+type: application
+version: 0.1.0
+appVersion: '0.1.0'
+keywords:
+  - ai
+  - agents
+  - gateway
+maintainers:
+  - name: HandStack maintainers

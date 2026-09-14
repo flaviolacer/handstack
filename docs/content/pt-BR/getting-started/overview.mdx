@@ -1,0 +1,64 @@
+---
+id: getting-started/overview
+title: Visão geral do HandStack
+description: Entenda a arquitetura do HandStack e verifique a fundação do repositório.
+audience:
+  - platform-operator
+  - developer
+permissions: []
+features:
+  - platform-foundation
+deploymentProfiles:
+  - compact
+  - distributed
+introducedIn: 0.1.0
+lastReviewedAt: 2026-08-31
+owner: core-team
+tags:
+  - getting-started
+  - architecture
+---
+
+# Visão geral do HandStack
+
+HandStack é um workspace open source de IA, runtime de agentes, gateway e plataforma de capabilities. **Capability** é a abstração central. Web, REST API, MCP e Agents usam o mesmo engine governado de execução.
+
+## Purpose and expected outcome
+
+Use este procedimento para instalar dependências e verificar a fundação do repositório. Ao final, todos os gates disponíveis do workspace devem passar.
+
+## Prerequisites
+
+- Node.js 22 ou 24 LTS.
+- npm 11.19.0.
+- Um checkout local do HandStack. Nenhuma credencial da aplicação é necessária.
+
+## Steps
+
+1. Na raiz do repositório, execute `npm ci`. Espere que o npm resolva todos os workspaces sem erros de peer dependency.
+2. Execute `npm run lint`. Espere sucesso no lint de cada package.
+3. Execute `npm run typecheck`. Espere que a verificação TypeScript estrita termine sem diagnósticos.
+4. Execute `npm test`. Espere que todos os testes unitários e de contrato documental passem.
+5. Execute `npm run build`. Espere artefatos implantáveis nos diretórios de saída das aplicações e packages.
+
+## Verify
+
+Inicie a API e consulte `/health/live`. Uma resposta bem-sucedida contém `status: "ok"`. `/health/ready` também informa checks das dependências configuradas.
+
+## Troubleshooting
+
+- Se o Node informar engine incompatível, instale Node.js 22 ou 24 LTS e reinstale as dependências.
+- Se um workspace não resolver, não remova arquivos manualmente; execute `npm ci` novamente e analise o primeiro erro.
+- Se readiness indicar dependência indisponível, valide a configuração dessa dependência antes de enviar tráfego.
+
+## Security, budget, and audit implications
+
+Telemetria é opt-in e permanece desabilitada por padrão. A verificação da fundação não chama LLM, não consome budget de modelo e não requer secrets. Endpoints de health nunca devem expor credenciais ou connection strings.
+
+## Rollback
+
+Esta verificação é somente leitura, exceto por dependências e outputs gerados. Remova apenas `node_modules`, `dist`, `.next` e `.turbo` gerados se precisar de um rebuild limpo.
+
+## Related articles
+
+- [Usar o Help Center](/help/user/help-center)

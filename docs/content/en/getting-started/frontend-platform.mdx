@@ -1,0 +1,47 @@
+---
+id: getting-started/frontend-platform
+title: Validate the frontend platform contract
+description: Verify responsive, accessible and offline-capable HandStack workspace behavior.
+audience: [platform-operator, workspace-admin]
+permissions: [workspace.read]
+features: [frontend, help-center, accessibility]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.0.0
+lastReviewedAt: 2026-09-10
+owner: frontend-platform
+tags: [frontend, accessibility, offline, browsers]
+---
+
+# Validate the frontend platform contract
+
+The Web application targets the latest two stable Chrome, Edge, Firefox and Safari versions,
+supports a 360px viewport, keyboard and screen-reader operation, and WCAG 2.2 AA practices.
+
+## Verification
+
+1. Run `npm run frontend:validate` to verify the offline Help Center service worker, responsive CSS,
+   browser projects, keyboard path, axe scan and visual regression contract.
+2. Run `npm --workspace @handstack/web run test` for route and component tests.
+3. Run `npm --workspace @handstack/web run test:e2e` with the supported Playwright browsers installed.
+4. Disconnect the network after opening `/help` and confirm cached articles remain readable.
+
+The service worker is limited to `/help`; chat and administrative actions never claim success
+without a server response. Keep secrets out of browser storage and respect reduced-motion settings.
+
+## Prerequisites
+
+Install the workspace dependencies and install the Playwright browsers required by the local E2E suite.
+
+## Steps
+
+Run the contract gate, then run the Web unit/component tests and the Playwright E2E suite.
+
+## Verify
+
+The contract gate passes, the axe scan has no violations, the 360px snapshots are stable, and
+cached Help Center pages remain readable after a network disconnect.
+
+## Troubleshooting
+
+If E2E browsers are unavailable, run the offline contract and unit tests first, then install the
+missing Playwright browser. A failing axe or snapshot check must be fixed before release.

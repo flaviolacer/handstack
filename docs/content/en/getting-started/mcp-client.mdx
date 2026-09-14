@@ -1,0 +1,45 @@
+---
+id: getting-started/mcp-client
+title: Connect governed MCP tools
+description: Discover and expose external MCP tools through tenant-scoped capabilities.
+audience: [developer, platform-operator]
+permissions: [mcp.use, capability.execute]
+features: [mcp, capabilities, agents]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.8.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [mcp, tools, agents]
+---
+
+# Connect governed MCP tools
+
+Register a tenant-scoped MCP server using Streamable HTTP or stdio. Discovery is explicit and
+only discovered tools can be invoked. The client also discovers resources and prompts. Authentication
+supports none, API key, Bearer/OAuth/OIDC tokens and custom headers; secrets stay in runtime memory
+and are never returned by the registry.
+
+## Prerequisites
+
+- A server owned by the same organization and a restricted MCP credential.
+- `mcp.use` and `capability.execute` granted to the calling principal.
+- A published AgentVersion when tools will be used by an agent.
+
+## Steps
+
+1. Register the server with its transport and authentication policy.
+2. Call `tools/list` through `discover` and review the returned schemas.
+3. Materialize the discovered tools with `registerCapabilities`; they are AGENT-only capabilities.
+4. Include the capability names in the AgentVersion allowlist and run through AgentHarness.
+
+## Verify
+
+Confirm the HTTP Authorization header uses the configured scheme, cross-organization calls fail,
+undiscovered tools are rejected, and an agent tool call emits the normal capability audit and
+budget events.
+
+## Troubleshooting
+
+- `MCP tools must be discovered first` means discovery has not completed for this server.
+- Permission denial means the principal lacks every permission required by the server/tool.
+- HTTP and stdio protocol errors are sanitized; inspect server logs using the request id.

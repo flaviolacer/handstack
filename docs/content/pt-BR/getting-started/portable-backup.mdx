@@ -1,0 +1,44 @@
+---
+id: getting-started/portable-backup
+title: Fazer backup e restaurar o HandStack
+description: Crie backups portáteis assinados e tenant-aware e restaure-os com segurança.
+audience: [platform-operator, security-admin]
+permissions: [database.admin]
+features: [database, backup, portability]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.1.0
+lastReviewedAt: 2026-09-10
+owner: platform-team
+tags: [backup, restore, database, portability]
+---
+
+# Fazer backup e restaurar o HandStack
+
+Use `handstack backup` para criar um backup NDJSON em streaming. O arquivo contém registros
+portáteis assinados e metadados do adapter e do schema; secrets nunca são gravados em texto claro.
+
+## Prerequisites
+
+- Defina `HANDSTACK_DATABASE_ADAPTER`, `HANDSTACK_DATABASE_URL` e
+  `HANDSTACK_PORTABLE_SIGNING_KEY` (com pelo menos 16 caracteres).
+- Proteja o destino e confirme espaço livre suficiente.
+
+## Steps
+
+1. Crie o backup com `handstack backup --output backup.ndjson --export-id backup-2026-09-10`.
+2. Mantenha o arquivo assinado imutável; `handstack restore` verifica todos os frames portáteis
+   antes do commit.
+3. Antes do restore, execute `handstack doctor` no banco de destino e confirme que adapter e schema
+   são compatíveis.
+4. Restaure com `handstack restore --input backup.ndjson --export-id backup-2026-09-10`.
+
+## Verify
+
+Confirme que o restore informa a quantidade esperada de registros, que a organização de destino
+acessa apenas seus próprios registros e que uma repetição retoma ou rejeita o trabalho duplicado
+com segurança.
+
+## Troubleshooting
+
+- Uma incompatibilidade de adapter é intencional: restaure em um banco com o mesmo adapter configurado.
+- Um erro de assinatura ou checksum indica alteração do backup ou signing key incorreta.

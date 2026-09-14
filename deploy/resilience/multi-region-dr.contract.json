@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "writeTopology": "active-standby",
+  "activeRegion": "primary",
+  "standbyRegion": "warm",
+  "globalFailover": "health-based-dns",
+  "rpoMinutes": 5,
+  "rtoMinutes": 15,
+  "fencingRequired": true,
+  "consistencyValidationRequired": true,
+  "smokeBeforeTraffic": true,
+  "failback": { "separateOperation": true, "auditRequired": true },
+  "replication": ["database", "object-storage", "secrets-config"],
+  "statelessServices": ["web", "api", "mcp", "workers"],
+  "externalDependencies": [
+    "database-ha",
+    "redis-ha",
+    "object-storage-replication",
+    "secret-provider"
+  ]
+}

@@ -1,0 +1,39 @@
+---
+id: getting-started/identity-plugin-registration
+title: Registrar um plugin de provedor de identidade
+description: Declare capabilities, configuração e permissões de um provedor de identidade pelo limite tipado do plugin SDK.
+audience: [platform-operator, developer]
+permissions: [plugins.manage, identity.manage]
+features: [plugins, identity, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.47.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, identity, providers]
+---
+
+# Registrar um plugin de provedor de identidade
+
+## Prerequisites
+
+- Um manifesto de plugin aprovado pelo host.
+- Um adapter de protocolo e schema de configuração para o provedor.
+
+## Steps
+
+1. Crie um `IdentityProviderRegistry` no limite do host.
+2. Registre ID estável, nome, capabilities de protocolo, schema de configuração e permissões necessárias.
+3. Resolva o registro antes de aceitar a configuração da organização e aplique as permissões declaradas durante o uso.
+
+## Expected results
+
+O host descobre provedores sem executar código do provedor, enquanto metadados incompletos e IDs duplicados falham fechados.
+
+## Verify
+
+Execute os testes de contrato do plugin SDK e confirme que cada provedor expõe somente capabilities e permissões declaradas.
+
+## Troubleshooting
+
+- `Identity provider permissions are required` indica ausência de limite de autorização.
+- `Identity provider is already registered` indica ID duplicado no host.

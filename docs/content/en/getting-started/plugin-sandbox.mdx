@@ -1,0 +1,51 @@
+---
+id: getting-started/plugin-sandbox
+title: Run untrusted code in the secure sandbox
+description: Execute community plugins, generated code and stdio tools through the SandboxProvider boundary with resource limits, deny-by-default networking and secret handles.
+audience: [platform-operator, security-admin, plugin-developer]
+permissions: [sandbox.execute]
+features: [sandbox, security, plugins]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.34.0
+lastReviewedAt: 2026-09-10
+owner: security-platform-team
+tags: [sandbox, security, plugins, isolation]
+---
+
+# Run untrusted code in the secure sandbox
+
+Untrusted execution — community plugins, generated code, local tools and MCP stdio commands — runs
+through a `SandboxProvider`. A provider exposes `prepare`, `execute` and `terminate` over a
+`SandboxProfile` that caps CPU, memory, processes and execution time, requires a read-only root
+filesystem with explicit writable mounts, denies network traffic unless a destination is in the
+allowlist, enforces SSRF protection, scopes and expires secret handles, bounds output and log size,
+and records tenant and execution identity.
+
+## Prerequisites
+
+Hold the `sandbox.execute` permission and select the organization whose sandbox profiles you manage.
+Attach a concrete provider (`ProcessIsolatedSandboxProvider` for development or
+`ContainerSandboxProvider` for production) before enabling isolated execution.
+
+## Steps
+
+1. Build a `SandboxProfile` with positive `executionTimeoutMs`, `maxOutputBytes` and `maxLogBytes`.
+2. Configure `network.policy` as `deny-all` or `allow-listed` and list only required destinations.
+3. Provision secret handles bound to the profile organization with an explicit expiry.
+4. Call `provider.prepare(profile)` to obtain a `SandboxHandle`.
+5. Call `provider.execute(handle, request)` with the command or image and any requested secret scopes
+   and network targets, then `provider.terminate(handle)` when finished.
+
+## Verify
+
+Execution with allowlisted targets and provisioned secrets succeeds; a target outside the allowlist,
+a private or metadata destination, an unprovisioned or expired secret scope, or execution after
+termination fails closed with a `SandboxError`. Output is truncated to the configured limits and
+flagged.
+
+## Troubleshooting
+
+A `sandbox_denied` result means the request violates the profile allowlist, secret scope, expiry or
+lifecycle; review the profile and request together. A `sandbox_unavailable` result means no concrete
+executor is attached; configure a process or container provider, never fall back to in-process
+execution for untrusted code.

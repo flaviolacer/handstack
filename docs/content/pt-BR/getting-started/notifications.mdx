@@ -1,0 +1,40 @@
+---
+id: getting-started/notifications
+title: Entregue notificações com escopo de tenant
+description: Envie notificações in-app, por email e webhook por meio de provedores substituíveis.
+audience: [platform-operator, developer]
+permissions: [notifications.manage]
+features: [notifications, smtp, webhook]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.31.0
+lastReviewedAt: 2026-09-10
+owner: platform-team
+tags: [notifications, smtp, webhook, in-app]
+---
+
+# Entregue notificações com escopo de tenant
+
+Notificações têm escopo de organização e são entregues por provedores substituíveis: armazenamento
+in-app, email SMTP e transporte de webhook assinado. Canais de plugin como Slack, Teams e Discord
+implementam a mesma fronteira `NotificationProvider` sem acoplar o core a um SDK de fornecedor.
+
+## Prerequisites
+
+Tenha a permissão `notifications.manage` e configure o transporte do canal de destino.
+
+## Steps
+
+1. Construa uma notificação com destinatário, canal, assunto e corpo.
+2. Despache pelo provedor correspondente.
+3. Para email, forneça um transporte SMTP e um resolvedor de destinatário.
+4. Para webhooks, forneça um fetcher de endpoint com tamanhos de requisição e resposta limitados.
+
+## Verify
+
+Notificações são anexadas de forma idempotente, listadas por destinatário dentro da organização e ids
+duplicados são ignorados.
+
+## Troubleshooting
+
+Se a entrega falhar, verifique a configuração do transporte e os limites de timeout. Nunca inclua
+secrets no corpo das notificações.

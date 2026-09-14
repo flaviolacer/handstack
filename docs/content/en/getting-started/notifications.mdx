@@ -1,0 +1,40 @@
+---
+id: getting-started/notifications
+title: Deliver tenant-scoped notifications
+description: Send in-app, email and webhook notifications through replaceable providers.
+audience: [platform-operator, developer]
+permissions: [notifications.manage]
+features: [notifications, smtp, webhook]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.31.0
+lastReviewedAt: 2026-09-10
+owner: platform-team
+tags: [notifications, smtp, webhook, in-app]
+---
+
+# Deliver tenant-scoped notifications
+
+Notifications are organization-scoped and delivered through replaceable providers: in-app storage,
+SMTP email, and signed webhook transport. Plugin channels such as Slack, Teams and Discord implement
+the same `NotificationProvider` boundary without coupling the core to a vendor SDK.
+
+## Prerequisites
+
+Hold the `notifications.manage` permission and configure the target channel transport.
+
+## Steps
+
+1. Build a notification with recipient, channel, subject and body.
+2. Dispatch through the matching provider.
+3. For email, provide an SMTP transport and a recipient resolver.
+4. For webhooks, provide an endpoint fetcher with bounded request and response sizes.
+
+## Verify
+
+Notifications append idempotently, list per recipient within the organization, and duplicate ids are
+ignored.
+
+## Troubleshooting
+
+If delivery fails, check the transport configuration and timeout limits. Never include secrets in
+notification bodies.

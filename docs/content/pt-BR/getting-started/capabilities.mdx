@@ -1,0 +1,40 @@
+---
+id: getting-started/capabilities
+title: Publicar e executar capabilities
+description: Exponha uma capability customizada pela API governada com uma única rota de autorização.
+audience: [developer, platform-operator]
+permissions: [capability.execute]
+features: [capabilities, policy, api]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.6.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [capability, authorization, execution]
+---
+
+# Publicar e executar capabilities
+
+Capabilities são contratos executáveis por tenant com schemas de entrada/saída, canais
+permitidos e handler. Adaptadores de API, Web, MCP e Agents devem usar o mesmo engine governado.
+
+## Prerequisites
+
+- Membro autenticado com `capability.execute`.
+- Capability registrada com `API` (ou o canal do adaptador) na publicação.
+
+## Steps
+
+1. Registre slug, schemas, timeout, permissões e canais de publicação estáveis.
+2. Resolva com `GET /api/v1/organizations/{organizationId}/capabilities`.
+3. Execute com `POST /api/v1/organizations/{organizationId}/capabilities/{slug}/run`.
+
+## Verify
+
+Confirme resultado para chamada autorizada e 403 para permissão ausente ou outro tenant.
+Confirme falha fechada quando o canal não estiver publicado.
+
+## Troubleshooting
+
+- `capability.execute permission is required` indica permissão ausente.
+- `Capability is unavailable` indica slug ou canal não publicado.
+- Timeout e abort liberam a reserva de budget antes do erro.

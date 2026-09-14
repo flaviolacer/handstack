@@ -1,0 +1,44 @@
+---
+id: getting-started/mcp-server
+title: Publish capabilities through MCP
+description: Serve tenant-bound capabilities over the authenticated MCP JSON-RPC endpoint.
+audience: [developer, platform-operator]
+permissions: [capability.execute]
+features: [mcp, capabilities, audit]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.9.0
+lastReviewedAt: 2026-09-10
+owner: platform-team
+tags: [mcp, json-rpc, tools]
+---
+
+# Publish capabilities through MCP
+
+The API exposes `/mcp` and `/mcp/:organizationId` as authenticated JSON-RPC endpoints. The server
+maps only capabilities allowed on the MCP channel and delegates every invocation to the common
+execution engine.
+
+## Prerequisites
+
+- A valid HandStack access token and an organization membership.
+- A published capability with `MCP` in `allowedChannels`.
+
+## Steps
+
+1. Send `initialize` to negotiate the MCP protocol.
+2. Call `tools/list` to inspect the tenant-scoped capability schemas.
+3. Call `tools/call` with the capability slug and JSON arguments.
+4. Use `resources/list` and `prompts/list` for configured MCP metadata.
+
+## Verify
+
+Confirm missing/invalid bearer tokens return an authentication error, organization mismatches are
+rejected, API-channel-only capabilities never appear, and tool calls emit the normal engine hooks.
+The API metrics endpoint counts `tools/call` as `handstack_mcp_calls_total`; failed tool calls also
+increment `handstack_plugin_errors_total`. Discovery is not counted as a tool call.
+
+## Troubleshooting
+
+- `MCP authentication required` means the access-token guard did not establish a principal.
+- An empty tools list means no capability is published for `MCP` in that organization.
+- JSON-RPC errors are sanitized; inspect the request id in structured audit logs.

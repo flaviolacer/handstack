@@ -1,0 +1,2312 @@
+version: 1
+requirements:
+  - id: HS-AI-014
+    title: Governed multimodal chat workspace
+    normativeStatement: HandStack MUST provide a responsive tenant-bound chat workspace that lists only published models for chat.use callers, persists multimodal messages and attachments before execution, consumes durable SSE with cursor-based reconnection and deduplication, supports cancellation, executable edit/regenerate/retry branches, owner-scoped archive/restore/privacy deletion with content-free durable audit evidence, and keeps bearer credentials only in memory.
+    rationale: End users need one safe provider-neutral UI without bypassing model publication, tenant authorization, attachment scanning, or durable stream semantics.
+    owner: ai-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/chat/src/index.ts
+      - packages/chat/src/execution.ts
+      - apps/api/src/chat/chat.controller.ts
+      - apps/api/src/chat/chat-runtime.service.ts
+      - apps/web/app/chat/chat-api.ts
+      - apps/web/app/chat/chat-client.tsx
+      - apps/web/app/chat/page.tsx
+    publicContracts: [ChatController, ChatExecutionService, chatApi, streamEvents]
+    dataEntities:
+      [
+        Conversation,
+        ConversationBranch,
+        Message,
+        MessagePart,
+        Attachment,
+        ChatStreamEvent,
+        ChatAuditEvent,
+      ]
+    securityPrivacyImpact: chat.use and exact route/token organization binding are mandatory; model catalog exposes only published non-secret fields; access tokens remain in memory and outside URLs; attachments are scoped, scanned and signed; provider failures are redacted.
+    acceptanceCriteria: A chat.use principal can create and paginate conversations, choose a published model, append text and scanned attachments, receive incremental model output after reconnecting from Last-Event-ID without duplication, cancel a stream, execute immutable edit/regenerate/retry branches, and archive/restore/delete owned conversations; deletion purges content and retains no content in audit, unprivileged and cross-tenant access fails, and browser storage contains no bearer credential.
+    testIds:
+      [
+        HS-T-M4-API-RBAC-001,
+        HS-T-M4-STREAM-RECONNECT-001,
+        HS-T-M4-WEB-CLIENT-001,
+        HS-T-M4-ATTACHMENT-001,
+      ]
+    testPaths:
+      - packages/chat/tests/chat.test.ts
+      - apps/api/tests/chat.http.test.ts
+      - apps/web/tests/chat-api.test.ts
+      - apps/web/tests/routes.test.tsx
+      - apps/web/tests/chat-client.test.tsx
+      - apps/web/tests/e2e/chat.e2e.ts
+    documentationArticleIds: [user/chat-workspace]
+    introducedVersion: 0.4.0
+  - id: HS-CORE-001
+    title: npm Turborepo monorepo foundation
+    normativeStatement: HandStack MUST use npm (or yarn when selected by the workspace) and Turborepo with explicit application and package boundaries.
+    rationale: A single workspace keeps modular-monolith contracts consistent across deployable processes.
+    owner: core-team
+    status: verified
+    risk: medium
+    affectedModules: [package.json, apps, packages, turbo.json]
+    publicContracts: []
+    dataEntities: []
+    securityPrivacyImpact: Dependency boundaries prevent infrastructure leakage into domain code.
+    acceptanceCriteria: Root lint, typecheck, test, and build commands execute every current workspace.
+    testIds: [HS-T-M0-WORKSPACE-001]
+    testPaths: [packages/core/tests/event-bus.test.ts]
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.1.0
+  - id: HS-CORE-002
+    title: Strict TypeScript baseline
+    normativeStatement: All TypeScript MUST enable strict mode, noImplicitAny, noUncheckedIndexedAccess, and exactOptionalPropertyTypes.
+    rationale: Strong compile-time contracts reduce ambiguity across extension and persistence boundaries.
+    owner: core-team
+    status: verified
+    risk: medium
+    affectedModules: [tsconfig.base.json, eslint.config.mjs]
+    publicContracts: []
+    dataEntities: []
+    securityPrivacyImpact: Strict types reduce unsafe error and authorization handling.
+    acceptanceCriteria: The repository typecheck and lint gates pass without suppressing type errors.
+    testIds: [HS-T-M0-TYPES-001]
+    testPaths: [packages/shared/tests/problem-details.test.ts]
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.1.0
+  - id: HS-CORE-003
+    title: Versioned extension provider registry
+    normativeStatement: Cross-cutting providers MUST register through closed, versioned extension contracts and resolve deterministically by organization and priority.
+    rationale: Plugins may extend the platform without bypassing core governance.
+    owner: core-team
+    status: verified
+    risk: high
+    affectedModules: [packages/core/src/extensions.ts]
+    publicContracts: [ExtensionProvider, ExtensionRegistry]
+    dataEntities: [ExtensionRegistration]
+    securityPrivacyImpact: Mandatory providers remain explicit and tenant-scoped resolution is deterministic.
+    acceptanceCriteria: Tenant registrations resolve before global registrations and duplicates are rejected.
+    testIds: [HS-T-M0-EXT-001, HS-T-M0-EXT-002]
+    testPaths: [packages/core/tests/extensions.test.ts]
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.1.0
+  - id: HS-API-001
+    title: Fastify API health contract
+    normativeStatement: The NestJS API MUST use Fastify and expose separate liveness and readiness endpoints without leaking dependency secrets.
+    rationale: Distributed orchestration requires safe process and dependency health signals.
+    owner: api-team
+    status: verified
+    risk: high
+    affectedModules: [apps/api/src/main.ts, apps/api/src/health/health.controller.ts]
+    publicContracts: [/health, /health/live, /health/ready]
+    dataEntities: []
+    securityPrivacyImpact: Health responses expose status classes only, never credentials or connection strings.
+    acceptanceCriteria: Liveness excludes dependency checks and readiness reports configured dependency state.
+    testIds: [HS-T-M0-HEALTH-001]
+    testPaths: [apps/api/tests/health.service.test.ts]
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.1.0
+  - id: HS-API-002
+    title: Typed Problem Details
+    normativeStatement: Public HTTP errors MUST use RFC 9457 Problem Details with stable HandStack codes, requestId, traceId, and actionable helpArticleId where applicable.
+    rationale: Clients need safe, stable, diagnosable failures.
+    owner: api-team
+    status: verified
+    risk: high
+    affectedModules:
+      [packages/shared/src/problem-details.ts, apps/api/src/http/problem-details.filter.ts]
+    publicContracts: [ProblemDetails]
+    dataEntities: []
+    securityPrivacyImpact: Unknown internal errors are redacted before returning to clients.
+    acceptanceCriteria: Typed errors retain stable codes and unknown errors do not expose internal messages.
+    testIds: [HS-T-M0-PROBLEM-001, HS-T-M0-PROBLEM-002]
+    testPaths: [packages/shared/tests/problem-details.test.ts]
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.1.0
+  - id: HS-CORE-004
+    title: Validated hierarchical configuration
+    normativeStatement: Configuration MUST use environment, config file, database settings, and organization settings hierarchy with exactly one explicit primary database adapter.
+    rationale: Compact and distributed profiles require predictable portable configuration.
+    owner: core-team
+    status: verified
+    risk: high
+    affectedModules: [packages/config/src/index.ts, handstack.config.ts]
+    publicContracts: [HandStackConfig, defineConfig, configFromEnvironment]
+    dataEntities: []
+    securityPrivacyImpact: Configuration schema rejects unknown fields and telemetry is opt-in.
+    acceptanceCriteria: SQLite compact defaults validate, MongoDB can be selected alone, and invalid adapters or ports fail startup parsing.
+    testIds: [HS-T-M0-CONFIG-001, HS-T-M0-CONFIG-002, HS-T-M0-CONFIG-003]
+    testPaths: [packages/config/tests/config.test.ts]
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.1.0
+  - id: HS-DOC-001
+    title: Canonical localized documentation source
+    normativeStatement: Public docs and the in-product Help Center MUST render the same docs-as-code source with English and Portuguese parity.
+    rationale: Self-hosted users need version-matched, offline-capable guidance without content drift.
+    owner: docs-team
+    status: verified
+    risk: high
+    affectedModules:
+      [packages/docs-engine/src/index.ts, apps/docs/app, apps/web/app/help, docs/content]
+    publicContracts: [DocumentationArticle, ArticleMetadata]
+    dataEntities: []
+    securityPrivacyImpact: Article metadata supports audience and permission-aware presentation.
+    acceptanceCriteria: Frontmatter and required operational sections validate in both locales and both surfaces render the canonical article body.
+    testIds: [HS-T-M0-DOCS-001, HS-T-M0-DOCS-002, HS-T-M0-DOCS-003]
+    testPaths:
+      [
+        packages/docs-engine/tests/documentation.test.ts,
+        apps/docs/tests/routes.test.tsx,
+        apps/web/tests/routes.test.tsx,
+      ]
+    documentationArticleIds: [user/help-center]
+    introducedVersion: 0.1.0
+  - id: HS-UX-001
+    title: Responsive branded Help Center shell
+    normativeStatement: The Web application MUST expose Help Center navigation and responsive design tokens from a 360px viewport width.
+    rationale: Guidance is a product feature available to users and administrators on supported devices.
+    owner: web-team
+    status: verified
+    risk: medium
+    affectedModules: [apps/web/app/globals.css, apps/web/app/help]
+    publicContracts: [/help, /help/:articleId]
+    dataEntities: []
+    securityPrivacyImpact: Navigation uses packaged article IDs and does not require external network access.
+    acceptanceCriteria: Workspace, Help catalog, localized article routes, keyboard focus styles, and the mobile breakpoint render.
+    testIds: [HS-T-M0-WEB-001, HS-T-M0-WEB-002, HS-T-M0-WEB-003]
+    testPaths: [apps/web/tests/routes.test.tsx]
+    documentationArticleIds: [user/help-center]
+    introducedVersion: 0.1.0
+  - id: HS-DATA-001
+    title: Adapter-neutral persistence contracts
+    normativeStatement: Domain modules MUST depend only on canonical tenant-aware repository and transaction contracts, never database-specific concepts.
+    rationale: SQL and MongoDB must preserve public and domain behavior while remaining independently deployable primary adapters.
+    owner: data-team
+    status: verified
+    risk: critical
+    affectedModules:
+      [packages/domain/src/persistence.ts, docs/architecture/persistence-conformance.yaml]
+    publicContracts: [Repository, TransactionManager, TransactionContext]
+    dataEntities: [TenantEntity]
+    securityPrivacyImpact: Every repository operation requires an explicit tenant isolation predicate.
+    acceptanceCriteria: Contracts express tenant scope, opaque cursor pagination, optimistic concurrency, and transaction options without infrastructure types.
+    testIds: [HS-T-M1-PERSISTENCE-001]
+    testPaths: [packages/domain/tests/persistence.test.ts]
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.1.0
+  - id: HS-DATA-002
+    title: UUIDv7 canonical identifiers
+    normativeStatement: New persistent HandStack entities MUST use canonical RFC 9562 UUIDv7 identifiers independent of database-native IDs.
+    rationale: Portable, time-ordered identifiers avoid coupling exports and domain contracts to SQL sequences or MongoDB ObjectId.
+    owner: data-team
+    status: verified
+    risk: high
+    affectedModules: [packages/domain/src/uuid-v7.ts]
+    publicContracts: [uuidV7, isUuidV7]
+    dataEntities: [TenantEntity.id]
+    securityPrivacyImpact: Random UUID bits prevent simple sequential identifier enumeration.
+    acceptanceCriteria: Generated identifiers have UUID version 7 and RFC variant bits, remain unique and lexically monotonic within a millisecond, and reject invalid timestamps.
+    testIds: [HS-T-M1-UUID-001, HS-T-M1-UUID-002, HS-T-M1-UUID-003]
+    testPaths: [packages/domain/tests/uuid-v7.test.ts]
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.1.0
+  - id: HS-DATA-003
+    title: TypeORM SQL persistence adapter
+    normativeStatement: SQLite and PostgreSQL persistence MUST implement the canonical repository and transaction contracts through TypeORM with managed migrations.
+    rationale: One SQL implementation preserves domain behavior while allowing the recommended production and zero-infrastructure databases.
+    owner: data-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/database/typeorm/src/adapter.ts
+      - packages/database/typeorm/src/repository.ts
+      - packages/database/typeorm/src/migrations/initial-schema.ts
+    publicContracts: [TypeOrmAdapter, TypeOrmRepository]
+    dataEntities: [handstack_entities]
+    securityPrivacyImpact: Composite keys and every query include repository and tenant predicates.
+    acceptanceCriteria: SQLite runs managed migrations and passes tenant isolation, conflict mapping, cursor pagination, optimistic concurrency, and transaction rollback tests.
+    testIds: [HS-T-M1-SQL-001, HS-T-M1-SQL-002, HS-T-M1-SQL-003, HS-T-M1-SQL-004]
+    testPaths: [packages/database/typeorm/tests/typeorm-conformance.test.ts]
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.1.0
+  - id: HS-DATA-004
+    title: MongoDB first-class persistence adapter
+    normativeStatement: MongoDB MUST operate as the only primary database through the official driver with managed document migrations, schema validation, tenant indexes, and canonical transactions.
+    rationale: MongoDB is a first-class production alternative and cannot require a hidden SQL dependency.
+    owner: data-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/database/mongodb/src/adapter.ts
+      - packages/database/mongodb/src/repository.ts
+      - packages/database/mongodb/src/migrations.ts
+      - packages/database/mongodb/src/schema.ts
+    publicContracts: [MongoAdapter, MongoRepository, DocumentMigration]
+    dataEntities: [handstack_entities, handstack_migrations]
+    securityPrivacyImpact: JSON schema rejects unmanaged fields and compound indexes enforce tenant-scoped uniqueness.
+    acceptanceCriteria: The adapter initializes without SQL, applies versioned migrations and validators, and exposes the canonical repository and transaction contracts.
+    testIds: [HS-T-M1-MONGO-SCHEMA-001, HS-T-M1-MONGO-INDEX-001, HS-T-M1-MONGO-MIGRATION-001]
+    testPaths: [packages/database/mongodb/tests/schema.test.ts]
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.1.0
+  - id: HS-DATA-005
+    title: Configuration-driven primary database lifecycle
+    normativeStatement: HandStack MUST select exactly one primary database adapter from validated configuration and manage its initialization, migrations, readiness, and shutdown lifecycle.
+    rationale: Deployments must switch adapters without changing domain contracts or public APIs.
+    owner: data-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/database/src/index.ts
+      - packages/config/src/index.ts
+      - apps/api/src/database/database.service.ts
+      - apps/api/src/health/health.service.ts
+    publicContracts: [DatabaseAdapter, createDatabaseAdapter, /health/ready]
+    dataEntities: [handstack_entities]
+    securityPrivacyImpact: Adapter-specific URL validation prevents accidental cross-driver interpretation and readiness exposes status only.
+    acceptanceCriteria: SQLite initializes and migrates through the factory, MongoDB selection creates no SQL connection, incompatible URL schemes fail validation, and API readiness reports database up.
+    testIds: [HS-T-M1-FACTORY-001, HS-T-M1-FACTORY-002, HS-T-M1-CONFIG-URL-001, HS-T-M1-READY-001]
+    testPaths:
+      - packages/database/tests/factory.test.ts
+      - packages/config/tests/config.test.ts
+      - apps/api/tests/health.http.test.ts
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.1.0
+  - id: HS-DATA-006
+    title: Shared persistence conformance harness
+    normativeStatement: Every official database adapter MUST pass the same canonical repository and transaction behavior suite without conditional skips.
+    rationale: Matching method names do not guarantee SQL and MongoDB behavioral portability.
+    owner: data-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/domain/src/repository-conformance.ts
+      - packages/database/typeorm/tests/postgresql.integration.test.ts
+      - packages/database/mongodb/tests/mongodb.integration.test.ts
+      - .github/workflows/ci.yml
+    publicContracts: [ConformanceAdapter, verifyRepositoryConformance]
+    dataEntities: [handstack_entities]
+    securityPrivacyImpact: The harness verifies tenant isolation and atomic rollback on every adapter.
+    acceptanceCriteria: SQLite runs the harness locally while CI provisions PostgreSQL and MongoDB replica-set and runs mandatory integration commands requiring explicit URLs.
+    testIds:
+      [
+        HS-T-M1-CONFORMANCE-SQLITE-001,
+        HS-T-M1-CONFORMANCE-POSTGRES-001,
+        HS-T-M1-CONFORMANCE-MONGO-001,
+      ]
+    testPaths:
+      - packages/database/tests/factory.test.ts
+      - packages/database/typeorm/tests/postgresql.integration.test.ts
+      - packages/database/mongodb/tests/mongodb.integration.test.ts
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.1.0
+  - id: HS-DATA-007
+    title: Complete official SQL adapter matrix
+    normativeStatement: MySQL, MariaDB, and SQL Server MUST use the canonical TypeORM persistence implementation, managed migrations, and shared conformance harness alongside SQLite and PostgreSQL.
+    rationale: Every SQL database promised by the support matrix must preserve identical tenant, pagination, concurrency, and transaction semantics.
+    owner: data-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/database/typeorm/src/adapter.ts
+      - packages/database/typeorm/src/migrations/initial-schema.ts
+      - packages/database/src/index.ts
+      - .github/workflows/ci.yml
+    publicContracts: [SqlAdapterConfig, TypeOrmAdapter, createDatabaseAdapter]
+    dataEntities: [handstack_entities]
+    securityPrivacyImpact: All supported SQL engines retain composite tenant-scoped keys and mandatory tenant predicates.
+    acceptanceCriteria: Configuration selects MySQL, MariaDB, and SQL Server through their official drivers, portable migrations initialize each engine, and CI runs the canonical conformance harness against every adapter without conditional skips.
+    testIds:
+      [HS-T-M1-MYSQL-001, HS-T-M1-MARIADB-001, HS-T-M1-SQLSERVER-001, HS-T-M1-SQL-FACTORY-001]
+    testPaths:
+      - packages/database/typeorm/tests/official-sql.integration.test.ts
+      - packages/database/tests/factory.test.ts
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.1.0
+  - id: HS-DATA-008
+    title: Signed portable persistence protocol
+    normativeStatement: Cross-adapter data movement MUST use a versioned, tenant-aware, streaming and resumable protocol with canonical checksums, a signed manifest, logical metadata, and transactional import staging.
+    rationale: SQL and MongoDB migrations require independently verifiable parity and safe recovery from interruption or tampering.
+    owner: data-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/database/src/portable.ts
+      - packages/database/src/adapter-portable.ts
+      - packages/database/typeorm/src/migrations/portable-import.ts
+      - packages/database/mongodb/src/migrations.ts
+    publicContracts:
+      [
+        PortableSource,
+        PortableSink,
+        exportPortable,
+        importPortable,
+        verifyPortable,
+        comparePortable,
+      ]
+    dataEntities: [PortableRecord, PortableManifest, PortableFrame]
+    securityPrivacyImpact: Tenant scope is enforced, plaintext secret fields are rejected, manifests use HMAC-SHA256, and invalid staged imports roll back before commit.
+    acceptanceCriteria: Exports stream canonical records and metadata from SQL or MongoDB with tenant predicates, imports resume after durable checkpoints, tampered content never commits, and verification and comparison report count or checksum divergence.
+    testIds:
+      [
+        HS-T-M1-PORTABLE-ROUNDTRIP-001,
+        HS-T-M1-PORTABLE-TAMPER-001,
+        HS-T-M1-PORTABLE-RESUME-001,
+        HS-T-M1-PORTABLE-TENANT-001,
+        HS-T-M1-PORTABLE-COMPARE-001,
+      ]
+    testPaths:
+      - packages/database/tests/portable.test.ts
+      - packages/database/tests/factory.test.ts
+      - packages/database/tests/mongodb-portable.integration.test.ts
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.1.0
+  - id: HS-OPS-001
+    title: Portable database CLI commands
+    normativeStatement: The HandStack CLI MUST expose streaming portable export, import, verification, comparison, backup, and restore commands over the canonical persistence protocol.
+    rationale: Operators require one adapter-independent interface for migration preflight, copy, integrity verification, and reconciliation.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules:
+      - packages/cli/src/bin.ts
+      - packages/cli/src/database-command.ts
+      - packages/cli/src/codec.ts
+      - packages/cli/src/file-runtime.ts
+      - packages/cli/src/backup-command.ts
+    publicContracts:
+      [
+        handstack database,
+        handstack backup,
+        handstack restore,
+        executeDatabaseCommand,
+        executeBackupCommand,
+        DatabaseCommandRuntime,
+        BackupCommandRuntime,
+      ]
+    dataEntities: [PortableFrame NDJSON]
+    securityPrivacyImpact: Signing material is read from HANDSTACK_PORTABLE_SIGNING_KEY and is never accepted as a process argument or written to output.
+    acceptanceCriteria: Export and import require --portable, NDJSON is streamed and validated, verify rejects malformed or unsigned data, compare fails on canonical divergence, backup writes redacted adapter/schema metadata, restore validates compatibility before staging, and required arguments produce actionable errors.
+    testIds:
+      [
+        HS-T-M1-CLI-ROUNDTRIP-001,
+        HS-T-M1-CLI-INVALID-001,
+        HS-T-M1-CLI-COMPARE-001,
+        HS-T-M1-CLI-BACKUP-001,
+      ]
+    testPaths:
+      - packages/cli/tests/database-command.test.ts
+      - packages/cli/tests/backup-command.test.ts
+    documentationArticleIds: [getting-started/portable-backup]
+    introducedVersion: 0.1.0
+  - id: HS-OPS-002
+    title: Database migration and diagnostic commands
+    normativeStatement: The HandStack CLI MUST apply managed database migrations and expose a machine-readable diagnostic covering connectivity, engine version discovery, transactions, schema, indexes, and migration currency.
+    rationale: Operators need deterministic initialization and preflight evidence before starting or upgrading an installation.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules:
+      - packages/database/src/operations.ts
+      - packages/cli/src/operational-command.ts
+      - packages/cli/src/bin.ts
+    publicContracts: [handstack migrate, handstack doctor, databaseMigrationStatus, databaseDoctor]
+    dataEntities: [MigrationStatus, DoctorReport]
+    securityPrivacyImpact: Reports contain database capability metadata but never echo connection URLs or credentials.
+    acceptanceCriteria: Adapter initialization applies managed migrations; migrate reports applied and pending migrations; doctor reports every mandatory check as JSON and exits nonzero when any check fails.
+    testIds: [HS-T-M1-MIGRATE-001, HS-T-M1-DOCTOR-001, HS-T-M1-CLI-OPS-001]
+    testPaths:
+      - packages/database/tests/operations.test.ts
+      - packages/cli/tests/operational-command.test.ts
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.1.0
+  - id: HS-SEC-001
+    title: Tenant-safe identity and policy core contracts
+    normativeStatement: Identity, authentication, provider integration, and authorization MUST be separated into vendor-neutral contracts with explicit organization scope and deny-by-default policy evaluation.
+    rationale: Every authentication method and provider must converge on one internal Principal and authorization model without weakening tenant isolation.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/identity/src/index.ts
+      - packages/identity-sdk/src/index.ts
+      - packages/auth/src/index.ts
+      - packages/policy/src/index.ts
+    publicContracts: [Principal, User, IdentityProviderCapability, Session, ApiKey, PolicyEngine]
+    dataEntities:
+      [Organization, Principal, User, Group, ExternalIdentity, Session, Role, Permission]
+    securityPrivacyImpact: Organization-owned data carries organizationId, credentials require Argon2id or one-way hashes, refresh cookies are hardened, and unmatched or cross-tenant authorization is denied.
+    acceptanceCriteria: Core packages contain no vendor SDK; identity scopes cannot silently diverge from repository tenant scope; capabilities are namespaced; policy evaluation enforces organization, principal, resource, action, group, time, and explicit-deny precedence.
+    testIds:
+      [
+        HS-T-M2-IDENTITY-SCOPE-001,
+        HS-T-M2-IDP-CAPABILITY-001,
+        HS-T-M2-AUTH-CONTRACT-001,
+        HS-T-M2-POLICY-001,
+      ]
+    testPaths:
+      - packages/identity/tests/identity.test.ts
+      - packages/identity-sdk/tests/capabilities.test.ts
+      - packages/auth/tests/auth-contracts.test.ts
+      - packages/policy/tests/policy.test.ts
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.2.0
+  - id: HS-DATA-009
+    title: Multi-adapter identity persistence
+    normativeStatement: Every identity, authentication, and authorization aggregate MUST persist through the canonical database abstraction with mandatory organization scope and equivalent transactional behavior on SQL and MongoDB.
+    rationale: Selecting MongoDB or any official SQL adapter must not alter identity contracts, isolation, or rollback guarantees.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/identity-storage/src/index.ts
+      - packages/database/src/index.ts
+      - .github/workflows/ci.yml
+    publicContracts: [IdentityStorage, OrganizationStores, ScopedRepository]
+    dataEntities:
+      [Organization, Principal, User, Group, Role, Permission, LocalCredential, Session, ApiKey]
+    securityPrivacyImpact: Callers cannot obtain an organization-owned repository without a non-empty organizationId, cross-organization writes are rejected, and critical writes use serializable transactions.
+    acceptanceCriteria: SQLite proves persistence, tenant isolation, scope rejection, and atomic rollback locally; CI runs equivalent persistence and rollback checks against a MongoDB replica set without skips.
+    testIds: [HS-T-M2-STORAGE-SQLITE-001, HS-T-M2-STORAGE-MONGO-001]
+    testPaths:
+      - packages/identity-storage/tests/storage.test.ts
+      - packages/identity-storage/tests/mongodb.integration.test.ts
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.2.0
+  - id: HS-CORE-006
+    title: Identity administration and persistent RBAC
+    normativeStatement: Organization administrators MUST be able to create users and groups, manage memberships, define roles and permissions, and alter access through persistent role grants.
+    rationale: The M2 acceptance flow requires authorization changes to be durable, tenant-safe, and independent of the selected database adapter.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/identity-service/src/index.ts
+      - packages/identity-storage/src/index.ts
+    publicContracts: [IdentityAdministrationService]
+    dataEntities:
+      [
+        User,
+        OrganizationMembership,
+        Group,
+        GroupMembership,
+        Role,
+        Permission,
+        RolePermission,
+        PrincipalRole,
+      ]
+    securityPrivacyImpact: Administrative writes are organization-scoped and serializable; authorization defaults to deny, validates the principal in the same organization, and resolves only tenant-local grants.
+    acceptanceCriteria: An admin workflow creates a user and group, adds the user to the group, observes access denied before a permission grant, grants a dynamic role, observes access allowed afterward, and remains denied from another organization.
+    testIds: [HS-T-M2-ADMIN-FLOW-001, HS-T-M2-USERNAME-UNIQUE-001, HS-T-M2-RBAC-TENANT-001]
+    testPaths: [packages/identity-service/tests/administration.test.ts]
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.2.0
+  - id: HS-SEC-002
+    title: Local authentication and rotating credentials
+    normativeStatement: Local authentication MUST hash passwords with Argon2id, issue short-lived signed access tokens, rotate hashed refresh tokens with reuse detection, and store API keys only as keyed hashes.
+    rationale: Long-lived bearer material and recoverable credential storage would turn a database disclosure or token replay into durable account compromise.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/auth/src/index.ts
+      - packages/auth-service/src/index.ts
+      - packages/identity-storage/src/index.ts
+    publicContracts: [AuthenticationService, LocalAuthenticator, SessionManager, AccessTokenClaims]
+    dataEntities: [LocalCredential, Session, ApiKey]
+    securityPrivacyImpact: Passwords use Argon2id; opaque secrets use 256 random bits and HMAC-SHA256 with a separate pepper; JWTs validate HS256, issuer, audience, and expiry; refresh reuse revokes the session durably.
+    acceptanceCriteria: Valid local credentials log in, invalid credentials do not; stored password and bearer values do not contain plaintext; access claims verify; refresh rotates exactly once and replay revokes the successor; API keys authenticate until explicitly revoked.
+    testIds:
+      [
+        HS-T-M2-ARGON2ID-001,
+        HS-T-M2-SESSION-ROTATE-001,
+        HS-T-M2-REFRESH-REUSE-001,
+        HS-T-M2-API-KEY-001,
+      ]
+    testPaths: [packages/auth-service/tests/authentication.test.ts]
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.2.0
+  - id: HS-SEC-003
+    title: Generic secure OIDC provider plugin
+    normativeStatement: OIDC authentication MUST use a vendor-neutral provider plugin with HTTPS discovery, Authorization Code plus PKCE, one-time state and nonce, signed ID-token validation, and tenant-scoped external identity linking.
+    rationale: Enterprise identity providers must integrate through one protocol-safe boundary without coupling HandStack Core to vendor SDKs or accepting replayed callbacks.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/identity-sdk/src/index.ts
+      - packages/plugin-oidc/src/index.ts
+      - packages/identity-storage/src/index.ts
+    publicContracts: [OidcIdentityProvider, GenericOidcPlugin, OidcPluginOptions]
+    dataEntities: [OidcAuthorizationTransaction, ExternalIdentity]
+    securityPrivacyImpact: Discovery and endpoints require HTTPS; PKCE uses S256; state secrets are persisted only as HMAC; transactions expire and are consumed once; ID tokens validate signature, issuer, audience, expiry, nonce, and subject.
+    acceptanceCriteria: A generated authorization URL includes PKCE, state, and nonce; a callback exchanges the code and validates an RSA-signed ID token from discovered JWKS; the external identity is linked in the organization; replaying the same callback is rejected.
+    testIds: [HS-T-M2-OIDC-PKCE-001, HS-T-M2-OIDC-IDTOKEN-001, HS-T-M2-OIDC-REPLAY-001]
+    testPaths: [packages/plugin-oidc/tests/oidc.test.ts]
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.2.0
+  - id: HS-SEC-004
+    title: Secure HTTP authentication sessions
+    normativeStatement: Frontend authentication MUST expose short-lived access tokens only in no-store response bodies, keep rotating refresh tokens exclusively in hardened cookies, protect cookie-authenticated operations from CSRF, and revalidate persistent session and user state on protected requests.
+    rationale: Browser storage, replayable refresh credentials, ambient cookie authority, and stateless acceptance after revocation each permit avoidable account compromise.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - apps/api/src/auth/auth.controller.ts
+      - apps/api/src/auth/access-token.guard.ts
+      - packages/auth-service/src/index.ts
+    publicContracts: [AuthController, AccessTokenGuard, AuthenticatedRequest]
+    dataEntities: [Session, User]
+    securityPrivacyImpact: Refresh tokens are HttpOnly, Secure, SameSite=Strict, path-scoped, rotated and hashed; refresh requires a non-simple CSRF header; protected requests deny revoked sessions and disabled users immediately.
+    acceptanceCriteria: Login never returns a refresh token in JSON; refresh rotates the cookie and rejects CSRF omission and replay; a Bearer token populates tenant-aware authentication context; logout revokes the session and the same access token is rejected.
+    testIds: [HS-T-M2-HTTP-LOGIN-001, HS-T-M2-HTTP-REFRESH-001, HS-T-M2-HTTP-LOGOUT-001]
+    testPaths:
+      - apps/api/tests/auth.http.test.ts
+      - packages/auth-service/tests/authentication.test.ts
+    documentationArticleIds: [getting-started/authentication-sessions]
+    introducedVersion: 0.2.0
+  - id: HS-SEC-005
+    title: Tenant-aware Identity Provider configuration and OIDC session bridge
+    normativeStatement: Organizations MUST support multiple isolated Identity Providers whose persisted configuration contains no secret material, whose JIT and account-linking policies are explicit, and whose successful OIDC callbacks create revocable HandStack sessions.
+    rationale: Protocol validation alone is insufficient if tenant configuration leaks credentials, silently links accounts, or bypasses the platform session boundary.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/identity/src/index.ts
+      - packages/identity-service/src/index.ts
+      - packages/core/src/secrets.ts
+      - apps/api/src/auth/oidc-runtime.service.ts
+      - apps/api/src/auth/oidc.controller.ts
+    publicContracts:
+      [IdentityProvider, IdentityProviderAdministrationService, SecretProvider, OidcController]
+    dataEntities: [IdentityProvider, ExternalIdentity, User, Session]
+    securityPrivacyImpact: Provider records contain an opaque secret reference only; the host supplies a tenant/plugin-scoped resolver; linking by verified email and JIT are opt-in; disabled and cross-tenant providers cannot authenticate.
+    acceptanceCriteria: Multiple providers are ordered and isolated by organization; unsafe inline secret configuration is rejected; unverified or unapproved linking fails; verified-email linking and JIT work only when enabled; the OIDC HTTP callback links/provisions a principal and emits a revocable session without returning the refresh token in JSON.
+    testIds: [HS-T-M2-IDP-CONFIG-001, HS-T-M2-IDP-LINKING-001, HS-T-M2-OIDC-HTTP-001]
+    testPaths:
+      - packages/identity-service/tests/identity-providers.test.ts
+      - packages/core/tests/secrets.test.ts
+      - apps/api/tests/oidc.http.test.ts
+    documentationArticleIds: [getting-started/authentication-sessions]
+    introducedVersion: 0.2.0
+  - id: HS-SEC-006
+    title: Organization login enforcement, break-glass, and identity audit
+    normativeStatement: Organization login policy MUST prevent local authentication from bypassing SSO enforcement, restrict emergency local access to explicitly enabled and limited break-glass accounts, enforce a stronger dedicated password, and durably audit identity configuration and authentication outcomes without secret leakage.
+    rationale: SSO controls are ineffective when local credentials bypass them, while unbounded emergency accounts and rollback-prone or secret-bearing audit records create critical security gaps.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/identity/src/index.ts
+      - packages/identity-service/src/index.ts
+      - packages/auth-service/src/index.ts
+      - packages/plugin-oidc/src/index.ts
+      - apps/api/src/auth/oidc.controller.ts
+    publicContracts:
+      [OrganizationLoginPolicy, BreakGlassAccount, IdentityAuditEvent, IdentityAuditService]
+    dataEntities: [OrganizationLoginPolicy, BreakGlassAccount, IdentityAuditEvent]
+    securityPrivacyImpact: SSO-required organizations deny ordinary local credentials; break-glass is opt-in, capped, independently disableable, and requires a 20-character password; audit events are tenant-scoped and contain no passwords, tokens, client secrets, or raw claims.
+    acceptanceCriteria: Local login succeeds by default but is denied under SSO policy; an explicitly registered break-glass user can log in and is denied again after disablement; account limits are enforced; a specific IdP policy rejects other providers; failed and successful local/OIDC paths plus configuration, JIT, linking, and break-glass actions produce durable redacted audit events.
+    testIds: [HS-T-M2-LOGIN-ENFORCEMENT-001, HS-T-M2-BREAK-GLASS-001, HS-T-M2-IDENTITY-AUDIT-001]
+    testPaths:
+      - packages/auth-service/tests/authentication.test.ts
+      - packages/identity-service/tests/identity-providers.test.ts
+      - apps/api/tests/oidc.http.test.ts
+    documentationArticleIds: [getting-started/authentication-sessions]
+    introducedVersion: 0.2.0
+  - id: HS-SEC-007
+    title: Authorized tenant-safe identity administration API
+    normativeStatement: Identity administration endpoints MUST require an authenticated principal with explicit identity.manage permission, reject route and token organization mismatches before data access, and return provider representations without secret values or internal secret references.
+    rationale: Correct identity policy is insufficient when its administrative control plane permits cross-tenant access, defaults to allow, or exposes secret-management internals.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - apps/api/src/auth/identity-admin.controller.ts
+      - apps/api/src/auth/access-token.guard.ts
+      - packages/identity-service/src/index.ts
+    publicContracts: [IdentityAdminController, AccessTokenGuard]
+    dataEntities: [IdentityProvider, OrganizationLoginPolicy, BreakGlassAccount]
+    securityPrivacyImpact: Every operation is Bearer-authenticated and denied unless identity.manage is granted in the token organization; cross-organization paths are rejected before RBAC repository access; provider output includes only a secret-presence boolean.
+    acceptanceCriteria: An authorized administrator can list and create providers, toggle providers, update login policy, and enable or disable break-glass; a principal without permission and an administrator targeting another organization both receive HTTP 403; no response serializes a password or client secret reference.
+    testIds:
+      [
+        HS-T-M2-IDENTITY-ADMIN-RBAC-001,
+        HS-T-M2-IDENTITY-ADMIN-TENANT-001,
+        HS-T-M2-IDENTITY-ADMIN-SECRETS-001,
+      ]
+    testPaths: [apps/api/tests/identity-admin.http.test.ts]
+    documentationArticleIds: [getting-started/authentication-sessions]
+    introducedVersion: 0.2.0
+  - id: HS-UX-002
+    title: Identity provider administration interface
+    normativeStatement: The web application MUST expose a responsive Settings and Identity Providers route with accessible loading, empty, error, and ready states; secure OIDC configuration; provider enable and confirmed disable actions; login enforcement controls; and contextual help.
+    rationale: Enterprise identity configuration requires an operable and understandable administrative surface rather than API-only setup or unsafe secret handling.
+    owner: frontend-team
+    status: verified
+    risk: high
+    affectedModules:
+      - apps/web/app/settings/identity-providers/page.tsx
+      - apps/web/app/settings/identity-providers/identity-providers-client.tsx
+      - apps/web/app/settings/identity-providers/identity-api.ts
+    publicContracts: [IdentityProvidersClient, identityApi]
+    dataEntities: [IdentityProvider, OrganizationLoginPolicy]
+    securityPrivacyImpact: The Bearer credential is held only in component memory and is never placed in a URL, request body, localStorage, or sessionStorage; secret references use a password field and provider responses contain only secret presence.
+    acceptanceCriteria: The route renders in the administrative shell; can load, create, enable, and disable providers and save enforcement policy; shows explicit loading, empty, error, and ready states; confirms disable; remains responsive; and exposes contextual Help Center guidance.
+    testIds: [HS-T-M2-IDENTITY-UI-ROUTE-001, HS-T-M2-IDENTITY-UI-CLIENT-001]
+    testPaths:
+      - apps/web/tests/routes.test.tsx
+      - apps/web/tests/identity-api.test.ts
+    documentationArticleIds: [getting-started/authentication-sessions]
+    introducedVersion: 0.2.0
+  - id: HS-OPS-003
+    title: Privacy-safe identity observability
+    normativeStatement: SSO and identity administration MUST emit OpenTelemetry spans, operation counters, and latency histograms using a closed low-cardinality operation vocabulary and MUST NOT attach credentials, claims, exception messages, or tenant, user, and provider identifiers.
+    rationale: Identity integrations require latency and failure visibility, but unrestricted telemetry attributes can leak authentication material and create unbounded observability cost.
+    owner: platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/telemetry/src/identity.ts
+      - apps/api/src/auth/oidc.controller.ts
+      - apps/api/src/auth/identity-admin-telemetry.interceptor.ts
+    publicContracts: [IdentityTelemetry, IdentityTelemetrySink, IdentityOperation]
+    dataEntities: []
+    securityPrivacyImpact: Only identity.operation and identity.outcome are exported; failures set span status without recording exception message or stack; no identity or tenant identifiers are telemetry dimensions.
+    acceptanceCriteria: Successful and failed measured operations record one bounded observation and close their span; failure propagates unchanged; serialized observations and statuses contain no supplied secret-bearing exception message; OIDC and every identity administration handler are instrumented.
+    testIds: [HS-T-M2-IDENTITY-OTEL-SUCCESS-001, HS-T-M2-IDENTITY-OTEL-REDACTION-001]
+    testPaths:
+      - packages/telemetry/tests/identity.test.ts
+      - apps/api/tests/oidc.http.test.ts
+      - apps/api/tests/identity-admin.http.test.ts
+    documentationArticleIds: [getting-started/authentication-sessions]
+    introducedVersion: 0.2.0
+  - id: HS-SEC-008
+    title: Atomic identity deprovisioning and credential revocation
+    normativeStatement: User deprovisioning MUST atomically disable the tenant-scoped user, principal, and organization membership; revoke every active session, API key, and break-glass registration; deny all existing and new authentication paths immediately; preserve external identity and audit history; and be idempotent.
+    rationale: Disabling only a user row leaves refresh sessions, automation credentials, emergency access, or tenant-adjacent records able to outlive employment or membership termination.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/identity-service/src/index.ts
+      - packages/auth-service/src/index.ts
+      - apps/api/src/auth/identity-admin.controller.ts
+    publicContracts: [IdentityAdministrationService, IdentityAdminController]
+    dataEntities:
+      [
+        User,
+        Principal,
+        OrganizationMembership,
+        Session,
+        ApiKey,
+        BreakGlassAccount,
+        IdentityAuditEvent,
+      ]
+    securityPrivacyImpact: A single tenant transaction uses one revocation timestamp and retains evidence; the endpoint requires identity.manage and route/token organization equality; API-key authentication also revalidates the principal state.
+    acceptanceCriteria: Deprovisioning revokes two active sessions and one API key, rejects access token, refresh token, API key, and password login immediately, leaves a same-ID user in another tenant active, emits one redacted USER_DEPROVISIONED event, and a repeated call is a no-op.
+    testIds:
+      [
+        HS-T-M2-DEPROVISION-ATOMIC-001,
+        HS-T-M2-DEPROVISION-CREDENTIALS-001,
+        HS-T-M2-DEPROVISION-HTTP-001,
+      ]
+    testPaths:
+      - packages/auth-service/tests/authentication.test.ts
+      - apps/api/tests/identity-admin.http.test.ts
+    documentationArticleIds: [getting-started/authentication-sessions]
+    introducedVersion: 0.2.0
+  - id: HS-SEC-009
+    title: Provenance-safe OIDC group and role mapping
+    normativeStatement: OIDC claims MUST grant HandStack group membership or roles only through tenant-scoped, administrator-configured exact-value allowlist mappings; reconciliation MUST apply during JIT, account linking, and recurring login and MUST remove only assignments whose IdP mapping provenance is persisted.
+    rationale: Treating arbitrary external claims as authorization creates privilege escalation, while reconciliation without provenance can delete manually administered access.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/identity/src/index.ts
+      - packages/identity-storage/src/index.ts
+      - packages/identity-service/src/index.ts
+      - apps/api/src/auth/identity-admin.controller.ts
+      - apps/web/app/settings/identity-providers/identity-providers-client.tsx
+    publicContracts: [IdentityMapping, IdentityMappingGrant, IdentityMappingInput]
+    dataEntities: [IdentityMapping, IdentityMappingGrant, GroupMembership, PrincipalRole]
+    securityPrivacyImpact: Claim names are flat validated identifiers, source values use exact string comparison, targets must already exist in the same organization, mapping count is bounded, and only provenance-backed assignments are removed.
+    acceptanceCriteria: An administrator can configure group and role mappings through RBAC-protected API and UI; matching claims create both assignments; a later empty claim removes mapped assignments but preserves a manual group membership; mapping changes and reconciliation emit redacted audit events.
+    testIds:
+      [
+        HS-T-M2-MAPPING-ALLOWLIST-001,
+        HS-T-M2-MAPPING-PROVENANCE-001,
+        HS-T-M2-MAPPING-HTTP-001,
+        HS-T-M2-MAPPING-UI-001,
+      ]
+    testPaths:
+      - packages/identity-service/tests/identity-providers.test.ts
+      - apps/api/tests/identity-admin.http.test.ts
+      - apps/web/tests/identity-api.test.ts
+    documentationArticleIds: [getting-started/authentication-sessions]
+    introducedVersion: 0.2.0
+  - id: HS-SEC-010
+    title: Bounded and redacted OIDC connection diagnostics
+    normativeStatement: Identity administrators MUST be able to validate an OIDC provider discovery document and JWKS before enablement; the check MUST require HTTPS endpoints and exact issuer matching, reject redirects, enforce timeout and response-size bounds, require a usable typed key, and expose, audit, and measure only closed diagnostic values.
+    rationale: Unbounded or verbose outbound diagnostics can become an SSRF amplification path and can leak provider configuration, remote response contents, or secrets into clients and telemetry.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - apps/api/src/auth/oidc-runtime.service.ts
+      - apps/api/src/auth/identity-admin.controller.ts
+      - apps/api/src/auth/identity-admin-telemetry.interceptor.ts
+      - apps/web/app/settings/identity-providers/identity-providers-client.tsx
+    publicContracts: [OidcConnectionTestResult, testOidcConnection, IdentityAdminController]
+    dataEntities: [IdentityProvider, IdentityAuditEvent]
+    securityPrivacyImpact: Requests use HTTPS without redirects, a five-second abort signal, and 256 KiB per-document limit; public and audit results contain only ok, stage, and a closed code; telemetry retains only the closed operation and outcome.
+    acceptanceCriteria: An identity.manage administrator can start a test from API and UI; valid discovery and JWKS succeed; issuer mismatch, insecure endpoint, empty JWKS, and timeout produce redacted closed failures; cross-tenant and unauthorized calls remain denied.
+    testIds:
+      [
+        HS-T-M2-OIDC-CONNECTION-SUCCESS-001,
+        HS-T-M2-OIDC-CONNECTION-FAILURE-001,
+        HS-T-M2-OIDC-CONNECTION-TIMEOUT-001,
+        HS-T-M2-OIDC-CONNECTION-HTTP-001,
+        HS-T-M2-OIDC-CONNECTION-UI-001,
+      ]
+    testPaths:
+      - apps/api/tests/oidc-connection.test.ts
+      - apps/api/tests/identity-admin.http.test.ts
+      - apps/web/tests/identity-api.test.ts
+    documentationArticleIds: [getting-started/authentication-sessions]
+    introducedVersion: 0.2.0
+  - id: HS-DATA-010
+    title: Versioned identity persistence compatibility
+    normativeStatement: Every M2 identity and authentication aggregate MUST use the canonical migrated DatabaseAdapter through stable, tenant-scoped repository namespaces; the namespace manifest MUST be versioned and append-only within a schema version, and representative identity, provider, and session records MUST remain readable after adapter shutdown, migration rerun, and reopen.
+    rationale: Identity data that works only within one process or silently changes repository namespaces cannot safely survive deployment, restart, or upgrade.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/identity-storage/src/index.ts
+      - packages/database/typeorm/src/migrations/initial-schema.ts
+      - packages/database/mongodb/src/migrations.ts
+    publicContracts: [IdentityStorage, identityStorageSchema]
+    dataEntities: [Organization, User, IdentityProvider, Session]
+    securityPrivacyImpact: All namespaces remain tenant-scoped through the same migrated adapter; the compatibility manifest contains names and a version only, never identity data or credentials.
+    acceptanceCriteria: The manifest snapshot covers every M2 repository namespace; a file-backed SQLite adapter persists organization, user, provider policy, and session data; closing and reopening the migrated adapter reads the same scoped values without data loss.
+    testIds: [HS-T-M2-STORAGE-MANIFEST-001, HS-T-M2-STORAGE-REOPEN-001]
+    testPaths: [packages/identity-storage/tests/storage.test.ts]
+    documentationArticleIds: [getting-started/authentication-sessions]
+    introducedVersion: 0.2.0
+  - id: HS-AI-001
+    title: Tenant-scoped model registry with fail-closed evaluation publication
+    normativeStatement: HandStack MUST represent providers and models through vendor-neutral contracts and stable tenant-scoped registry records; model aliases MUST be unique per Organization, provider secrets MUST remain references, and a model MUST NOT become published unless a persisted, passing evaluation gate matches its recorded suite version and has been explicitly approved.
+    rationale: Direct vendor model references and UI-only approval checks make routing brittle and allow untested model changes to reach stable execution paths.
+    owner: ai-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/models/src/index.ts
+      - packages/model-registry/src/index.ts
+      - packages/evaluation/src/index.ts
+    publicContracts:
+      [LLMProvider, EvaluationProvider, ModelDefinition, ProviderDefinition, ModelRegistry]
+    dataEntities:
+      [
+        ProviderDefinition,
+        ModelDefinition,
+        EvaluationSuite,
+        EvaluationDataset,
+        EvaluationRun,
+        EvaluationGate,
+      ]
+    securityPrivacyImpact: Registry isolation is enforced by organization predicates; only secret references are stored; provider data-classification allowlists are explicit; approved datasets carry classification, provenance, owner and retention metadata; production data additionally requires legal basis and sanitization; publication revalidates immutable persisted run provenance and fails closed.
+    acceptanceCriteria: Provider and model records persist through the canonical adapter; IDs and aliases resolve only within their organization; duplicate aliases and cross-tenant providers fail; approved versioned datasets and suites cover the product minimum quality, tool, security and efficiency metrics; fabricated, failed, absent or stale runs block approval/publication; a passing persisted current run permits evaluated, approved, then published transitions.
+    testIds:
+      [
+        HS-T-M3-PROVIDER-CONTRACT-001,
+        HS-T-M3-EVALUATION-CORE-001,
+        HS-T-M3-EVALUATION-GOVERNANCE-001,
+        HS-T-M3-REGISTRY-GATE-001,
+        HS-T-M3-REGISTRY-ISOLATION-001,
+      ]
+    testPaths:
+      - packages/models/tests/contracts.test.ts
+      - packages/evaluation/tests/evaluation.test.ts
+      - packages/model-registry/tests/registry.test.ts
+    documentationArticleIds: [getting-started/model-registry]
+    introducedVersion: 0.3.0
+  - id: HS-API-005
+    title: Governed capability registry and execution API
+    normativeStatement: HandStack MUST register tenant-scoped capabilities with schemas and allowed channels, and Web/API/MCP/Agent adapters MUST execute through one engine applying authorization, guardrails, budget, rate limit, approval, timeout, audit and telemetry hooks.
+    rationale: A single governed execution path prevents channel-specific authorization bypasses.
+    owner: platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/capabilities/src/index.ts
+      - apps/api/src/capabilities/capability.controller.ts
+    publicContracts: [Capability, CapabilityRegistry, CapabilityExecutionEngine]
+    dataEntities: [Capability]
+    securityPrivacyImpact: capability.execute and exact organization binding protect invocation; disallowed channels fail closed.
+    acceptanceCriteria: A custom capability is listed and executed through the API with the same engine authorization; disallowed channels, missing permission, timeout and failure release reservations and produce audit hooks.
+    testIds: [HS-T-M7-CAPABILITY-001, HS-T-M7-CAPABILITY-002]
+    testPaths:
+      - packages/capabilities/tests/capability.test.ts
+      - apps/api/tests/capability.http.test.ts
+    documentationArticleIds: [getting-started/capabilities]
+    introducedVersion: 0.6.0
+  - id: HS-API-006
+    title: Agent harness with governed capability tools
+    normativeStatement: HandStack MUST execute published AgentVersions through a bounded LLM loop that enforces declared tool allowlists, timeouts, iteration limits, budget hooks and lifecycle events, invoking tools only through CapabilityExecutionEngine.
+    rationale: Agent autonomy must not bypass capability authorization, tenant isolation or cost controls.
+    owner: ai-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/agents/src/index.ts
+      - packages/capabilities/src/index.ts
+    publicContracts: [Agent, AgentVersion, AgentHarness, AgentRunResult, AgentEvent]
+    dataEntities: [Agent, AgentVersion, AgentRun]
+    securityPrivacyImpact: published versions and declared tools constrain execution; events contain identifiers and sanitized errors only.
+    acceptanceCriteria: A published agent calls a declared capability and returns a response; undeclared tools, cross-tenant versions, timeout and iteration limit fail closed and emit lifecycle events.
+    testIds: [HS-T-M8-AGENT-001, HS-T-M8-AGENT-002]
+    testPaths:
+      - packages/agents/tests/agent-harness.test.ts
+    documentationArticleIds: [getting-started/agents]
+    introducedVersion: 0.7.0
+  - id: HS-API-004
+    title: Tenant budgets, reservations and usage endpoints
+    normativeStatement: HandStack MUST support tenant-scoped budget scopes and periods, transactional hard-limit reservations, settlement records and authenticated budget/usage administration without cross-tenant access.
+    rationale: Cost governance must be enforced before model work and remain auditable after measured usage.
+    owner: platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/budgets/src/index.ts
+      - apps/api/src/budgets/budget.controller.ts
+    publicContracts: [Budget, BudgetReservation, UsageRecord, CostRecord, BudgetController]
+    dataEntities: [Budget, BudgetReservation, UsageRecord, CostRecord]
+    securityPrivacyImpact: budget.manage and organization binding protect financial controls; usage records are tenant scoped.
+    acceptanceCriteria: Authorized administrators create/list budgets and usage; hard limits reject over-budget reservations; idempotent reservations and settlements persist atomically; cross-tenant access is denied.
+    testIds: [HS-T-M6-BUDGET-001, HS-T-M6-BUDGET-002]
+    testPaths:
+      - packages/budgets/tests/budget-engine.test.ts
+      - apps/api/tests/budget.http.test.ts
+    documentationArticleIds: [getting-started/budgets]
+    introducedVersion: 0.5.0
+  - id: HS-API-003
+    title: OpenAI-compatible virtual-key gateway
+    normativeStatement: HandStack MUST expose /v1/models and /v1/chat/completions through tenant-scoped virtual API keys, enforce key expiry/revocation/model allowlists/rate limits, return the secret only once, support synchronous and SSE responses, and append redacted lifecycle audit events without bypassing the governed model runtime.
+    rationale: Existing OpenAI SDKs need a provider-neutral endpoint while HandStack retains authorization, publication, privacy and usage controls.
+    owner: gateway-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/gateway/src/index.ts
+      - apps/api/src/gateway/gateway.controller.ts
+      - apps/api/src/gateway/openai-compatible.controller.ts
+      - apps/api/src/gateway/gateway-runtime.service.ts
+    publicContracts: [VirtualApiKeyService, GatewayController, OpenAiCompatibleController]
+    dataEntities: [VirtualApiKey, IdentityAuditEvent]
+    securityPrivacyImpact: Full secrets are never persisted or returned after issuance; authentication is constant-time and tenant-scoped; revoked, expired, unauthorized and disallowed-model requests fail closed; audit metadata contains no key material or prompts.
+    acceptanceCriteria: An authorized administrator issues, lists and revokes a key; an OpenAI-compatible caller lists only permitted published models and can receive JSON or SSE completions; malformed, expired, revoked, cross-tenant, rate-limited and model-disallowed requests fail without provider traffic; lifecycle events are durable and redacted.
+    testIds: [HS-T-M5-KEY-001, HS-T-M5-GATEWAY-HTTP-001, HS-T-M5-MODEL-CATALOG-001]
+    testPaths:
+      - packages/gateway/tests/virtual-api-key.test.ts
+      - apps/api/tests/gateway.http.test.ts
+    documentationArticleIds: [getting-started/gateway]
+    introducedVersion: 0.4.0
+  - id: HS-AI-002
+    title: OpenAI-compatible provider contract and sanitized transport
+    normativeStatement: The official OpenAI-compatible LLMProvider MUST implement model discovery, health, chat, tool calls, SSE streaming, normalized finish reasons and usage, cancellation and bounded timeout; it MUST resolve credentials at request time, require HTTPS for remote endpoints, restrict insecure HTTP to explicitly allowed loopback hosts, reject redirects, and expose only sanitized error codes and optional HTTP status.
+    rationale: Provider-specific payloads, uncontrolled transport, and verbose upstream failures otherwise leak credentials and make routing behavior inconsistent across OpenAI, Ollama, and compatible servers.
+    owner: ai-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/models/src/index.ts
+      - packages/provider-testkit/src/index.ts
+      - packages/provider-openai-compatible/src/index.ts
+    publicContracts:
+      [
+        LLMProvider,
+        ToolDefinition,
+        ToolCall,
+        OpenAICompatibleProvider,
+        ProviderRequestError,
+        verifyLLMProviderContract,
+      ]
+    dataEntities: []
+    securityPrivacyImpact: API keys exist only in authorization headers produced after async secret resolution; redirects and insecure remote URLs are rejected; error bodies, headers, URLs, credentials, and network messages are never propagated.
+    acceptanceCriteria: A deterministic OpenAI-compatible adapter passes the shared contract for models, health, chat, tools, stream completion, finish reason, and usage; timeout and HTTP failures use closed redacted errors; remote HTTP is rejected while explicit loopback Ollama HTTP is accepted.
+    testIds:
+      [
+        HS-T-M3-PROVIDER-TESTKIT-001,
+        HS-T-M3-OPENAI-COMPAT-001,
+        HS-T-M3-OPENAI-TIMEOUT-001,
+        HS-T-M3-OLLAMA-LOOPBACK-001,
+      ]
+    testPaths:
+      - packages/provider-testkit/tests/testkit.test.ts
+      - packages/provider-openai-compatible/tests/provider.test.ts
+    documentationArticleIds: [getting-started/model-registry]
+    introducedVersion: 0.3.0
+  - id: HS-AI-003
+    title: Native Anthropic and Gemini provider contracts
+    normativeStatement: The official native Anthropic and Gemini LLMProviders MUST translate vendor-neutral messages, system instructions, tool definitions and calls, streaming events, usage, and finish reasons through their native HTTP APIs; credentials MUST be resolved per request and sent only in vendor authorization headers; remote endpoints MUST require HTTPS; timeout, cancellation, transport, HTTP, and invalid response failures MUST expose only closed sanitized errors.
+    rationale: Native APIs have different message, tool, stream, and accounting envelopes; explicit adapters preserve one stable execution contract without leaking SDK or credential details into product code.
+    owner: ai-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/provider-anthropic/src/index.ts
+      - packages/provider-gemini/src/index.ts
+      - packages/provider-testkit/src/index.ts
+    publicContracts:
+      [AnthropicProvider, createAnthropicProvider, GeminiProvider, createGeminiProvider]
+    dataEntities: []
+    securityPrivacyImpact: API keys are obtained asynchronously for each request and sent only in x-api-key or x-goog-api-key headers; credentials never enter URLs or payloads; redirects, insecure endpoints, and verbose upstream errors are rejected.
+    acceptanceCriteria: Deterministic Anthropic and Gemini adapters each pass the shared provider contract for discovery, health, chat, tools, streaming termination, usage and finish reason; requests use the native path and credential header; HTTPS enforcement, cancellation, timeout, and sanitized HTTP failures are tested without real network access.
+    testIds:
+      [
+        HS-T-M3-ANTHROPIC-CONTRACT-001,
+        HS-T-M3-GEMINI-CONTRACT-001,
+        HS-T-M3-NATIVE-PROVIDER-ERRORS-001,
+      ]
+    testPaths:
+      - packages/provider-anthropic/tests/provider.test.ts
+      - packages/provider-gemini/tests/provider.test.ts
+    documentationArticleIds: [getting-started/model-registry]
+    introducedVersion: 0.3.0
+  - id: HS-AI-004
+    title: Azure OpenAI, OpenRouter, and vLLM provider specializations
+    normativeStatement: Azure OpenAI, OpenRouter, and vLLM MUST implement the complete LLMProvider contract through the official OpenAI-compatible core while preserving provider-specific endpoint and authorization rules; Azure MUST require explicit resource, deployment, and API version and use only the api-key header; OpenRouter MAY send explicit public application attribution; vLLM MUST reject insecure non-loopback URLs.
+    rationale: Compatible wire formats still have material authentication, endpoint, discovery, and local-transport differences that cannot be left to unvalidated caller conventions.
+    owner: ai-platform-team
+    status: verified
+    risk: high
+    affectedModules:
+      - packages/models/src/index.ts
+      - packages/provider-openai-compatible/src/index.ts
+    publicContracts: [createAzureOpenAIProvider, createOpenRouterProvider, createVllmProvider]
+    dataEntities: [ProviderDefinition]
+    securityPrivacyImpact: Azure credentials use a dedicated api-key header; OpenRouter credentials remain bearer headers; keys are resolved per request and excluded from bodies; vLLM loopback HTTP is explicit and remote insecure HTTP remains rejected.
+    acceptanceCriteria: All three factories pass the shared provider contract; Azure generates the deployment path and encoded API-version query with a static deployment catalog and no authorization header; OpenRouter includes configured public attribution; loopback vLLM succeeds while remote HTTP construction fails.
+    testIds:
+      [
+        HS-T-M3-AZURE-OPENAI-CONTRACT-001,
+        HS-T-M3-OPENROUTER-CONTRACT-001,
+        HS-T-M3-VLLM-CONTRACT-001,
+      ]
+    testPaths: [packages/provider-openai-compatible/tests/provider.test.ts]
+    documentationArticleIds: [getting-started/model-registry]
+    introducedVersion: 0.3.0
+  - id: HS-AI-005
+    title: Native AWS Bedrock provider contract
+    normativeStatement: The official AWS Bedrock LLMProvider MUST use the AWS SDK credential provider chain and SigV4 transport by default, discover foundation models, translate Converse and ConverseStream messages, system prompts, tools, incremental tool input, usage, and stop reasons into the neutral provider contract, propagate cancellation and bounded timeouts, and expose no raw AWS errors or credential material.
+    rationale: Bedrock authentication and event-stream semantics are not OpenAI-compatible; a native boundary is required to support workload identity and temporary credentials without leaking AWS-specific contracts into product code.
+    owner: ai-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/provider-bedrock/src/index.ts
+      - packages/provider-testkit/src/index.ts
+    publicContracts:
+      [BedrockProvider, BedrockTransport, AwsSdkBedrockTransport, createBedrockProvider]
+    dataEntities: []
+    securityPrivacyImpact: Signing and refresh remain inside the official SDK credential chain; registry data contains no AWS key, secret, or session token; raw SDK errors are replaced by closed provider errors; abort signals bound every operation and stream read.
+    acceptanceCriteria: The provider passes the shared discovery, health, chat, tools, streaming, usage and finish contract through an injected transport; incremental tool JSON is emitted only after block completion; the default AWS SDK transport constructs for a valid region; timeout and cancellation yield sanitized closed errors without AWS details.
+    testIds: [HS-T-M3-BEDROCK-CONTRACT-001, HS-T-M3-BEDROCK-STREAM-001, HS-T-M3-BEDROCK-ERRORS-001]
+    testPaths: [packages/provider-bedrock/tests/provider.test.ts]
+    documentationArticleIds: [getting-started/model-registry]
+    introducedVersion: 0.3.0
+  - id: HS-AI-006
+    title: Tenant-aware fail-closed model execution runtime
+    normativeStatement: Product execution MUST address models only by an internal ModelDefinition ID or alias plus Organization and data classification; the runtime MUST resolve a PUBLISHED model and enabled provider within that Organization, enforce the provider classification allowlist before external traffic, instantiate only a registered adapter, map to providerModel internally, resolve only the provider's stored secret reference in tenant scope, and expose closed runtime errors while observing health and usage without secret material.
+    rationale: Calling vendor model IDs or provider factories directly bypasses evaluation publication, tenant isolation, privacy policy, and secret boundaries established by the model registry.
+    owner: ai-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/model-registry/src/index.ts
+      - packages/model-runtime/src/index.ts
+    publicContracts:
+      [
+        ModelExecutionRuntime,
+        ProviderFactoryRegistry,
+        ProviderFactory,
+        SecretResolver,
+        ModelRuntimeObserver,
+      ]
+    dataEntities: [ProviderDefinition, ModelDefinition]
+    securityPrivacyImpact: Tenant-scoped registry lookups and classification checks precede provider creation; only the registered secret reference can be resolved for the active Organization; provider failures are redacted; observations contain scoped IDs, health, and token counts only.
+    acceptanceCriteria: Published model chat and stream resolve both alias and ID to the vendor model, use the tenant secret reference, and record health/usage; cross-tenant lookups, denied classifications, unpublished or unavailable models, duplicate factories, and unknown adapters fail closed before provider traffic; observations never contain secret values.
+    testIds:
+      [HS-T-M3-RUNTIME-EXECUTION-001, HS-T-M3-RUNTIME-TENANT-001, HS-T-M3-RUNTIME-PRIVACY-001]
+    testPaths: [packages/model-runtime/tests/runtime.test.ts]
+    documentationArticleIds: [getting-started/model-registry]
+    introducedVersion: 0.3.0
+  - id: HS-AI-007
+    title: Official initial provider factory bootstrap
+    normativeStatement: HandStack MUST provide one official factory bootstrap for every initial LLM adapter; provider-specific non-secret transport settings MUST be stored separately from secretReference, factories MUST receive only a model definition already authorized by the tenant runtime, required public settings and endpoint rules MUST fail fast, credential resolution MUST remain lazy, and AWS Bedrock MUST use workload identity or the AWS credential chain rather than a registry secret reference.
+    rationale: Adapters that exist but require application-specific wiring invite inconsistent authentication, direct vendor IDs, eager secret materialization, and unsafe endpoint defaults.
+    owner: ai-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/models/src/index.ts
+      - packages/model-runtime/src/index.ts
+      - packages/model-provider-bootstrap/src/index.ts
+    publicContracts: [ProviderDefinition, ProviderFactoryContext, createOfficialProviderFactories]
+    dataEntities: [ProviderDefinition, ModelDefinition]
+    securityPrivacyImpact: Provider configuration contains public strings only; secret values remain behind the tenant resolver and are not fetched during factory construction; Bedrock registry secrets are rejected; adapter URL validation remains authoritative.
+    acceptanceCriteria: The bootstrap registers and constructs OpenAI, compatible, Ollama, vLLM, OpenRouter, Anthropic, Gemini, Azure OpenAI, and Bedrock providers; construction resolves no secret; missing compatible URL, missing Azure public settings, and a Bedrock secret reference fail fast; Azure can derive deployment from the authorized model definition.
+    testIds:
+      [
+        HS-T-M3-PROVIDER-BOOTSTRAP-001,
+        HS-T-M3-PROVIDER-CONFIG-001,
+        HS-T-M3-PROVIDER-SECRET-LAZY-001,
+      ]
+    testPaths: [packages/model-provider-bootstrap/tests/bootstrap.test.ts]
+    documentationArticleIds: [getting-started/model-registry]
+    introducedVersion: 0.3.0
+  - id: HS-AI-008
+    title: Atomic audit and bounded telemetry for model governance
+    normativeStatement: Every provider/model registration, versioned evaluation dataset or suite registration, evaluation run, gate recording, approval, and publication MUST persist a tenant-scoped append-only audit event; administrative mutations and their mandatory event MUST commit atomically, and registry, evaluation, chat, and stream operations MUST expose closed OpenTelemetry operations and outcomes without prompts, responses, evidence, credentials, error text, or tenant identifiers as metric attributes.
+    rationale: Evaluation gates without durable provenance and administrative promotions without atomic audit can be bypassed or become unverifiable, while unconstrained telemetry can leak sensitive model traffic and create unbounded cardinality.
+    owner: ai-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/models/src/index.ts
+      - packages/model-registry/src/index.ts
+      - packages/evaluation/src/index.ts
+      - packages/model-runtime/src/index.ts
+      - packages/telemetry/src/ai-governance.ts
+    publicContracts:
+      [
+        AiGovernanceTelemetry,
+        AiGovernanceOpenTelemetry,
+        ModelAuditEvent,
+        ModelRegistry,
+        CoreEvaluationProvider,
+      ]
+    dataEntities: [ModelAuditEvent, EvaluationRun, EvaluationGate, ModelDefinition]
+    securityPrivacyImpact: Audit metadata is an explicit scalar allowlist of IDs, versions, lifecycle states, counts, classification, and outcomes; dataset cases, prompts, evidence, scores, provider responses, error messages, credentials, and secret references are excluded. Telemetry attributes contain only closed operation and outcome values.
+    acceptanceCriteria: Successful governance mutations create tenant-isolated events; rerunning an idempotent evaluation does not duplicate its event; secret references, vendor model IDs, evidence, and provider errors are absent from audit and telemetry; failure to append mandatory audit rolls back the administrative mutation; success, failure, stream completion, and stream iteration failure close spans and record exactly one bounded observation.
+    testIds:
+      [
+        HS-T-M3-AUDIT-ATOMIC-001,
+        HS-T-M3-AUDIT-REDACTION-001,
+        HS-T-M3-TELEMETRY-001,
+        HS-T-M3-TELEMETRY-STREAM-001,
+      ]
+    testPaths:
+      - packages/model-registry/tests/registry.test.ts
+      - packages/evaluation/tests/evaluation.test.ts
+      - packages/model-runtime/tests/runtime.test.ts
+      - packages/telemetry/tests/ai-governance.test.ts
+    documentationArticleIds: [getting-started/model-registry]
+    introducedVersion: 0.3.0
+  - id: HS-AI-009
+    title: Versioned provider and model administration API
+    normativeStatement: HandStack MUST expose authenticated provider and model registration/listing under /api/v1 with Zod as the canonical request and response schema source, generated OpenAPI, strict unknown-field rejection, exact route/token/repository tenant binding, and models.manage authorization; public provider representations MUST replace secretReference with a boolean presence marker and MUST reject or redact secret-like configuration keys.
+    rationale: A registry that is reachable only from internal code cannot satisfy the public administration contract, while loosely validated or tenant-ambiguous endpoints can leak credentials and create IDOR vulnerabilities.
+    owner: ai-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - apps/api/src/main.ts
+      - apps/api/src/models/model-admin.schemas.ts
+      - apps/api/src/models/model-admin.controller.ts
+      - apps/api/src/models/model-admin-runtime.service.ts
+      - packages/model-registry/src/index.ts
+    publicContracts: [OpenAPI, createProviderSchema, createModelSchema, ModelAdminController]
+    dataEntities: [ProviderDefinition, ModelDefinition, ModelAuditEvent]
+    securityPrivacyImpact: Access tokens and models.manage are mandatory; organization path and token must match before repository access; secret references are write-only and secret-like public configuration is rejected and defensively redacted from reads.
+    acceptanceCriteria: An authorized administrator can register and list providers and draft models through /api/v1; requests and responses appear in /api/openapi.json; missing authentication, missing permission and cross-tenant paths fail; unknown fields and secret-like configuration fail validation; responses and audit output do not expose secret references or values.
+    testIds:
+      [
+        HS-T-M3-API-OPENAPI-001,
+        HS-T-M3-API-RBAC-001,
+        HS-T-M3-API-TENANT-001,
+        HS-T-M3-API-REDACTION-001,
+      ]
+    testPaths: [apps/api/tests/model-admin.http.test.ts]
+    documentationArticleIds: [getting-started/model-registry]
+    introducedVersion: 0.3.0
+  - id: HS-AI-010
+    title: Governed evaluation dataset and suite administration API
+    normativeStatement: HandStack MUST expose authenticated tenant-bound registration and metadata listing for versioned evaluation datasets and suites under /api/v1; datasets MUST carry approval, classification, provenance, owner, retention, unique cases, and production-data legal-basis and sanitization controls; suites MUST bind an exact dataset version and include every product-minimum model gate metric; public responses MUST omit case inputs, expected outputs, and legal-basis text, and clients MUST NOT submit evaluation scores through these collection endpoints.
+    rationale: Evaluation gates are not reproducible without governed versioned inputs, while returning case material or accepting client-computed scores would leak evaluation data and allow publication controls to be forged.
+    owner: ai-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/evaluation/src/index.ts
+      - apps/api/src/models/model-admin.schemas.ts
+      - apps/api/src/models/model-admin.controller.ts
+      - apps/api/src/models/model-admin-runtime.service.ts
+    publicContracts:
+      [
+        CoreEvaluationProvider,
+        createEvaluationDatasetSchema,
+        createEvaluationSuiteSchema,
+        ModelAdminController,
+      ]
+    dataEntities: [EvaluationDataset, EvaluationCase, EvaluationSuite, EvaluationMetric]
+    securityPrivacyImpact: models.manage and exact route/token/repository organization binding are mandatory; dataset reads expose only governance metadata and counts, never cases, expectations, or legal-basis text; production material requires explicit approval, legal basis, and sanitization.
+    acceptanceCriteria: An authorized administrator can register and list a governed dataset and a suite bound to its exact version; OpenAPI contains both collections; missing minimum metrics, duplicate cases, unknown fields, or unsafe production data fail; unprivileged and cross-tenant callers fail; list and create responses contain no case content or legal-basis text.
+    testIds:
+      [
+        HS-T-M3-EVAL-API-OPENAPI-001,
+        HS-T-M3-EVAL-DATA-GOVERNANCE-001,
+        HS-T-M3-EVAL-MINIMUM-GATE-001,
+        HS-T-M3-EVAL-REDACTION-001,
+      ]
+    testPaths: [apps/api/tests/model-admin.http.test.ts]
+    documentationArticleIds: [getting-started/model-registry]
+    introducedVersion: 0.3.0
+  - id: HS-AI-011
+    title: Server-derived evaluation and model publication workflow
+    normativeStatement: HandStack MUST execute pre-publication model evaluations through the tenant-authorized official provider factory, derive minimum gate scores from the actual neutral provider response, persist only bounded results and evidence digests, accept no caller-supplied scores, rebuild a gate only from a persisted run digest, and block approval and publication unless the current versioned gate passed; model secret references MUST resolve lazily through the restricted tenant runtime and MUST NOT appear in records, responses, telemetry, audit, or errors.
+    rationale: Allowing clients to assert scores or requiring publication before evaluation makes the release gate circular and forgeable; evaluating through a different transport than production also invalidates provider compatibility and security evidence.
+    owner: ai-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/model-runtime/src/evaluation-runner.ts
+      - packages/model-registry/src/index.ts
+      - packages/evaluation/src/index.ts
+      - apps/api/src/models/model-admin.schemas.ts
+      - apps/api/src/models/model-admin.controller.ts
+      - apps/api/src/models/model-admin-runtime.service.ts
+    publicContracts:
+      [
+        ModelEvaluationCaseRunner,
+        EvaluationProvider,
+        createEvaluationRunSchema,
+        recordEvaluationGateSchema,
+        ModelAdminController,
+      ]
+    dataEntities: [EvaluationRun, EvaluationResult, EvaluationGate, ModelDefinition]
+    securityPrivacyImpact: The route, model, provider, dataset, suite, run and gate remain tenant-bound; clients submit identifiers only; case inputs and responses are not returned or persisted in clear text; secret values resolve only at provider request time from the restricted HANDSTACK_SECRET namespace.
+    acceptanceCriteria: A draft model executes through an official provider factory and yields response-derived minimum metrics; request-supplied scores and nonexistent run digests fail; only a passing persisted run can move the same model through EVALUATED, APPROVED and PUBLISHED; approval before evaluation fails; OpenAPI documents every operation; results, audit and API payloads contain no case or secret material.
+    testIds:
+      [
+        HS-T-M3-EVAL-RUNNER-001,
+        HS-T-M3-EVAL-NO-FABRICATION-001,
+        HS-T-M3-EVAL-LIFECYCLE-001,
+        HS-T-M3-EVAL-SECRET-001,
+      ]
+    testPaths:
+      - packages/model-runtime/tests/evaluation-runner.test.ts
+      - apps/api/tests/model-admin.http.test.ts
+    documentationArticleIds: [getting-started/model-registry]
+    introducedVersion: 0.3.0
+  - id: HS-AI-012
+    title: Neutral multi-provider model response API
+    normativeStatement: HandStack MUST expose one authenticated tenant-bound response API that accepts only an internal model ID or alias, explicit data classification, neutral messages and optional neutral tools; it MUST require models.execute, resolve only a published evaluated model and its provider internally, enforce classification before provider traffic, and return the common ChatResponse without exposing vendor identifiers, endpoints, secret references or credentials; the same API MUST generate responses through at least three official providers.
+    rationale: A provider-neutral product boundary prevents vendor coupling and credential injection while ensuring that stable traffic cannot bypass versioned evaluation gates.
+    owner: ai-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/model-runtime/src/index.ts
+      - apps/api/src/models/model-admin.schemas.ts
+      - apps/api/src/models/model-admin.controller.ts
+      - apps/api/src/models/model-admin-runtime.service.ts
+    publicContracts:
+      [ModelExecutionRuntime, CreateModelResponseInput, ModelAdminController, ChatResponse]
+    dataEntities: [ProviderDefinition, ModelDefinition, EvaluationGate]
+    securityPrivacyImpact: models.execute and exact token/route organization binding are mandatory; callers cannot choose a provider endpoint or submit credentials; draft and unpublished models and disallowed classifications are rejected locally; upstream failures are sanitized.
+    acceptanceCriteria: OpenAPI contains the neutral response operation; an evaluated and published OpenAI-compatible, Anthropic and Gemini model each return the common response through the same route; a draft model and an unprivileged caller fail; no caller payload or response exposes provider model IDs, endpoints, secret references or credential values.
+    testIds: [HS-T-M3-NEUTRAL-API-001, HS-T-M3-THREE-PROVIDERS-001, HS-T-M3-PUBLISHED-ONLY-001]
+    testPaths: [apps/api/tests/model-admin.http.test.ts]
+    documentationArticleIds: [getting-started/model-registry]
+    introducedVersion: 0.3.0
+  - id: HS-AI-013
+    title: Versioned prompt publication gates
+    normativeStatement: HandStack MUST store tenant-bound Prompt resources and immutable PromptVersion snapshots containing content, declared variables, digest and internal model route; prompt evaluation runs and gates MUST bind the exact version, content digest and model definition; stable publication MUST require prompts.manage and a passing persisted gate for that unchanged snapshot, and new content or a new model route MUST begin as DRAFT without inheriting approval.
+    rationale: Prompt behavior can change independently of a model, so model-only evaluation cannot prove that the deployed prompt/model combination is safe or reproducible.
+    owner: ai-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/models/src/index.ts
+      - packages/model-registry/src/index.ts
+      - packages/evaluation/src/index.ts
+      - packages/model-runtime/src/evaluation-runner.ts
+      - apps/api/src/models/model-admin.schemas.ts
+      - apps/api/src/models/model-admin.controller.ts
+    publicContracts:
+      [Prompt, PromptVersion, PromptEvaluationGate, EvaluationRunInput, ModelAdminController]
+    dataEntities: [Prompt, PromptVersion, PromptEvaluationGate, EvaluationRunRecord]
+    securityPrivacyImpact: prompts.manage and exact organization binding protect all administration; prompt content is omitted from audit metadata; runs persist only subject identifiers, digest, scores and evidence digests; stale or cross-version gates fail closed.
+    acceptanceCriteria: An authorized administrator creates a prompt and immutable version, evaluates the rendered prompt through its bound model, records the persisted gate, approves and publishes it; publication before the gate fails; a new version remains DRAFT and cannot reuse the earlier run; OpenAPI documents all operations and an unprivileged caller receives 403.
+    testIds: [HS-T-M3-PROMPT-VERSION-001, HS-T-M3-PROMPT-GATE-001, HS-T-M3-PROMPT-STALE-001]
+    testPaths:
+      - packages/model-registry/tests/registry.test.ts
+      - packages/evaluation/tests/evaluation.test.ts
+      - packages/model-runtime/tests/evaluation-runner.test.ts
+      - apps/api/tests/model-admin.http.test.ts
+    documentationArticleIds: [getting-started/model-registry]
+    introducedVersion: 0.3.0
+  - id: HS-API-007
+    title: Governed MCP client connectivity
+    normativeStatement: HandStack MUST register tenant-scoped MCP servers, discover tools over Streamable HTTP or stdio with configured authentication, reject cross-tenant or unauthorized calls, and expose discovered tools to AgentHarness only through AGENT capabilities and the common execution engine.
+    rationale: External tool ecosystems require a controlled boundary that preserves tenant isolation, explicit discovery and the same authorization, budget, rate and audit hooks as native capabilities.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules:
+      - packages/mcp-client/src/index.ts
+      - packages/capabilities/src/index.ts
+      - packages/agents/src/index.ts
+    publicContracts: [McpClientRegistry, McpServerConfig, McpTool]
+    dataEntities: [McpServerConfig, McpTool]
+    securityPrivacyImpact: Server credentials remain runtime-only; organization mismatch, missing discovery and missing permissions fail closed before external traffic.
+    acceptanceCriteria: An authenticated server can be discovered and called; stdio and HTTP transports use JSON-RPC; tools materialize as AGENT capabilities and AgentHarness invokes them through CapabilityExecutionEngine; unauthorized and cross-tenant calls fail.
+    testIds: [HS-T-M9-MCP-CLIENT-001]
+    testPaths: [packages/mcp-client/tests/mcp-client.test.ts]
+    documentationArticleIds: [getting-started/mcp-client]
+    introducedVersion: 0.8.0
+  - id: HS-API-008
+    title: Authenticated MCP server endpoint
+    normativeStatement: HandStack MUST expose /mcp and organization-scoped MCP JSON-RPC endpoints that publish only tenant-bound capabilities allowed on the MCP channel, support tools/resources/prompts discovery, authenticate principals and delegate tool calls to CapabilityExecutionEngine.
+    rationale: MCP OUT is a product channel and must preserve the same tenant isolation, authorization, timeout, budget and audit invariants as REST and agents.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules:
+      - packages/mcp-server/src/index.ts
+      - apps/api/src/mcp/mcp.controller.ts
+    publicContracts: [McpServer, McpJsonRpcRequest, McpJsonRpcResponse]
+    dataEntities: [Capability]
+    securityPrivacyImpact: Access tokens establish the tenant principal; cross-organization routes and unavailable channels fail closed; external errors are sanitized.
+    acceptanceCriteria: Authenticated initialize, tools/list, resources/list, prompts/list and tools/call operations are served; only MCP capabilities appear; unauthorized, unknown methods and cross-tenant requests produce JSON-RPC errors; calls use the common execution engine.
+    testIds: [HS-T-M10-MCP-SERVER-001]
+    testPaths: [packages/mcp-server/tests/mcp-server.test.ts, apps/api/tests/health.http.test.ts]
+    documentationArticleIds: [getting-started/mcp-server]
+    introducedVersion: 0.9.0
+  - id: HS-CORE-005
+    title: Plugin SDK lifecycle and isolation
+    normativeStatement: HandStack MUST provide a typed plugin SDK with manifest API version and capability declarations, explicit permission approval, checksum recording, lifecycle hooks, trusted in-process execution and isolated RPC execution for community plugins.
+    rationale: Extensibility must not turn untrusted packages into arbitrary code execution or a supply-chain bypass.
+    owner: platform-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/plugin-sdk/src/index.ts]
+    publicContracts: [PluginManifest, PluginDefinition, PluginHost, definePlugin]
+    dataEntities: [PluginRecord]
+    securityPrivacyImpact: Permissions are allowlisted and approved; source checksum is recorded; isolated mode fails closed without an RPC runner; manifests cannot carry secrets.
+    acceptanceCriteria: Valid manifests install with checksum, lifecycle hooks run, duplicate installs fail, unapproved permission escalation fails and isolated plugins never execute in-process.
+    testIds: [HS-T-M11-PLUGIN-001]
+    testPaths: [packages/plugin-sdk/tests/plugin-sdk.test.ts]
+    documentationArticleIds: [getting-started/plugins]
+    introducedVersion: 0.10.0
+  - id: HS-CORE-008
+    title: Typed and permissioned plugin UI extension points
+    normativeStatement: HandStack MUST expose typed plugin UI extension contracts for settings pages, admin pages, chat actions and message renderers, validate stable IDs, permissions, capabilities and plugin-scoped routes, and reject duplicates or namespace escapes.
+    rationale: Plugin UI must extend the host without bypassing authorization or allowing arbitrary routes and executable code to escape the plugin boundary.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/plugin-sdk/src/index.ts]
+    publicContracts: [PluginUiExtension, PluginUiRegistry, PluginUiExtensionKind]
+    dataEntities: []
+    securityPrivacyImpact: Every extension declares a permission and capability; routes are constrained to `/plugins/` and arbitrary duplicate registrations fail closed.
+    acceptanceCriteria: The registry accepts all four extension kinds, lists by kind, and rejects invalid IDs, missing authorization metadata, duplicate IDs and routes outside the plugin namespace.
+    testIds: [HS-T-M48-PLUGIN-UI-001]
+    testPaths: [packages/plugin-sdk/tests/plugin-sdk.test.ts]
+    documentationArticleIds: [getting-started/plugin-ui-extensions]
+    introducedVersion: 0.46.0
+  - id: HS-CORE-009
+    title: Typed identity provider plugin registration
+    normativeStatement: HandStack MUST provide a typed plugin SDK registration boundary for identity providers that declares a stable provider ID, capabilities, configuration schema and required permissions before an organization can configure or use the provider.
+    rationale: Identity plugins must be discoverable and governable without executing provider code or allowing undeclared capabilities and permissions.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/plugin-sdk/src/index.ts]
+    publicContracts: [IdentityProviderRegistration, IdentityProviderRegistry]
+    dataEntities: []
+    securityPrivacyImpact: Provider registrations require explicit capabilities, configuration schema and permissions; duplicate or incomplete registrations fail closed at the host boundary.
+    acceptanceCriteria: Valid provider registrations are listed deterministically; missing IDs, capabilities, schema or permissions and duplicate IDs are rejected with typed validation errors.
+    testIds: [HS-T-M49-IDENTITY-REGISTRATION-001]
+    testPaths: [packages/plugin-sdk/tests/plugin-sdk.test.ts]
+    documentationArticleIds: [getting-started/identity-plugin-registration]
+    introducedVersion: 0.47.0
+  - id: HS-CORE-010
+    title: Tenant-scoped plugin-owned identity configuration
+    normativeStatement: HandStack MUST provide a typed configuration contract for identity plugins that scopes values by organization and provider, rejects inline secrets and allows adapters to persist or resolve configuration without coupling the host to provider SDKs.
+    rationale: Identity provider settings belong to the organization and plugin, while secret material must stay in the external secret manager and never enter ordinary configuration storage.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/plugin-sdk/src/index.ts]
+    publicContracts:
+      [
+        IdentityProviderConfiguration,
+        IdentityProviderConfigurationStore,
+        InMemoryIdentityProviderConfigurationStore,
+      ]
+    dataEntities: [IdentityProviderConfiguration]
+    securityPrivacyImpact: Every lookup uses organization and provider scope; fields named password, secret, token or private key accept only opaque `secret://` references.
+    acceptanceCriteria: Configuration round-trips within its organization, cross-organization reads return nothing, invalid scopes and empty values fail, and inline confidential values are rejected.
+    testIds: [HS-T-M50-IDENTITY-CONFIG-001]
+    testPaths: [packages/plugin-sdk/tests/plugin-sdk.test.ts]
+    documentationArticleIds: [getting-started/identity-plugin-configuration]
+    introducedVersion: 0.48.0
+  - id: HS-CORE-011
+    title: Governed host wiring for identity provider registration
+    normativeStatement: HandStack MUST route identity provider registration from plugin setup through the governed PluginHost boundary, allowing the host to apply policy before organization configuration and preserving isolated plugin execution semantics.
+    rationale: A typed registration contract is incomplete if plugins can bypass lifecycle, isolation or host policy when becoming available to organizations.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/plugin-sdk/src/index.ts]
+    publicContracts:
+      [PluginHostOptions.registerIdentityProvider, PluginRegistrationContext.identity]
+    dataEntities: []
+    securityPrivacyImpact: Registration is delivered only during enabled plugin execution; isolated plugins still fail closed without their RPC runner and host callbacks can enforce policy before persistence.
+    acceptanceCriteria: Trusted setup registration reaches the configured host callback once; disabled or unavailable isolated runtimes do not register providers; the existing lifecycle and permission checks remain enforced.
+    testIds: [HS-T-M51-IDENTITY-HOST-001]
+    testPaths: [packages/plugin-sdk/tests/plugin-sdk.test.ts]
+    documentationArticleIds: [getting-started/identity-plugin-host]
+    introducedVersion: 0.49.0
+  - id: HS-CORE-012
+    title: Permission-aware plugin UI resolution
+    normativeStatement: HandStack MUST resolve plugin UI extensions only when the current authorization boundary includes the extension permission, optionally narrowing by capability, without treating UI visibility as an authorization grant.
+    rationale: A typed UI descriptor must not become a privilege escalation path; visibility and invocation need deterministic permission filtering while server actions retain final enforcement.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/plugin-sdk/src/index.ts]
+    publicContracts: [PluginUiRegistry.listAuthorized]
+    dataEntities: []
+    securityPrivacyImpact: Missing permissions fail closed, capability filters only reduce visibility, and the contract explicitly keeps action authorization at the server boundary.
+    acceptanceCriteria: Authorized permissions return matching extensions, absent permissions return none, optional capability filtering narrows results and no resolver call grants permission.
+    testIds: [HS-T-M52-PLUGIN-UI-AUTH-001]
+    testPaths: [packages/plugin-sdk/tests/plugin-sdk.test.ts]
+    documentationArticleIds: [getting-started/plugin-ui-authorization]
+    introducedVersion: 0.50.0
+  - id: HS-CORE-013
+    title: Governed host wiring for plugin UI registration
+    normativeStatement: HandStack MUST route typed plugin UI registration from plugin setup through the governed PluginHost lifecycle, preserving trusted/isolated execution semantics before descriptors reach the host UI shell.
+    rationale: UI extension points must not bypass plugin lifecycle or isolation when publishing settings, admin, chat or renderer descriptors.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/plugin-sdk/src/index.ts]
+    publicContracts: [PluginHostOptions.registerUiExtension, PluginRegistrationContext.ui]
+    dataEntities: []
+    securityPrivacyImpact: Only enabled plugin setup can publish descriptors; isolated plugins still require the RPC runner and the host can validate/authorize descriptors before exposure.
+    acceptanceCriteria: Trusted setup descriptors reach the host callback once; unavailable isolated runtimes do not publish; host UI receives only descriptors from the normal plugin lifecycle.
+    testIds: [HS-T-M53-PLUGIN-UI-HOST-001]
+    testPaths: [packages/plugin-sdk/tests/plugin-sdk.test.ts]
+    documentationArticleIds: [getting-started/plugin-ui-host]
+    introducedVersion: 0.51.0
+  - id: HS-CORE-014
+    title: Governed host wiring for plugin tool registration
+    normativeStatement: HandStack MUST route typed plugin tool registration from plugin setup through the governed PluginHost lifecycle so host policy can place tools behind the common capability execution boundary before invocation.
+    rationale: Tool registration must not expose arbitrary handlers that bypass authentication, authorization, rate limits, budgets, guardrails, audit or telemetry.
+    owner: platform-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/plugin-sdk/src/index.ts]
+    publicContracts:
+      [PluginToolRegistration, PluginHostOptions.registerTool, PluginRegistrationContext.tools]
+    dataEntities: []
+    securityPrivacyImpact: Tools are published only by enabled plugins and the host callback remains responsible for the common execution, authorization and observability boundary.
+    acceptanceCriteria: Trusted setup tools reach the host callback once; isolated plugins remain unavailable without their RPC runner; registration does not invoke the handler directly.
+    testIds: [HS-T-M54-PLUGIN-TOOL-HOST-001]
+    testPaths: [packages/plugin-sdk/tests/plugin-sdk.test.ts]
+    documentationArticleIds: [getting-started/plugin-tool-host]
+    introducedVersion: 0.52.0
+  - id: HS-CORE-015
+    title: Governed host wiring for provider registration
+    normativeStatement: HandStack MUST route typed provider descriptors from plugin setup through the governed PluginHost lifecycle, distinguishing model, embedding, storage and notification providers from executable instances before they enter their domain registries.
+    rationale: Provider extensions need a common discovery boundary without bypassing tenant policy, provider classification or isolated plugin execution.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/plugin-sdk/src/index.ts]
+    publicContracts:
+      [
+        ProviderRegistration,
+        PluginHostOptions.registerProvider,
+        PluginRegistrationContext.providers,
+      ]
+    dataEntities: []
+    securityPrivacyImpact: Provider metadata is published only by enabled plugins; host/domain registries retain final authorization, tenant and execution checks.
+    acceptanceCriteria: Valid provider descriptors reach the host callback once during trusted enable; isolated plugins remain unavailable without an RPC runner; descriptor registration never executes a provider instance.
+    testIds: [HS-T-M55-PLUGIN-PROVIDER-HOST-001]
+    testPaths: [packages/plugin-sdk/tests/plugin-sdk.test.ts]
+    documentationArticleIds: [getting-started/plugin-provider-host]
+    introducedVersion: 0.53.0
+  - id: HS-CORE-016
+    title: Governed host wiring for capability registration
+    normativeStatement: HandStack MUST route versioned, permissioned capability descriptors from plugin setup through the governed PluginHost lifecycle and keep capability discovery separate from executable provider or tool invocation.
+    rationale: Capabilities are the platform's cross-channel contract and must enter the common execution engine with explicit version and permission metadata.
+    owner: platform-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/plugin-sdk/src/index.ts]
+    publicContracts:
+      [
+        CapabilityRegistration,
+        PluginHostOptions.registerCapabilities,
+        PluginRegistrationContext.capabilities,
+      ]
+    dataEntities: []
+    securityPrivacyImpact: Capability descriptors declare permissions and remain subject to common authentication, authorization, budget, guardrail, audit and telemetry enforcement.
+    acceptanceCriteria: Typed capability descriptors reach the host callback once during enabled setup; missing metadata is rejected by the capability boundary; registration never invokes a capability implementation directly.
+    testIds: [HS-T-M56-PLUGIN-CAPABILITY-HOST-001]
+    testPaths: [packages/plugin-sdk/tests/plugin-sdk.test.ts]
+    documentationArticleIds: [getting-started/plugin-capability-host]
+    introducedVersion: 0.54.0
+  - id: HS-CORE-017
+    title: Fail-closed capability metadata validation
+    normativeStatement: HandStack MUST validate capability IDs, major.minor versions, descriptions and unique non-empty permissions before invoking the PluginHost capability registration callback.
+    rationale: Capability discovery is part of the authorization boundary and malformed metadata must not create an ungoverned execution entry point.
+    owner: platform-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/plugin-sdk/src/index.ts]
+    publicContracts: [validateCapabilityRegistration]
+    dataEntities: []
+    securityPrivacyImpact: Invalid capability metadata fails before any host side effect; duplicate or missing permissions cannot silently widen access.
+    acceptanceCriteria: Invalid IDs, versions, empty descriptions and empty/duplicate permissions throw typed validation errors and never reach the registration callback.
+    testIds: [HS-T-M57-PLUGIN-CAPABILITY-VALIDATION-001]
+    testPaths: [packages/plugin-sdk/tests/plugin-sdk.test.ts]
+    documentationArticleIds: [getting-started/plugin-capability-validation]
+    introducedVersion: 0.55.0
+  - id: HS-CORE-018
+    title: Fail-closed provider metadata validation
+    normativeStatement: HandStack MUST validate provider IDs, display names, capabilities and configuration schemas before invoking the PluginHost provider registration callback.
+    rationale: Provider discovery must not create an ungoverned domain entry point from malformed plugin metadata.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/plugin-sdk/src/index.ts]
+    publicContracts: [validateProviderRegistration]
+    dataEntities: []
+    securityPrivacyImpact: Invalid provider descriptors produce no callback side effect and remain separate from executable provider instances.
+    acceptanceCriteria: Invalid IDs, empty names, missing capabilities or empty schemas throw typed validation errors before callback invocation.
+    testIds: [HS-T-M58-PLUGIN-PROVIDER-VALIDATION-001]
+    testPaths: [packages/plugin-sdk/tests/plugin-sdk.test.ts]
+    documentationArticleIds: [getting-started/plugin-provider-validation]
+    introducedVersion: 0.56.0
+  - id: HS-CORE-019
+    title: Fail-closed identity provider metadata validation
+    normativeStatement: HandStack MUST validate identity provider IDs, names, capabilities, configuration schemas and unique permissions before invoking the PluginHost identity registration callback.
+    rationale: Identity provider discovery is security-sensitive and malformed metadata must not become an organization-configurable authentication entry point.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/plugin-sdk/src/index.ts]
+    publicContracts: [validateIdentityProviderRegistration]
+    dataEntities: []
+    securityPrivacyImpact: Invalid identity descriptors create no callback side effect; duplicate or missing permissions cannot silently widen authentication behavior.
+    acceptanceCriteria: Invalid IDs, empty names/capabilities/schemas and empty or duplicate permissions throw typed validation errors before callback invocation.
+    testIds: [HS-T-M59-IDENTITY-VALIDATION-001]
+    testPaths: [packages/plugin-sdk/tests/plugin-sdk.test.ts]
+    documentationArticleIds: [getting-started/identity-plugin-validation]
+    introducedVersion: 0.57.0
+  - id: HS-CORE-020
+    title: Official cross-cutting plugin contract suite coverage
+    normativeStatement: HandStack MUST expose the canonical cross-cutting plugin contract suites and fail closed when a plugin declaration omits any required suite.
+    rationale: Consistent contract coverage prevents extensions from bypassing policy, privacy, resilience and operational integration checks.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/plugin-testkit/src/index.ts]
+    publicContracts: [officialPluginContractSuites, assertOfficialPluginContractCoverage]
+    dataEntities: []
+    securityPrivacyImpact: Missing contract suites block publication and cannot silently reduce security or operational coverage.
+    acceptanceCriteria: A complete declaration returns all ten official suites; an incomplete declaration throws a typed error listing missing suites.
+    testIds: [HS-T-M60-PLUGIN-SUITES-001]
+    testPaths: [packages/plugin-testkit/tests/identity.test.ts]
+    documentationArticleIds: [getting-started/plugin-contract-suites]
+    introducedVersion: 0.58.0
+  - id: HS-CORE-021
+    title: Official built-in implementations for critical plugin points
+    normativeStatement: HandStack MUST map every official cross-cutting plugin contract suite to a non-empty built-in core package and fail closed when that invariant is absent.
+    rationale: Pluggability cannot make critical governance, privacy, execution or operational behavior optional.
+    owner: platform-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/plugin-testkit/src/index.ts]
+    publicContracts: [officialPluginImplementations, assertOfficialBuiltInImplementations]
+    dataEntities: []
+    securityPrivacyImpact: Third-party extensions cannot replace the core enforcement path by masquerading as official implementations.
+    acceptanceCriteria: All ten official suites map to non-empty package paths marked builtIn true; invalid mappings throw a typed error.
+    testIds: [HS-T-M61-PLUGIN-BUILTINS-001]
+    testPaths: [packages/plugin-testkit/tests/identity.test.ts]
+    documentationArticleIds: [getting-started/official-plugin-implementations]
+    introducedVersion: 0.59.0
+  - id: HS-CORE-022
+    title: Runtime verification of official built-in plugin packages
+    normativeStatement: HandStack MUST verify through an injected resolver that every official cross-cutting suite has an available built-in core package before activation, without executing untrusted plugin code.
+    rationale: Static metadata cannot prove that a deployment contains the core implementation required for a complete product.
+    owner: platform-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/plugin-testkit/src/index.ts]
+    publicContracts: [OfficialPluginImplementationResolver, verifyOfficialBuiltInImplementations]
+    dataEntities: []
+    securityPrivacyImpact: Missing core implementations fail closed and package discovery remains separate from third-party code execution.
+    acceptanceCriteria: An all-present resolver succeeds; any unavailable official package throws a typed built-in-implementation error.
+    testIds: [HS-T-M62-PLUGIN-BUILTINS-001]
+    testPaths: [packages/plugin-testkit/tests/identity.test.ts]
+    documentationArticleIds: [getting-started/verify-plugin-implementations]
+    introducedVersion: 0.60.0
+  - id: HS-AI-015
+    title: Portable tenant-scoped Knowledge/RAG
+    normativeStatement: HandStack MUST provide KnowledgeBase, Document, Chunk, Embedding and DataSource contracts, configurable chunking, replaceable embedding providers and VectorStore adapters, with organization filters on ingest and search.
+    rationale: Retrieval quality and portability require an adapter-neutral vector boundary and strict tenant isolation independent of the primary database.
+    owner: ai-platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/knowledge/src/index.ts]
+    publicContracts:
+      [
+        KnowledgeBase,
+        Document,
+        Chunk,
+        Embedding,
+        VectorStore,
+        EmbeddingProvider,
+        KnowledgeIngestionService,
+        KnowledgeSearchService,
+      ]
+    dataEntities: [KnowledgeBase, Document, Chunk, Embedding, DataSource]
+    securityPrivacyImpact: Organization ids are required and applied to vector keys and filters; source credentials are not stored by the contracts.
+    acceptanceCriteria: Character/token/paragraph chunking rejects invalid overlap, ingestion embeds/upserts chunks, search returns only the requested organization and knowledge base, and any VectorStore implementation can be substituted.
+    testIds: [HS-T-M12-KNOWLEDGE-001]
+    testPaths: [packages/knowledge/tests/knowledge.test.ts]
+    documentationArticleIds: [getting-started/knowledge]
+    introducedVersion: 0.11.0
+  - id: HS-API-009
+    title: Plugin registry and marketplace catalogs
+    normativeStatement: HandStack MUST expose official, community, installed and updates plugin catalogs, support npm/GitHub/local source metadata with checksum pinning, and provide registry lookup APIs without executing package code in the API process.
+    rationale: Marketplace discovery and supply-chain verification need a tenant-safe catalog boundary independent from plugin runtime execution.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules:
+      [packages/plugins/src/index.ts, apps/api/src/plugins/plugin-registry.controller.ts]
+    publicContracts: [PluginRegistry, PluginRegistryEntry, PluginSource]
+    dataEntities: [PluginRegistryEntry, InstalledPlugin]
+    securityPrivacyImpact: Source locators are validated, checksums are compared on install, and registry reads do not execute plugin code or reveal secrets.
+    acceptanceCriteria: Official/community entries publish and list, installed entries are tracked, newer semver entries appear in updates, checksum mismatches fail, and GET registry APIs expose catalog/lookup operations.
+    testIds: [HS-T-M13-PLUGIN-REGISTRY-001]
+    testPaths: [packages/plugins/tests/plugins.test.ts]
+    documentationArticleIds: [getting-started/plugins]
+    introducedVersion: 0.12.0
+  - id: HS-SEC-011
+    title: ABAC approvals and durable workflows
+    normativeStatement: HandStack MUST evaluate deny-by-default RBAC/ABAC policies with tenant, principal, group, time and attribute conditions, and MUST persist workflow executions and pause/resume at human approval nodes for manual, API, webhook, schedule and event triggers.
+    rationale: High-risk capability and workflow actions require explicit policy decisions and recoverable human consent.
+    owner: security-platform-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/policy/src/index.ts, packages/workflows/src/index.ts]
+    publicContracts:
+      [PolicyEngine, InMemoryApprovalService, Workflow, WorkflowRuntime, WorkflowExecution]
+    dataEntities: [AuthorizationPolicy, ApprovalRequest, WorkflowExecution, WorkflowStepExecution]
+    securityPrivacyImpact: Policies are organization-scoped with explicit deny precedence; approvals require all configured approvers and cannot cross tenants; workflow payloads remain execution-scoped.
+    acceptanceCriteria: Attribute and time conditions evaluate correctly, unmatched requests deny, approval quorum gates continuation, invalid graphs/triggers fail, and an execution resumes after approval with persisted status.
+    testIds: [HS-T-M14-WORKFLOW-001]
+    testPaths: [packages/policy/tests/policy.test.ts, packages/workflows/tests/workflows.test.ts]
+    documentationArticleIds: [getting-started/governance-workflows]
+    introducedVersion: 0.13.0
+  - id: HS-AI-016
+    title: Multi-agent orchestration, memory and guardrails
+    normativeStatement: HandStack MUST support sequential, bounded parallel and supervisor agent orchestration with controlled handoff, and MUST provide explicit memory scopes and input/tool/output guardrail stages.
+    rationale: Agent collaboration needs bounded concurrency and explicit retention/safety controls rather than hidden shared state.
+    owner: ai-platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/agents/src/index.ts]
+    publicContracts:
+      [AgentOrchestrator, AgentRunner, MemoryStore, InMemoryMemoryStore, GuardrailPipeline]
+    dataEntities: [MemoryEntry, AgentTask, AgentTaskResult]
+    securityPrivacyImpact: Parallelism is bounded, memory is organization/owner keyed and guardrails are stage-specific; orchestration delegates only through the injected runner.
+    acceptanceCriteria: Sequential, parallel and supervisor modes execute with a concurrency cap; memory cannot cross organizations; guardrails run input/tool/output stages and undeclared handoffs fail.
+    testIds: [HS-T-M15-AGENTS-001]
+    testPaths: [packages/agents/tests/agent-harness.test.ts]
+    documentationArticleIds: [getting-started/agents]
+    introducedVersion: 0.14.0
+  - id: HS-DATA-011
+    title: Tenant-scoped storage and file security
+    normativeStatement: HandStack MUST provide a replaceable StorageProvider with organization-scoped object operations, signed URLs, upload size/MIME/extension validation and a malware scanning hook.
+    rationale: File uploads require portable storage and consistent security controls independent of the backing object store.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/storage/src/index.ts]
+    publicContracts: [StorageProvider, InMemoryStorageProvider, FileSecurityPolicy, validateUpload]
+    dataEntities: [StoredObject]
+    securityPrivacyImpact: Organization ids are part of every operation; policy and malware failures prevent persistence; signed URLs are time-limited.
+    acceptanceCriteria: Objects are isolated by organization, invalid uploads are rejected, scanner failures do not persist data, and signed URLs require positive expiry and an existing object.
+    testIds: [HS-T-M18-STORAGE-001]
+    testPaths: [packages/storage/tests/storage.test.ts]
+    documentationArticleIds: [getting-started/storage]
+    introducedVersion: 0.15.0
+  - id: HS-CORE-007
+    title: Hierarchical feature flags
+    normativeStatement: HandStack MUST provide a feature flag service with global, organization and user scopes, explicit false overrides, deny-by-default evaluation and organization-safe identity keys.
+    rationale: Rollouts need tenant-aware controls without allowing client input or cross-tenant user identifiers to change behavior.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/feature-flags/src/index.ts]
+    publicContracts: [FeatureFlagService, InMemoryFeatureFlagService, FeatureFlag]
+    dataEntities: [FeatureFlag]
+    securityPrivacyImpact: User flags require organization context; records are resolved by scoped keys and unknown flags are disabled.
+    acceptanceCriteria: Global, organization and user values resolve in precedence order, false values override true defaults, invalid scopes are rejected and user ids cannot cross organizations.
+    testIds: [HS-T-M19-FLAGS-001]
+    testPaths: [packages/feature-flags/tests/feature-flags.test.ts]
+    documentationArticleIds: [getting-started/feature-flags]
+    introducedVersion: 0.16.0
+  - id: HS-SEC-012
+    title: Privacy, retention and data lifecycle controls
+    normativeStatement: HandStack MUST provide adapter-neutral privacy policy, retention planning, legal hold, data-subject request and data-residency contracts with organization isolation.
+    rationale: Compliance controls must cover primary data, vectors, objects, queues and plugin-owned records without allowing deletion to bypass legal hold.
+    owner: security-platform-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/privacy/src/index.ts]
+    publicContracts:
+      [
+        PrivacyPolicyProvider,
+        DataLifecycleProvider,
+        DataSubjectRequestProvider,
+        DataResidencyProvider,
+      ]
+    dataEntities: [RetentionPolicy, LegalHold, DataSubjectRequest, LifecyclePlan]
+    securityPrivacyImpact: Tenant mismatch is rejected, legal holds block deletion, requests require approval and residency decisions deny unknown regions.
+    acceptanceCriteria: Lifecycle plans honor retention and legal hold, subject requests are approved before execution, residency denies unregistered regions and all contracts preserve organization scope.
+    testIds: [HS-T-M20-PRIVACY-001]
+    testPaths: [packages/privacy/tests/privacy.test.ts]
+    documentationArticleIds: [getting-started/privacy-lifecycle]
+    introducedVersion: 0.17.0
+  - id: HS-OPS-004
+    title: Append-only audit and SIEM export
+    normativeStatement: HandStack MUST provide tenant-scoped append-only AuditEvent storage with trace correlation and a redacting SIEM exporter contract.
+    rationale: Security and compliance evidence must be durable without leaking prompts, responses, secrets or cross-tenant events.
+    owner: security-platform-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/audit/src/index.ts, packages/telemetry/src/index.ts]
+    publicContracts:
+      [
+        AuditEvent,
+        AuditSink,
+        AuditSinkProvider,
+        AuditReceipt,
+        AuditCheckpoint,
+        TamperEvidentAuditSink,
+        SiemExporter,
+        RedactingSiemExporter,
+      ]
+    dataEntities: [AuditEvent]
+    securityPrivacyImpact: Every query requires organization scope and sensitive metadata is redacted before external export.
+    acceptanceCriteria: Events append and cannot be updated through the sink, tenant queries isolate organizations, SIEM export redacts configured sensitive keys, hash chains detect alteration, checkpoints are signed, and CLI verify/export/checkpoint commands require tenant scope.
+    testIds: [HS-T-M21-AUDIT-001, HS-T-M18-AUDIT-INTEGRITY-001, HS-T-M18-AUDIT-CLI-001]
+    testPaths: [packages/audit/tests/audit.test.ts, packages/cli/tests/audit-command.test.ts]
+    documentationArticleIds: [getting-started/audit-observability]
+    introducedVersion: 0.18.0
+  - id: HS-OPS-005
+    title: Bounded background jobs and worker queues
+    normativeStatement: HandStack MUST provide named background queues with priority, bounded backlog, idempotency, retries with backoff and jitter, timeout, heartbeat/checkpoint, cancellation, dead-letter retention and typed backpressure.
+    rationale: Distributed workloads must scale independently without unbounded memory or duplicate financial/agent side effects.
+    owner: platform-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/jobs/src/index.ts]
+    publicContracts: [InMemoryJobQueue, Job, JobContext, BackpressureError]
+    dataEntities: [Job]
+    securityPrivacyImpact: Queue payloads are bounded and cancellation/retry states are explicit; idempotency prevents duplicate processing.
+    acceptanceCriteria: All official queue names are available, capacity rejects with retry-after, duplicate keys are stable, failures retry then DLQ, and cancellation/timeout do not consume jobs silently.
+    testIds: [HS-T-M22-JOBS-001]
+    testPaths: [packages/jobs/tests/jobs.test.ts]
+    documentationArticleIds: [getting-started/jobs]
+    introducedVersion: 0.19.0
+  - id: HS-OPS-006
+    title: Distributed deployment topology and scaling
+    normativeStatement: HandStack MUST provide a distributed deployment baseline with stateless Web/API/MCP replicas, independent worker deployments, readiness/liveness probes and horizontal scaling hooks for queue backlog.
+    rationale: Horizontal scale must preserve tenant authorization, budgets, audit and streaming behavior while scaling each workload independently.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules: [deploy/kubernetes/handstack.yaml, packages/jobs/src/index.ts]
+    publicContracts: [DistributedDeploymentManifest, JobQueueName]
+    dataEntities: [Deployment, Worker]
+    securityPrivacyImpact: Secrets are externalized; replicas share only authenticated database/Redis/object-storage state and probes prevent unhealthy pods receiving traffic.
+    acceptanceCriteria: Manifest contains Web/API/MCP and six worker classes, bounded HPAs cover synchronous workloads, KEDA hooks cover worker backlog, every deployment has resources/probes/graceful termination, and PDB/network policy/topology defaults plus documentation are present.
+    testIds: [HS-T-M23-DEPLOY-001]
+    testPaths: [deploy/kubernetes/README.md]
+    documentationArticleIds: [getting-started/distributed-deployment]
+    introducedVersion: 0.20.0
+  - id: HS-API-010
+    title: Tenant-scoped operations administration API
+    normativeStatement: HandStack MUST expose authenticated organization-scoped APIs for feature flag management, append-only audit queries and bounded job enqueueing with explicit permission checks.
+    rationale: Administrative controls need one governed API boundary that cannot bypass tenant isolation or queue backpressure.
+    owner: platform-team
+    status: verified
+    risk: critical
+    affectedModules: [apps/api/src/operations/operations.controller.ts]
+    publicContracts: [OperationsController, OperationsRuntimeService]
+    dataEntities: [FeatureFlag, AuditEvent, Job]
+    securityPrivacyImpact: Bearer authentication, organization matching and permission checks precede every operation; payloads are validated and audit remains tenant filtered.
+    acceptanceCriteria: Feature flag GET/PUT, audit GET and job POST routes reject cross-tenant/unauthorized requests and preserve underlying service invariants.
+    testIds: [HS-T-M24-OPERATIONS-001]
+    testPaths: [apps/api/tests/health.http.test.ts]
+    documentationArticleIds: [getting-started/operations-api]
+    introducedVersion: 0.21.0
+  - id: HS-DATA-012
+    title: Portable object-storage adapter matrix
+    normativeStatement: HandStack MUST expose Local, S3, Cloudflare R2, Azure Blob and GCS storage adapters behind the StorageProvider contract with injectable clients and tenant-safe signed URLs.
+    rationale: Deployments need provider portability without weakening upload validation, isolation or signed URL semantics.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/storage/src/index.ts]
+    publicContracts:
+      [
+        LocalStorageProvider,
+        S3StorageProvider,
+        CloudflareR2StorageProvider,
+        AzureBlobStorageProvider,
+        GcsStorageProvider,
+      ]
+    dataEntities: [StoredObject]
+    securityPrivacyImpact: All adapters preserve organization-scoped operations and delegate signing only after backend existence checks.
+    acceptanceCriteria: Each official adapter implements put/get/delete/signedUrl, supports injected backends for tests and returns provider-specific signed URL schemes.
+    testIds: [HS-T-M25-STORAGE-ADAPTERS-001]
+    testPaths: [packages/storage/tests/storage.test.ts]
+    documentationArticleIds: [getting-started/storage]
+    introducedVersion: 0.22.0
+  - id: HS-OPS-007
+    title: Redis Streams event bus and durable job transport
+    normativeStatement: HandStack MUST expose Redis Streams consumer-group and BullMQ-compatible transport contracts with at-least-once delivery, explicit acknowledgement, retry and dead-letter behavior.
+    rationale: Distributed replicas require durable coordination without coupling domain packages to one Redis or BullMQ SDK.
+    owner: platform-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/core/src/event-bus.ts, packages/jobs/src/index.ts]
+    publicContracts:
+      [RedisStreamsEventBus, RedisStreamsTransport, DistributedJobQueue, DurableJobTransport]
+    dataEntities: [DomainEvent, Job]
+    securityPrivacyImpact: Event payloads retain organization scope; handlers acknowledge only after completion and transports must enforce tenant-safe idempotency.
+    acceptanceCriteria: Events are appended before publish returns, consumer groups acknowledge successful handlers only, failures route to transport DLQ, and distributed queues apply bounded admission with retries.
+    testIds: [HS-T-M26-REDIS-001]
+    testPaths: [packages/core/tests/event-bus.test.ts, packages/jobs/tests/jobs.test.ts]
+    documentationArticleIds: [getting-started/redis-streams]
+    introducedVersion: 0.23.0
+  - id: HS-API-011
+    title: Tenant-scoped agent management API
+    normativeStatement: HandStack MUST expose authenticated organization-scoped APIs to create agents, create immutable versions and publish exactly one active version with explicit permission checks.
+    rationale: Agent lifecycle changes are governed resources and must not cross organization boundaries.
+    owner: agents-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      [apps/api/src/agents/agent.controller.ts, apps/api/src/agents/agent-runtime.service.ts]
+    publicContracts: [AgentController, AgentRuntimeService]
+    dataEntities: [Agent, AgentVersion]
+    securityPrivacyImpact: Bearer authentication, organization matching and agents.read/manage permissions precede every operation; prompts remain tenant-scoped.
+    acceptanceCriteria: Agent listing, creation, version creation and publication reject cross-tenant or unauthorized requests, validate limits and deprecate prior published versions.
+    testIds: [HS-T-M28-AGENTS-001]
+    testPaths: [apps/api/tests/agent-runtime.test.ts]
+    documentationArticleIds: [getting-started/agents]
+    introducedVersion: 0.24.0
+  - id: HS-API-012
+    title: Tenant-scoped workflow runtime API
+    normativeStatement: HandStack MUST expose authenticated organization-scoped APIs to create, publish and execute validated workflow graphs, persist execution state and resume human approvals with explicit permission checks.
+    rationale: Workflow automation must preserve tenant isolation, graph validity and approval governance at the API boundary.
+    owner: platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      [
+        apps/api/src/workflows/workflow.controller.ts,
+        apps/api/src/workflows/workflow-runtime.service.ts,
+        packages/workflows/src/index.ts,
+      ]
+    publicContracts: [WorkflowController, WorkflowRuntimeService, WorkflowRuntime]
+    dataEntities: [Workflow, WorkflowExecution, WorkflowStepExecution]
+    securityPrivacyImpact: Bearer authentication, organization matching and workflows.read/manage/run permissions precede every operation; execution and approval lookups are tenant keyed.
+    acceptanceCriteria: Workflow listing, draft creation, publication, execution, execution lookup and approval resume validate schemas, reject cross-tenant/unauthorized requests and retain durable runtime state behind a replaceable repository boundary.
+    testIds: [HS-T-M29-WORKFLOWS-001]
+    testPaths: [apps/api/tests/workflow-runtime.test.ts, packages/workflows/tests/workflows.test.ts]
+    documentationArticleIds: [getting-started/governance-workflows]
+    introducedVersion: 0.25.0
+  - id: HS-OPS-008
+    title: Signed webhook delivery with retry and dead-letter handling
+    normativeStatement: HandStack MUST provide tenant-aware webhook event delivery with HMAC signatures, bounded retries, idempotency and explicit dead-letter retention.
+    rationale: External event consumers need authenticity, replay safety and operational recovery without leaking tenant payloads.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/webhooks/src/index.ts]
+    publicContracts: [WebhookDispatcher, WebhookTransport, verifyWebhookSignature]
+    dataEntities: [WebhookDelivery]
+    securityPrivacyImpact: Secrets remain in the dispatcher boundary; signatures use constant-time verification and dead-letter records retain only bounded error metadata.
+    acceptanceCriteria: Supported events are signed, transient failures retry with a bounded limit, poison deliveries are dead-lettered, and delivery state is tenant keyed and idempotent.
+    testIds: [HS-T-M30-WEBHOOKS-001]
+    testPaths: [packages/webhooks/tests/webhooks.test.ts]
+    documentationArticleIds: [getting-started/webhooks]
+    introducedVersion: 0.26.0
+  - id: HS-SEC-013
+    title: Tenant-scoped temporary access requests and notifications
+    normativeStatement: HandStack MUST support access requests with reason, duration and reference, temporary grants with explicit expiry or permanence, revocation and notification provider delivery without cross-tenant access.
+    rationale: Privileged access must be time-bounded, attributable and observable.
+    owner: security-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/access/src/index.ts]
+    publicContracts: [InMemoryAccessService, AccessRequest, AccessGrant, NotificationProvider]
+    dataEntities: [AccessRequest, AccessGrant, Notification]
+    securityPrivacyImpact: All lookups and active-grant checks include organization scope; grants expire and revocation is explicit; notification payloads contain ids rather than secrets.
+    acceptanceCriteria: Requests validate required fields, approval emits a tenant-scoped grant for supported durations, cross-tenant reads fail, revocation removes active access and notifications are delivered through a replaceable provider.
+    testIds: [HS-T-M31-ACCESS-001]
+    testPaths: [packages/access/tests/access.test.ts]
+    documentationArticleIds: [getting-started/access-requests]
+    introducedVersion: 0.27.0
+  - id: HS-API-013
+    title: Governed OpenAI-compatible embeddings endpoint
+    normativeStatement: HandStack MUST expose `/v1/embeddings` only through authenticated virtual keys and published model routes, delegating vector generation to an embedding-capable provider and failing closed when unsupported.
+    rationale: Embeddings share model governance, tenant isolation and budget boundaries with chat without allowing arbitrary provider access.
+    owner: ai-platform-team
+    status: verified
+    risk: high
+    affectedModules:
+      [
+        apps/api/src/gateway/openai-compatible.controller.ts,
+        packages/model-runtime/src/index.ts,
+        packages/models/src/index.ts,
+      ]
+    publicContracts: [EmbeddingRequest, EmbeddingResponse, ModelExecutionRuntime.embed]
+    dataEntities: [UsageRecord]
+    securityPrivacyImpact: Virtual-key authentication, model publication and provider classification checks run before embedding; unsupported adapters return a typed fail-closed error.
+    acceptanceCriteria: String and batch inputs validate bounds, published model routing is enforced, response uses OpenAI list/data/usage shape, and no provider or secret is client-selectable.
+    testIds: [HS-T-M37-EMBEDDINGS-001]
+    testPaths: [packages/model-runtime/tests/runtime.test.ts, apps/api/tests/gateway.http.test.ts]
+    documentationArticleIds: [getting-started/model-registry]
+    introducedVersion: 0.28.0
+  - id: HS-DATA-014
+    title: ACL-aware RAG lifecycle and retrieval safety
+    normativeStatement: Knowledge documents, chunks and embeddings MUST preserve source provenance, ACL snapshot, classification, residency and deletion state; ingestion MUST fail closed on unsafe content or missing ACL, and retrieval MUST revalidate the principal ACL and expose stale-result signals.
+    rationale: Vector similarity alone cannot authorize sensitive knowledge or prevent prompt injection, PII and secret leakage.
+    owner: ai-platform-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/knowledge/src/index.ts]
+    publicContracts:
+      [
+        RagPolicyProvider,
+        InMemoryRagPolicyProvider,
+        KnowledgeIngestionService,
+        KnowledgeSearchService,
+      ]
+    dataEntities: [Document, Chunk, Embedding, SourceAclEntry]
+    securityPrivacyImpact: ACL and organization filters run before results are returned; common PII, cloud keys and prompt-injection markers are rejected before embedding; source provenance and freshness remain visible.
+    acceptanceCriteria: Ingestion carries lifecycle metadata and rejects missing ACL or unsafe content; retrieval filters by principal and organization, marks stale sources, and returns no unauthorized matches.
+    testIds: [HS-T-M162-RAG-SECURITY-001]
+    testPaths: [packages/knowledge/tests/knowledge.test.ts]
+    documentationArticleIds: [getting-started/knowledge]
+    introducedVersion: 0.29.0
+  - id: HS-OPS-009
+    title: Tenant-scoped incident management and status communication
+    normativeStatement: HandStack MUST persist organization-scoped incidents with severity, lifecycle state, timeline, corrective actions and escalation policies, transition them through a bounded state machine, communicate only customer-safe details through a replaceable status-page provider, and retain root-cause evidence internally.
+    rationale: Incident response requires a governed, tenant-safe record of detection, investigation, mitigation and resolution without leaking internal root-cause detail to customers.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules:
+      [packages/incidents/src/index.ts, apps/api/src/incidents/incident.controller.ts]
+    publicContracts:
+      [
+        IncidentManagementProvider,
+        DefaultIncidentManagementProvider,
+        IncidentStore,
+        RepositoryIncidentStore,
+        InMemoryIncidentStore,
+        StatusPageProvider,
+        IncidentNotificationDispatcher,
+      ]
+    dataEntities:
+      [
+        Incident,
+        IncidentTimelineEntry,
+        CorrectiveAction,
+        IncidentEscalationPolicy,
+        IncidentNotification,
+      ]
+    securityPrivacyImpact: Incidents are tenant keyed; status-page output redacts root cause and corrective actions; escalation policies are organization scoped; notifications carry incident ids rather than secrets.
+    acceptanceCriteria: Incidents are created and transitioned only through allowed state changes, timeline entries and corrective actions update atomically, status-page publication redacts root cause, and cross-tenant reads fail.
+    testIds: [HS-T-M32-INCIDENTS-001]
+    testPaths: [packages/incidents/tests/incidents.test.ts]
+    documentationArticleIds: [getting-started/incidents]
+    introducedVersion: 0.30.0
+  - id: HS-OPS-010
+    title: Tenant-scoped multi-channel notifications
+    normativeStatement: HandStack MUST deliver organization-scoped notifications through replaceable in-app, email SMTP and webhook providers, store them durably, and support plugin channels such as Slack, Teams and Discord without coupling the core to a vendor SDK.
+    rationale: Operational and governance events require a governed, tenant-safe delivery boundary across the channels operators already use.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules:
+      [packages/notifications/src/index.ts, apps/api/src/notifications/notification.controller.ts]
+    publicContracts:
+      [
+        NotificationProvider,
+        NotificationStore,
+        RepositoryNotificationStore,
+        InMemoryNotificationStore,
+        InAppNotificationProvider,
+        SmtpNotificationProvider,
+        FetchNotificationWebhookTransport,
+      ]
+    dataEntities: [Notification]
+    securityPrivacyImpact: Notifications are tenant scoped and idempotently appended; SMTP and webhook transports receive bounded payloads and timeout limits; plugin channels remain behind the NotificationProvider boundary.
+    acceptanceCriteria: In-app notifications append and list by recipient, SMTP and webhook providers delegate to replaceable transports, cross-tenant listing fails, and duplicate notification ids are ignored.
+    testIds: [HS-T-M33-NOTIFICATIONS-001]
+    testPaths: [packages/notifications/tests/notifications.test.ts]
+    documentationArticleIds: [getting-started/notifications]
+    introducedVersion: 0.31.0
+  - id: HS-SEC-014
+    title: Encryption at rest for secrets
+    normativeStatement: HandStack MUST encrypt sensitive values at rest with AES-256-GCM under a 256-bit master key loaded from HANDSTACK_MASTER_KEY, derive purpose keys with HKDF-SHA256, bind ciphertext to organization and plugin context through GCM additional authenticated data, and never include plaintext, key material, or ciphertext in errors or logs.
+    rationale: Secrets persisted in the database or object storage must remain unreadable after a storage disclosure and must stay tenant-bound so a sealed value cannot be opened from another organization.
+    owner: security-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/core/src/encryption.ts
+      - packages/core/src/index.ts
+    publicContracts:
+      [
+        MasterKey,
+        encryptSecret,
+        decryptSecret,
+        sealSecret,
+        openSecret,
+        parseEnvelope,
+        EncryptedSecretStore,
+      ]
+    dataEntities: [SealedSecret]
+    securityPrivacyImpact: Ciphertext uses a fresh random 96-bit nonce and a 128-bit authentication tag; AAD binds each envelope to organizationId and pluginId; purpose keys are HKDF-derived so a compromise of one purpose does not expose the master key; failures collapse to a redacted EncryptionError without material.
+    acceptanceCriteria: Sealing and opening round-trip the plaintext; the same plaintext produces distinct nonces; a wrong key, mismatched AAD, tampered ciphertext, and malformed envelope each fail with a redacted EncryptionError; hex and base64 32-byte keys decode equally; purpose derivation is deterministic and separated; the encrypted store persists only envelopes and opens them only within the sealing organization.
+    testIds: [HS-T-M34-ENCRYPTION-001, HS-T-M34-ENCRYPTION-002, HS-T-M34-ENCRYPTION-003]
+    testPaths: [packages/core/tests/encryption.test.ts]
+    documentationArticleIds: [getting-started/encryption-secrets]
+    introducedVersion: 0.32.0
+  - id: HS-SEC-015
+    title: SCIM 2.0 corporate provisioning
+    normativeStatement: HandStack MUST support SCIM 2.0 provisioning of users, groups and memberships with activation, deactivation and profile updates, idempotent external identities, optimistic concurrency, tenant isolation, dedicated authentication, rate limiting and redacted audit.
+    rationale: Corporate identity providers must be able to provision and deprovision users without a first login while preserving the platform tenant isolation and audit guarantees.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/scim/src/index.ts]
+    publicContracts:
+      [
+        ScimProvisioningService,
+        ScimStore,
+        InMemoryScimStore,
+        RepositoryScimStore,
+        ScimRateLimiter,
+        ScimAuditSink,
+      ]
+    dataEntities: [ScimUser, ScimGroup, ScimGroupMember, ScimAuditEvent]
+    securityPrivacyImpact: Every operation is tenant keyed and rate limited per organization; externalId and userName are unique within an organization; updates require an ETag version match; audit events carry identifiers only and never secret or profile content.
+    acceptanceCriteria: Users and groups are created, listed, updated, deactivated, reactivated and deleted with tenant isolation; externalId upserts are idempotent; duplicate externalId or userName and version conflicts fail; group membership references only existing tenant users; and rate limiting and audit hooks fire on every mutation.
+    testIds: [HS-T-M35-SCIM-001]
+    testPaths: [packages/scim/tests/scim.test.ts]
+    documentationArticleIds: [getting-started/scim]
+    introducedVersion: 0.33.0
+  - id: HS-SEC-016
+    title: Secure sandbox for untrusted code execution
+    normativeStatement: Untrusted plugins, generated code, local tools and MCP stdio commands MUST execute through a SandboxProvider exposing prepare, execute and terminate over a SandboxProfile that enforces CPU, memory, process and execution-time limits, a read-only root filesystem, explicit writable mounts, deny-by-default network with a destination allowlist and SSRF protection, scoped and expiring secret handles, maximum output and log sizes, and tenant and execution identity.
+    rationale: Community plugins and generated code must never run arbitrarily in the main process or reach private networks, host filesystems or cross-tenant secrets.
+    owner: security-platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/sandbox/src/index.ts
+      - packages/sandbox/package.json
+    publicContracts:
+      [
+        SandboxProvider,
+        SandboxProfile,
+        SandboxHandle,
+        SandboxExecutionRequest,
+        SandboxExecutionResult,
+        ProcessIsolatedSandboxProvider,
+        ContainerSandboxProvider,
+        FailClosedSandboxProvider,
+        sandboxExtensionProvider,
+      ]
+    dataEntities: [SandboxProfile, SandboxHandle, SandboxExecutionResult, SecretHandle]
+    securityPrivacyImpact: Network is deny-by-default with private, loopback, link-local and metadata targets blocked unless explicitly allowlisted; secret handles are tenant-bound and expire; output is truncated to profile limits; termination is observable; and a fail-closed provider rejects execution when no concrete executor is available.
+    acceptanceCriteria: Profiles reject empty organization, non-positive time/output limits, empty allowlists and cross-tenant secret handles; destinations resolve only against the allowlist with private targets blocked by default; secrets resolve only when provisioned, unexpired and tenant-bound; output is truncated; providers execute through an injected executor and refuse execution after termination; the fail-closed provider and the sandbox extension wiring report healthy state.
+    testIds: [HS-T-M36-SANDBOX-001, HS-T-M36-SANDBOX-002, HS-T-M36-SANDBOX-003]
+    testPaths: [packages/sandbox/tests/sandbox.test.ts]
+    documentationArticleIds: [getting-started/plugin-sandbox]
+    introducedVersion: 0.34.0
+  - id: HS-SEC-017
+    title: Dedicated SCIM 2.0 HTTP endpoint
+    normativeStatement: HandStack MUST expose a RFC 7644 SCIM 2.0 endpoint authenticated by a dedicated per-organization bearer token whose full secret is returned only once and stored only as a keyed HMAC digest; the endpoint MUST discover users, groups and service-provider metadata, enforce optimistic concurrency through ETag and If-Match, return RFC 7644 error responses with 401/400/404/409/429 mapping, rate-limit per organization, audit mutations through the durable sink, and derive the organization exclusively from the credential so cross-tenant access is impossible.
+    rationale: Corporate IdPs such as Entra and Okta require an RFC 7644 HTTP surface with its own credential, not a user session, while the platform must keep provisioning tenant-isolated, rate-limited, audited and verifiable.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules:
+      - packages/scim/src/index.ts
+      - packages/shared/src/errors.ts
+      - apps/api/src/scim/scim.controller.ts
+      - apps/api/src/scim/scim-admin.controller.ts
+      - apps/api/src/scim/scim-auth.guard.ts
+      - apps/api/src/scim/scim-error.filter.ts
+      - apps/api/src/scim/scim-runtime.service.ts
+    publicContracts:
+      [
+        ScimController,
+        ScimAdminController,
+        ScimAuthGuard,
+        ScimErrorFilter,
+        ScimCredentialService,
+        ScimCredentialStore,
+        ScimRuntimeService,
+      ]
+    dataEntities: [ScimUser, ScimGroup, ScimCredential, ScimNotFoundError, ScimConflictError]
+    securityPrivacyImpact: The raw SCIM token is returned once and only its HMAC-SHA256 digest is stored; authentication is a tenant-scoped constant-time lookup keyed by the organization embedded in the token; the organization is never taken from a client-supplied path or body; mutations require an If-Match version; rate limits and durable audit fire per mutation; failures are sanitized RFC 7644 errors without internal details.
+    acceptanceCriteria: A dedicated token authenticates user and group CRUD plus ServiceProviderConfig, ResourceTypes and Schemas discovery; missing or invalid tokens return 401; create returns 201 with Location and ETag; externalId upserts are idempotent; stale If-Match returns 409 and unknown ids return 404 with RFC 7644 error bodies; a token issued for one organization cannot read another; an identity.manage administrator can issue, rotate and revoke the credential while an unprivileged principal is denied.
+    testIds: [HS-T-M37-SCIM-HTTP-001, HS-T-M37-SCIM-AUTH-001, HS-T-M37-SCIM-CONFLICT-001]
+    testPaths:
+      - packages/scim/tests/scim.test.ts
+      - apps/api/tests/scim.http.test.ts
+    documentationArticleIds: [getting-started/scim]
+    introducedVersion: 0.35.0
+  - id: HS-API-014
+    title: Typed public TypeScript SDK
+    normativeStatement: HandStack MUST provide a dependency-free typed TypeScript SDK that authenticates with an API key held only in memory, sends bearer credentials exclusively in the authorization header, exposes the OpenAI-compatible gateway and the organization-scoped REST surface, supports bounded timeout, cancellation and SSE streaming, and maps RFC 9457 Problem Details into typed actionable errors carrying status, code, requestId, traceId and helpArticleId.
+    rationale: Existing OpenAI SDKs and integration code need one stable, typed, transport-safe client without leaking credentials or vendor identifiers, while custom callers benefit from exact route and error contracts.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules:
+      - packages/sdk/src/index.ts
+      - packages/sdk/src/client.ts
+      - packages/sdk/src/errors.ts
+      - packages/sdk/src/sse.ts
+    publicContracts: [HandStack, HandStackApiError, HandStackSdkError, FetchLike, parseSse]
+    dataEntities: []
+    securityPrivacyImpact: API keys are never persisted or written to URLs or request bodies and are sent only in the authorization header; timeouts and cancellation use AbortSignal; typed errors expose only closed Problem Details fields and never internal stacks; SSE parsing bounds memory and stops at the [DONE] sentinel.
+    acceptanceCriteria: A client built from baseUrl and apiKey lists gateway models, runs a governed capability through the organization-scoped endpoint, generates a neutral model response, streams SSE chunks and stops at [DONE], and maps problem-detail responses and aborted transports into typed errors with the original status and code.
+    testIds: [HS-T-M38-SDK-001]
+    testPaths: [packages/sdk/tests/sdk.test.ts]
+    documentationArticleIds: [getting-started/sdk]
+    introducedVersion: 0.36.0
+  - id: HS-SEC-018
+    title: Scoped multi-metric rate limiting
+    normativeStatement: HandStack MUST enforce rate limits across organization, group, user, API key, agent, model and capability scopes using requests-per-minute, tokens-per-minute, concurrent-requests and daily-requests metrics, keep every counter tenant-scoped so one organization's limit never consumes another's capacity, and return a typed 429 with retry guidance.
+    rationale: Shared AI capacity requires per-tenant and per-principal admission control to prevent one consumer from starving others while preserving deterministic denial behavior across compact and distributed profiles.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules:
+      - packages/rate-limiting/src/index.ts
+      - packages/rate-limiting/package.json
+    publicContracts:
+      [
+        ScopedRateLimiter,
+        RateLimitStore,
+        InMemoryRateLimitStore,
+        RateLimitRule,
+        RateLimitContext,
+        RateLimitDecision,
+        raiseRateLimitError,
+      ]
+    dataEntities: [RateLimitRule, RateLimitDecision]
+    securityPrivacyImpact: Every counter key embeds organizationId plus scope and scopeId so tenants cannot bleed capacity; concurrency slots are acquired and released explicitly; denials use the shared typed RateLimitError and expose only the exceeded scope, metric and retry seconds.
+    acceptanceCriteria: A requests-per-minute rule denies a third request within the window and resets after it; a tokens-per-minute rule charges token deltas; a daily rule enforces an independent window; a concurrency rule rejects a second in-flight acquisition until release; identical rules keyed to different tenants or scopes do not interfere; and empty organizations or invalid limits fail with a typed error.
+    testIds: [HS-T-M39-RATELIMIT-001]
+    testPaths: [packages/rate-limiting/tests/rate-limit.test.ts]
+    documentationArticleIds: [getting-started/rate-limiting]
+    introducedVersion: 0.37.0
+  - id: HS-AI-017
+    title: Tenant-scoped model routing policies
+    normativeStatement: HandStack MUST resolve tenant-scoped model routing policies across fallback, round-robin, least-cost, least-latency, weighted, priority, random, custom and semantic strategies, skip disabled or tag-incompatible candidates, and fail closed when no route or required scorer exists.
+    rationale: Multiple published models and providers require governed failover, cost/latency optimization and deterministic distribution without allowing cross-tenant or credential-level routing choices.
+    owner: ai-platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/model-routing/src/index.ts]
+    publicContracts:
+      [
+        RoutingPolicy,
+        RoutingCandidate,
+        RoutingRequest,
+        RoutingDecision,
+        ModelRouter,
+        validateRoutingPolicy,
+      ]
+    dataEntities: [RoutingPolicy]
+    securityPrivacyImpact: Policies are organization scoped; callers select only internal model definitions and cannot inject provider credentials or vendor identifiers; no route is returned when all candidates are disabled or filtered.
+    acceptanceCriteria: Fallback/priority, round-robin, least-cost, least-latency, weighted, random, custom and semantic strategies select candidates correctly; required tags and disabled candidates are enforced; invalid scope, duplicate candidates, missing scorers and empty routes fail closed.
+    testIds: [HS-T-M40-ROUTING-001, HS-T-M40-ROUTING-002]
+    testPaths: [packages/model-routing/tests/routing.test.ts]
+    documentationArticleIds: [getting-started/model-routing]
+    introducedVersion: 0.38.0
+  - id: HS-AI-018
+    title: Versioned tenant-scoped model pricing
+    normativeStatement: HandStack MUST provide tenant-scoped ProviderPricing and ModelPricing records with inputTokenPrice, outputTokenPrice, cachedInputPrice, imagePrice, audioPrice and requestPrice dimensions, resolve the latest version effective at a usage timestamp, and reject invalid or duplicate pricing versions.
+    rationale: Cost governance and historical reconciliation require immutable effective-dated prices without cross-tenant leakage or ambiguous duplicate versions.
+    owner: ai-platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/pricing/src/index.ts]
+    publicContracts:
+      [PricingFields, ProviderPricing, ModelPricing, CostUsage, PricingService, estimateCost]
+    dataEntities: [ProviderPricing, ModelPricing]
+    securityPrivacyImpact: Pricing records are organization scoped and contain no credentials; cost estimates feed the existing budget pipeline and cannot bypass authorization, budget or audit controls.
+    acceptanceCriteria: All six pricing dimensions are calculated with documented units; provider and model prices resolve by effective date; tenant isolation holds; negative/non-finite fields or usage and duplicate effective versions fail with typed validation errors.
+    testIds: [HS-T-M41-PRICING-001, HS-T-M41-PRICING-002]
+    testPaths: [packages/pricing/tests/pricing.test.ts]
+    documentationArticleIds: [getting-started/pricing]
+    introducedVersion: 0.39.0
+  - id: HS-OPS-011
+    title: Pluggable redacting observability exporters
+    normativeStatement: HandStack MUST support replaceable observability exporters for OpenTelemetry OTLP, Langfuse, Datadog, Grafana and New Relic, batch tenant-scoped trace/metric/log events, recursively redact sensitive attributes, and fail closed on invalid events or transport errors.
+    rationale: Operators need portable delivery to common observability backends without coupling the core to vendor SDKs or leaking secrets, prompts, responses or exception details.
+    owner: platform-team
+    status: verified
+    risk: high
+    affectedModules: [packages/observability-exporters/src/index.ts]
+    publicContracts:
+      [
+        ObservabilityEvent,
+        ObservabilityTransport,
+        ObservabilityExporter,
+        HttpObservabilityExporter,
+        FanoutObservabilityExporter,
+        redactObservabilityEvent,
+      ]
+    dataEntities: [ExporterPayload]
+    securityPrivacyImpact: Organization scope is preserved; secret-bearing keys are redacted recursively; transports are injected so credentials remain outside event payloads; durable audit remains authoritative.
+    acceptanceCriteria: All five exporter kinds use the same transport boundary; batches respect the configured maximum; sensitive nested attributes are redacted; invalid events, non-finite values and transport failures produce typed errors.
+    testIds: [HS-T-M42-OBSERVABILITY-001, HS-T-M42-OBSERVABILITY-002]
+    testPaths: [packages/observability-exporters/tests/exporters.test.ts]
+    documentationArticleIds: [getting-started/observability-exporters]
+    introducedVersion: 0.40.0
+  - id: HS-OPS-012
+    title: Official compact and distributed deployment profiles
+    normativeStatement: HandStack MUST provide an official compact single-container profile running API, UI and SQLite without Redis, Compose profiles that isolate PostgreSQL and MongoDB development dependencies, and a production Kubernetes/Helm profile with stateless Web/API/MCP replicas, specialized workers, probes, resources, HPA, KEDA, PDB, NetworkPolicies and externally managed secrets.
+    rationale: Operators need a reproducible zero-infrastructure development path and a complete production topology without coupling credentials or state to images and manifests.
+    owner: platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      [
+        deploy/docker/single-container.contract.json,
+        deploy/docker-compose/compose.yaml,
+        deploy/helm/handstack,
+        scripts/validate_container_contract.mjs,
+      ]
+    publicContracts: [SingleContainerDeploymentContract, DockerComposeProfiles, HandStackHelmChart]
+    dataEntities: [DeploymentProfile]
+    securityPrivacyImpact: Compact images use SQLite and no Redis; production secrets are externalized; distributed workloads are stateless and use readiness/liveness, resource and network isolation defaults.
+    acceptanceCriteria: The compact contract validates API/UI/SQLite without Redis and required health checks; Compose exposes separate PostgreSQL/MongoDB profiles; the Helm chart structurally validates workloads, HPA/KEDA, PDB, NetworkPolicy, topology and external secrets.
+    testIds: [HS-T-M43-DEPLOYMENT-001, HS-T-M43-DEPLOYMENT-002]
+    testPaths: [scripts/validate_container_contract.mjs, scripts/validate_helm_chart.mjs]
+    documentationArticleIds: [getting-started/deployment-profiles]
+    introducedVersion: 0.41.0
+  - id: HS-OPS-013
+    title: Active-standby multi-region disaster recovery contract
+    normativeStatement: HandStack MUST define an active-write and warm-standby multi-region topology with health-based global failover, replicated database/object storage/secrets configuration, fencing before promotion, consistency validation, smoke tests before traffic, RPO <= 5 minutes, RTO <= 15 minutes and separately audited failback.
+    rationale: Regional failure must not create split-brain authorization, budget or audit state, and recovery objectives must be explicit and verifiable rather than implied by deployment replicas.
+    owner: platform-team
+    status: verified
+    risk: critical
+    affectedModules:
+      [deploy/resilience/multi-region-dr.contract.json, scripts/validate_dr_contract.mjs]
+    publicContracts: [MultiRegionDisasterRecoveryContract]
+    dataEntities: [DisasterRecoveryExercise]
+    securityPrivacyImpact: Only one region accepts authoritative writes; replicated secrets remain behind an approved provider; fencing, consistency checks and audit-gated failback protect tenant, budget and authorization state.
+    acceptanceCriteria: The contract validates active/warm standby regions, health-based DNS, RPO/RTO targets, fencing, replication, consistency and smoke gates, stateless services and separate audited failback.
+    testIds: [HS-T-M44-DR-001, HS-T-M44-DR-002]
+    testPaths: [scripts/validate_dr_contract.mjs]
+    documentationArticleIds: [getting-started/multi-region-recovery]
+    introducedVersion: 0.42.0
+  - id: HS-SEC-019
+    title: Tenant-scoped service accounts and workload identities
+    normativeStatement: HandStack MUST provide service accounts as machine principals distinct from human users, issue each tenant-scoped client secret only once, store only a one-way digest, support explicit scopes, expiry, rotation and revocation, and route authentication through the normal authorization boundary.
+    rationale: Automation and workloads require revocable credentials without sharing human login sessions or passwords, while every machine action must retain tenant, scope, budget and audit controls.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/service-accounts/src/index.ts]
+    publicContracts:
+      [
+        ServiceAccount,
+        ServiceAccountPrincipal,
+        ServiceAccountStore,
+        InMemoryServiceAccountStore,
+        ServiceAccountService,
+        signServiceAccountContext,
+      ]
+    dataEntities: [ServiceAccount]
+    securityPrivacyImpact: Raw secrets are returned only on issue/rotation and never persisted; authentication is tenant-bound and constant-time; revoked or expired accounts fail closed and do not enter human login flows.
+    acceptanceCriteria: Accounts issue with unique safe scopes, authenticate as SERVICE_ACCOUNT, isolate organizations, reject invalid credentials, rotate and invalidate old secrets, expire, revoke and list without exposing secret material.
+    testIds: [HS-T-M45-SERVICE-ACCOUNT-001, HS-T-M45-SERVICE-ACCOUNT-002]
+    testPaths: [packages/service-accounts/tests/service-accounts.test.ts]
+    documentationArticleIds: [getting-started/service-accounts]
+    introducedVersion: 0.43.0
+  - id: HS-SEC-020
+    title: Secure SAML and LDAP identity provider contracts
+    normativeStatement: HandStack MUST provide specialized SAML 2.0 and LDAP/LDAPS identity provider contracts with injected verification/transports, HTTPS or LDAPS enforcement, tenant-scoped identities, bounded timeouts, anti-replay for assertions and secret references instead of inline credentials.
+    rationale: Enterprise SSO needs protocol-specific security boundaries without coupling the identity domain to a vendor SDK or silently treating Entra ID and traditional Active Directory as the same protocol.
+    owner: identity-team
+    status: verified
+    risk: critical
+    affectedModules: [packages/plugin-saml/src/index.ts, packages/plugin-ldap/src/index.ts]
+    publicContracts:
+      [SamlIdentityProvider, SamlResponseVerifier, ReplayStore, LdapIdentityProvider, LdapTransport]
+    dataEntities: [SamlAssertion, LdapUser]
+    securityPrivacyImpact: SAML signatures are delegated to an explicit verifier and consumed assertions are replay-protected; LDAP requires LDAPS and secret references, never inline passwords. Offline contracts do not certify a real identity provider, certificate chain or directory.
+    acceptanceCriteria: SAML rejects insecure endpoints, invalid tenant/provider scope, expired or replayed assertions, and bounded verification failures; LDAP rejects non-LDAPS endpoints and inline credentials, uses an injected transport, maps users to the configured organization and closes the transport after each attempt.
+    testIds: [HS-T-M46-SAML-001, HS-T-M46-LDAP-001]
+    testPaths: [packages/plugin-saml/tests/saml.test.ts, packages/plugin-ldap/tests/ldap.test.ts]
+    documentationArticleIds: [getting-started/enterprise-identity-protocols]
+    introducedVersion: 0.44.0
+  - id: HS-SEC-021
+    title: Identity plugin contract test kit
+    normativeStatement: HandStack MUST provide an official identity plugin test kit that validates manifest, apiVersion, permissions, configuration schema, tenant isolation, timeout, fail-closed behavior, secret leakage prevention and applicable protocol capabilities through deterministic probes.
+    rationale: Identity extensions must preserve the authorization, tenant, privacy and audit boundaries before activation, without requiring live external providers in every test run.
+    owner: identity-team
+    status: verified
+    risk: high
+    affectedModules: [packages/plugin-testkit/src/index.ts]
+    publicContracts:
+      [
+        IdentityPluginManifest,
+        IdentityPluginContractProbe,
+        IdentityPluginContractReport,
+        verifyIdentityPluginContract,
+        identityPluginContractSuites,
+      ]
+    dataEntities: []
+    securityPrivacyImpact: Required probes make tenant isolation, bounded operations, fail-closed behavior and secret leakage explicit; deterministic offline checks do not certify external IdPs or directories.
+    acceptanceCriteria: Invalid manifests and failed security/protocol probes throw a typed contract error; passing plugins receive a report listing all executed checks and declared capabilities.
+    testIds: [HS-T-M47-PLUGIN-TESTKIT-001, HS-T-M47-PLUGIN-TESTKIT-002]
+    testPaths: [packages/plugin-testkit/tests/identity.test.ts]
+    documentationArticleIds: [getting-started/identity-plugin-testkit]
+    introducedVersion: 0.45.0

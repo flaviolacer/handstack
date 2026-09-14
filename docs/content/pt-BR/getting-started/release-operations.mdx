@@ -1,0 +1,65 @@
+---
+id: getting-started/release-operations
+title: Operar e certificar um release do HandStack
+description: Publique suporte, ciclo de vida, integridade e evidências de upgrade em cada release.
+audience: [platform-operator, security-admin]
+permissions: [deployment.manage]
+features: [release-operations, support-matrix, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.0.0
+lastReviewedAt: 2026-09-10
+owner: release-engineering
+tags: [release, sbom, provenance, support]
+---
+
+# Operar e certificar um release do HandStack
+
+Cada release deve publicar o contrato versionado em
+`deploy/release/handstack-release-manifest.json`. Ele registra as faixas suportadas de runtime e
+infraestrutura, versões testadas, avisos de ciclo de vida e os nomes das evidências de integridade
+e verificação.
+
+## Verificação local
+
+Execute `npm run release:validate` antes da publicação. O gate verifica se a matriz de suporte está
+completa, se o SBOM identifica o release, se a provenance está vinculada ao checksum do código e se
+as verificações possuem evidência ou responsável pela aprovação. Também verifica que depreciações
+informam substituto e versão de remoção.
+
+O manifesto de desenvolvimento pode conter um marcador de assinatura exigida pelo pipeline. Um
+release de produção deve substituí-lo por uma assinatura verificável pelo histórico de chaves
+publicado e manter SBOM, checksum e provenance SLSA/in-toto como artefatos imutáveis.
+
+O manifesto também referencia evidências redigidas de compatibilidade rolling de banco e eventos
+com as duas versões estáveis menores anteriores, SLAs de correção e divulgação coordenada de
+vulnerabilidades, e rotação, overlap, revogação e recuperação de certificados, signing/master keys,
+credenciais de providers e service accounts, API keys e segredos de webhooks. Esses contratos offline
+são obrigatórios na revisão do release; evidências reais de banco, cluster, pentest e drills de
+recuperação devem ser anexadas pelo pipeline ou pela equipe de operação.
+
+## Upgrade e ciclo de vida
+
+Execute o gate de release Helm, teste a compatibilidade rolling entre as janelas declaradas de banco
+e eventos e mantenha o release anterior disponível para rollback. Anuncie depreciação pelo menos
+90 dias antes da remoção e fim de vida pelo menos 180 dias antes do fim do suporte. Evidências de
+SLA de correção de segurança e rotação de chaves/certificados pertencem ao registro do release.
+
+## Prerequisites
+
+Tenha disponível o manifesto do release, os artefatos gerados, as evidências operacionais e o
+responsável pelo rollback.
+
+## Steps
+
+Execute `npm run release:validate`, o gate de release Helm e as verificações aplicáveis de banco,
+eventos e recuperação antes de publicar o release.
+
+## Verify
+
+O contrato do release passa, as assinaturas de produção são verificáveis e as evidências reais
+estão anexadas para cada verificação que não pode ser executada offline.
+
+## Troubleshooting
+
+Não publique quando faltar artefato, assinatura, referência de evidência ou janela de compatibilidade.
+Restaure o release anterior e registre o incidente quando uma verificação rolling falhar.

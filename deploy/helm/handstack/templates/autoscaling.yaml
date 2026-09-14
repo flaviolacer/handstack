@@ -1,0 +1,52 @@
+{{- if .Values.autoscaling.enabled }}
+{{- $root := . }}
+{{- range $name := list "api" "web" }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "handstack.fullname" $root }}-{{ $name }}
+  labels:
+    {{- include "handstack.labels" $root | nindent 4 }}
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: {{ include "handstack.fullname" $root }}-{{ $name }} }
+  minReplicas: {{ (index $root.Values.autoscaling $name).minReplicas }}
+  maxReplicas: {{ (index $root.Values.autoscaling $name).maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: {{ (index $root.Values.autoscaling $name).targetCPUUtilizationPercentage }} }
+{{- if eq $name "api" }}
+{{- range (index $root.Values.autoscaling $name).externalMetrics }}
+    - type: External
+      external:
+        metric: { name: {{ .name }} }
+        target: { type: {{ .type }}, averageValue: {{ .value | quote }} }
+{{- end }}
+{{- end }}
+---
+{{- end }}
+{{- if .Values.mcp.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "handstack.fullname" . }}-mcp
+  labels:
+    {{- include "handstack.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: {{ include "handstack.fullname" . }}-mcp }
+  minReplicas: {{ .Values.autoscaling.mcp.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.mcp.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: {{ .Values.autoscaling.mcp.targetCPUUtilizationPercentage }} }
+{{- range .Values.autoscaling.mcp.externalMetrics }}
+    - type: External
+      external:
+        metric: { name: {{ .name }} }
+        target: { type: {{ .type }}, averageValue: {{ .value | quote }} }
+{{- end }}
+{{- end }}
+{{- end }}

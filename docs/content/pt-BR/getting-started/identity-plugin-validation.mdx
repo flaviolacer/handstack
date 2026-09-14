@@ -1,0 +1,39 @@
+---
+id: getting-started/identity-plugin-validation
+title: Validar metadados do provedor de identidade antes do registro
+description: Rejeite descritores de identidade inválidos antes que alcancem a configuração da organização.
+audience: [platform-operator, developer]
+permissions: [plugins.manage, identity.manage]
+features: [plugins, identity, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.57.0
+lastReviewedAt: 2026-09-11
+owner: identity-team
+tags: [plugins, identity, validation]
+---
+
+# Validar metadados do provedor de identidade antes do registro
+
+## Prerequisites
+
+- Um host com callback de registro de provedor de identidade.
+- Um descritor com ID estável, nome, capabilities, schema e permissões únicas.
+
+## Steps
+
+1. Registre o provedor no setup do plugin.
+2. Faça o host chamar `validateIdentityProviderRegistration` antes de encaminhar o descritor.
+3. Aceite a configuração da organização somente após validação e política do host.
+
+## Expected results
+
+IDs, metadados, schemas vazios ou permissões duplicadas falham antes do callback e não criam side effect.
+
+## Verify
+
+Execute os testes do Plugin SDK e confirme que metadados inválidos falham fechados.
+
+## Troubleshooting
+
+- `Identity provider permissions must be unique and non-empty` indica autorização incompleta ou duplicada.
+- `Identity provider configuration schema is required` indica que o provedor não pode ser configurado com segurança.

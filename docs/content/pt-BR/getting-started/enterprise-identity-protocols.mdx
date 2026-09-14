@@ -1,0 +1,50 @@
+---
+id: getting-started/enterprise-identity-protocols
+title: Configurar protocolos de identidade corporativa
+description: Use os contratos especializados de SAML 2.0 e LDAP/LDAPS sem acoplar o HandStack a um SDK de fornecedor.
+audience: [platform-operator, developer]
+permissions: [identity.manage]
+features: [identity, saml, ldap, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.44.0
+lastReviewedAt: 2026-09-11
+owner: identity-team
+tags: [identity, saml, ldap, sso]
+---
+
+# Configurar protocolos de identidade corporativa
+
+## Objetivo
+
+Use `@handstack/plugin-saml` para asserções SAML 2.0 e `@handstack/plugin-ldap` para Active Directory tradicional ou outro diretório LDAP. São limites de protocolo distintos; Entra ID deve ser configurado por OIDC, OAuth2 ou SAML, não como LDAP.
+
+## Pré-requisitos de segurança
+
+- Forneça issuer e endpoint SSO SAML em HTTPS, audience esperado e fingerprint do certificado confiável.
+- Injete um verificador que valide assinatura XML, issuer, audience e cadeia de certificados. O HandStack só consome o resultado verificado.
+- Use `ldaps://` e uma referência ao segredo do bind. Nunca coloque senha na configuração do provedor.
+- Mantenha IDs de provedor e organização isolados por tenant e use timeouts limitados.
+
+## Prerequisites
+
+- Um administrador da organização com `identity.manage`.
+- Um verificador SAML ou transporte LDAPS configurado com o gerenciador de segredos da implantação.
+
+## Steps
+
+1. Registre o provedor específico do protocolo para uma organização.
+2. Valide a configuração antes de habilitar o login.
+3. Injete o verificador ou transporte e encaminhe a identidade pelo limite normal de autorização.
+
+## Verificação
+
+Os contratos offline rejeitam HTTP ou LDAP sem TLS, asserções SAML de outra organização, expiradas ou repetidas, senhas LDAP inline e timeouts ilimitados. Verificadores e transportes injetados ainda devem ser testados contra o IdP/diretório real de cada implantação.
+
+## Verify
+
+Confirme que endpoints inseguros, credenciais inline, asserções expiradas/repetidas e identidades de outro tenant falham fechados.
+
+## Troubleshooting
+
+- `INVALID_CONFIGURATION` indica endpoint, timeout ou referência de segredo inválidos.
+- `REPLAYED_ASSERTION` indica que a mesma asserção SAML foi apresentada mais de uma vez.

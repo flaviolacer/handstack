@@ -1,0 +1,41 @@
+---
+id: getting-started/capabilities
+title: Publish and run capabilities
+description: Expose a custom capability through the governed API engine with one authorization path.
+audience: [developer, platform-operator]
+permissions: [capability.execute]
+features: [capabilities, policy, api]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.6.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [capability, authorization, execution]
+---
+
+# Publish and run capabilities
+
+Capabilities are tenant-scoped executable contracts with input/output schemas, allowed
+channels and a handler. API and future Web/MCP/Agent adapters must call the same governed
+execution engine.
+
+## Prerequisites
+
+- An authenticated organization member with `capability.execute`.
+- A registered capability whose channel list includes `API` (or the adapter channel).
+
+## Steps
+
+1. Register a capability with a stable slug, schema, timeout, permissions and publication channels.
+2. Resolve it with `GET /api/v1/organizations/{organizationId}/capabilities`.
+3. Execute it with `POST /api/v1/organizations/{organizationId}/capabilities/{slug}/run`.
+
+## Verify
+
+Confirm an authorized API call returns the handler result and a cross-organization or missing
+permission call returns 403. Confirm a channel not listed by the capability fails closed.
+
+## Troubleshooting
+
+- `capability.execute permission is required` means the caller lacks the required permission.
+- `Capability is unavailable` means the slug is not published for the requested channel.
+- Timeout and aborted requests release any budget reservation before returning the error.

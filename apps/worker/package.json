@@ -1,0 +1,19 @@
+{
+  "name": "@handstack/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint src tests",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@handstack/config": "file:../../packages/config",
+    "@handstack/jobs": "file:../../packages/jobs",
+    "@handstack/telemetry": "file:../../packages/telemetry",
+    "bullmq": "^5.81.4"
+  }
+}

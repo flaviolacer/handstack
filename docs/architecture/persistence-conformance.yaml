@@ -1,0 +1,49 @@
+version: 1
+repositories:
+  tenant-entity:
+    tenant_isolation_predicate: tenant_id equals execution tenant
+    operations:
+      find_by_id:
+        transaction_boundary: single read
+        consistency_requirement: read-your-writes in a transaction
+        uniqueness_behavior: id unique within tenant
+        concurrency_control: none
+        ordering_and_cursor_semantics: not applicable
+        read_replica_safety: safe after replication watermark
+        retryable_errors: [transient-connection, serialization]
+        canonical_domain_error_mapping: not-found returns undefined
+        required_indexes: [tenant_id+id unique]
+        expected_during_migration_and_failover: retry or fail without partial result
+      list:
+        transaction_boundary: single paginated read
+        consistency_requirement: stable cursor ordering
+        uniqueness_behavior: not applicable
+        concurrency_control: cursor based on immutable ordering key
+        ordering_and_cursor_semantics: deterministic opaque cursor
+        read_replica_safety: safe after replication watermark
+        retryable_errors: [transient-connection]
+        canonical_domain_error_mapping: invalid cursor
+        required_indexes: [tenant_id+ordering_key+id]
+        expected_during_migration_and_failover: page is complete or retried
+      insert:
+        transaction_boundary: atomic write
+        consistency_requirement: durable acknowledged write
+        uniqueness_behavior: duplicate maps to conflict
+        concurrency_control: initial version is one
+        ordering_and_cursor_semantics: not applicable
+        read_replica_safety: not applicable
+        retryable_errors: [transient-connection, serialization]
+        canonical_domain_error_mapping: conflict
+        required_indexes: [tenant_id+id unique]
+        expected_during_migration_and_failover: idempotent by tenant and id
+      update_delete:
+        transaction_boundary: atomic compare-and-swap
+        consistency_requirement: durable acknowledged write
+        uniqueness_behavior: preserve tenant-scoped uniqueness
+        concurrency_control: expected version predicate
+        ordering_and_cursor_semantics: not applicable
+        read_replica_safety: not applicable
+        retryable_errors: [transient-connection, serialization]
+        canonical_domain_error_mapping: stale version maps to concurrency conflict
+        required_indexes: [tenant_id+id unique]
+        expected_during_migration_and_failover: never report success for partial write

@@ -1,0 +1,12 @@
+.git
+.github
+.handstack-codex
+.next
+.turbo
+coverage
+dist
+graphify-out
+node_modules
+*.log
+.env*
+!.env.example

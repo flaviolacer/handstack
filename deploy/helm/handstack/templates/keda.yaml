@@ -1,0 +1,28 @@
+{{- if .Values.keda.enabled }}
+{{- $root := . }}
+{{- range $name, $cfg := .Values.workers }}
+{{- if and (ne $name "resources") $cfg.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "handstack.fullname" $root }}-worker-{{ kebabcase $name }}
+  labels:
+    {{- include "handstack.labels" $root | nindent 4 }}
+spec:
+  scaleTargetRef: { name: {{ include "handstack.fullname" $root }}-worker-{{ kebabcase $name }} }
+  minReplicaCount: {{ $root.Values.keda.minReplicaCount }}
+  maxReplicaCount: {{ $root.Values.keda.maxReplicaCount }}
+  pollingInterval: 15
+  cooldownPeriod: 60
+  triggers:
+    - type: redis
+      metadata:
+        addressFromEnv: HANDSTACK_REDIS_URL
+        listName: {{ $cfg.queue | quote }}
+        listLength: {{ $root.Values.keda.listLength | quote }}
+{{- if not (eq $name "maintenance") }}
+---
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

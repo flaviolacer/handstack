@@ -1,0 +1,39 @@
+---
+id: getting-started/plugin-ui-extensions
+title: Register controlled plugin UI extensions
+description: Expose plugin settings, admin pages, chat actions and message renderers through typed, permissioned extension points.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, ui, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.46.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, ui, permissions]
+---
+
+# Register controlled plugin UI extensions
+
+## Prerequisites
+
+- A plugin installed through the signed/checksum-pinned plugin lifecycle.
+- An explicit permission and capability for every UI extension.
+
+## Steps
+
+1. Create a `PluginUiRegistry` in the host boundary.
+2. Register a `settings-page`, `admin-page`, `chat-action` or `message-renderer` descriptor with a stable ID, permission and capability.
+3. Keep routes under `/plugins/` and authorize the declared permission before rendering or invoking the extension.
+
+## Expected results
+
+Duplicate IDs, missing permissions/capabilities and routes outside the plugin namespace fail closed. The registry lists extensions by kind for the host UI to render without executing arbitrary plugin code in the API process.
+
+## Verify
+
+Run the plugin SDK contract tests and confirm that a user without the declared permission cannot see or invoke the extension.
+
+## Troubleshooting
+
+- `Plugin UI extension is already registered` means the ID must be unique within the host registry.
+- `Plugin UI routes must remain under /plugins/` means the extension attempted to escape its namespace.

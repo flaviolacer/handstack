@@ -1,0 +1,50 @@
+---
+id: getting-started/multi-region-recovery
+title: Operar disaster recovery multi-região
+description: Prepare failover active/standby com RPO/RTO limitado e failback auditado.
+audience: [platform-operator, security-admin]
+permissions: [deployment.manage, audit.read]
+features: [deployment, resilience, audit]
+deploymentProfiles: [distributed]
+introducedIn: 0.42.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [disaster-recovery, multi-region, resilience]
+---
+
+# Operar disaster recovery multi-região
+
+## Purpose and expected outcome
+
+Mantenha uma região ativa para escrita e uma região standby quente, com failover baseado em saúde que atenda RPO ≤5 minutos e RTO ≤15 minutos.
+
+## Prerequisites
+
+- Deployment distribuído com banco e Redis HA, object storage replicado e secret provider aprovado.
+- Failover global por DNS/WAF baseado em saúde e identidade operacional auditada.
+
+## Steps
+
+1. Replique banco, object storage e secrets/configuração aprovados para o standby quente.
+2. Monitore saúde e lag de replicação sem permitir que o standby aceite escritas.
+3. Faça fencing da região ativa anterior antes de promover o standby, evitando split-brain de budget, autorização ou auditoria.
+4. Valide a consistência do banco e execute smoke tests antes de enviar tráfego pelo DNS global.
+5. Registre incidente, promoção e RPO/RTO alcançados; trate failback como operação separada e auditada.
+
+## Verify
+
+Execute `node scripts/validate_dr_contract.mjs`. Em um exercício controlado, meça lag, tempo de fencing, validação de consistência, smoke tests e restauração de tráfego contra as metas RPO/RTO.
+
+## Troubleshooting
+
+- Falha de fencing bloqueia a promoção; nunca aceite escritas nas duas regiões.
+- Falha de consistência bloqueia tráfego; restaure do último checkpoint replicado válido.
+- Violação de RPO/RTO exige incidente e revisão de capacidade, não uma troca de DNS sem registro.
+
+## Security, budget, and audit implications
+
+Somente uma região escreve estado autoritativo por vez. Secrets usam o provider aprovado, e ações de failover/failback são auditadas; budget e autorização devem estar consistentes antes de habilitar tráfego.
+
+## Rollback
+
+Mantenha a região promovida ativa até a região original estar isolada, corrigida e sincronizada. Faça failback separadamente com consistência, smoke tests e registro de auditoria.

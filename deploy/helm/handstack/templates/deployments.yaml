@@ -1,0 +1,140 @@
+{{- $root := . }}
+{{- $services := dict "api" .Values.api "web" .Values.web }}
+{{- if .Values.mcp.enabled }}{{- $_ := set $services "mcp" .Values.mcp }}{{- end }}
+{{- range $name, $cfg := $services }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "handstack.fullname" $root }}-{{ $name }}
+  labels:
+    {{- include "handstack.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+spec:
+  replicas: {{ $cfg.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels:
+      {{- include "handstack.selector" $root | nindent 6 }}
+      app.kubernetes.io/component: {{ $name }}
+  template:
+    metadata:
+      labels:
+        {{- include "handstack.selector" $root | nindent 8 }}
+        app.kubernetes.io/component: {{ $name }}
+    spec:
+      serviceAccountName: {{ include "handstack.serviceAccountName" $root }}
+      automountServiceAccountToken: {{ $root.Values.serviceAccount.automount }}
+      terminationGracePeriodSeconds: {{ $root.Values.terminationGracePeriodSeconds.services }}
+      {{- with $root.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $root.Values.podSecurityContext | nindent 8 }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: {{ $name }}
+              topologyKey: topology.kubernetes.io/zone
+      {{- if $root.Values.topologySpread }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              {{- include "handstack.selector" $root | nindent 14 }}
+              app.kubernetes.io/component: {{ $name }}
+      {{- end }}
+      containers:
+        - name: {{ $name }}
+          image: {{ if eq $name "web" }}{{ $root.Values.images.web.repository }}:{{ $root.Values.images.web.tag }}{{ else }}{{ $root.Values.images.api.repository }}:{{ $root.Values.images.api.tag }}{{ end }}
+          {{ if eq $name "mcp" }}args: ["mcp-server"]{{ end }}
+          imagePullPolicy: {{ if eq $name "web" }}{{ $root.Values.images.web.pullPolicy }}{{ else }}{{ $root.Values.images.api.pullPolicy }}{{ end }}
+          securityContext:
+            {{- toYaml $root.Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ $cfg.port }}
+          envFrom:
+            - configMapRef: { name: {{ include "handstack.fullname" $root }}-config }
+          {{- if eq $name "web" }}
+          env:
+            - name: HANDSTACK_API_URL
+              value: http://{{ include "handstack.fullname" $root }}-api:{{ $root.Values.api.port }}
+          {{- else }}
+          env:
+            {{- include "handstack.env" $root | nindent 12 }}
+          {{- end }}
+          {{- include "handstack.probes" (dict "port" "http") | nindent 10 }}
+          resources:
+            {{- toYaml $cfg.resources | nindent 12 }}
+---
+{{- end }}
+
+{{- range $name, $cfg := .Values.workers }}
+{{- if and (ne $name "resources") $cfg.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "handstack.fullname" $root }}-worker-{{ kebabcase $name }}
+  labels:
+    {{- include "handstack.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: worker-{{ kebabcase $name }}
+spec:
+  replicas: {{ $cfg.replicas }}
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector:
+    matchLabels:
+      {{- include "handstack.selector" $root | nindent 6 }}
+      app.kubernetes.io/component: worker-{{ kebabcase $name }}
+  template:
+    metadata:
+      labels:
+        {{- include "handstack.selector" $root | nindent 8 }}
+        app.kubernetes.io/component: worker-{{ kebabcase $name }}
+    spec:
+      serviceAccountName: {{ include "handstack.serviceAccountName" $root }}
+      automountServiceAccountToken: {{ $root.Values.serviceAccount.automount }}
+      terminationGracePeriodSeconds: {{ $root.Values.terminationGracePeriodSeconds.workers }}
+      securityContext:
+        {{- toYaml $root.Values.podSecurityContext | nindent 8 }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: worker-{{ kebabcase $name }}
+              topologyKey: topology.kubernetes.io/zone
+      {{- if $root.Values.topologySpread }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              {{- include "handstack.selector" $root | nindent 14 }}
+              app.kubernetes.io/component: worker-{{ kebabcase $name }}
+      {{- end }}
+      containers:
+        - name: worker
+          image: {{ $root.Values.images.worker.repository }}:{{ $root.Values.images.worker.tag }}
+          imagePullPolicy: {{ $root.Values.images.worker.pullPolicy }}
+          args: [{{ $name | quote }}]
+          securityContext:
+            {{- toYaml $root.Values.containerSecurityContext | nindent 12 }}
+          envFrom:
+            - configMapRef: { name: {{ include "handstack.fullname" $root }}-config }
+          env:
+            {{- include "handstack.env" $root | nindent 12 }}
+          livenessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 20 }
+          readinessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 10 }
+          resources:
+            {{- toYaml $root.Values.workers.resources | nindent 12 }}
+---
+{{- end }}
+{{- end }}

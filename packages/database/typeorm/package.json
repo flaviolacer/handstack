@@ -1,0 +1,32 @@
+{
+  "name": "@handstack/database-typeorm",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint src tests",
+    "test": "vitest run",
+    "test:postgresql": "vitest run --config vitest.integration.config.ts",
+    "test:official-sql": "vitest run --config vitest.official-sql.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@handstack/domain": "file:../../domain",
+    "mssql": "^11.0.1",
+    "mysql2": "^3.14.4",
+    "pg": "^8.16.3",
+    "reflect-metadata": "^0.2.2",
+    "sql.js": "^1.13.0",
+    "typeorm": "^0.3.26"
+  },
+  "devDependencies": {
+    "@types/mssql": "^9.1.8",
+    "@types/pg": "^8.15.5",
+    "@types/sql.js": "^1.4.9"
+  }
+}

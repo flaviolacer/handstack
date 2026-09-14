@@ -1,0 +1,50 @@
+---
+id: getting-started/budgets
+title: Govern budgets and usage
+description: Configure tenant budgets and inspect usage records before enabling expensive model workloads.
+audience: [platform-operator, developer]
+permissions: [budget.manage]
+features: [budgets, usage, governance]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.5.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [budgets, usage, cost]
+---
+
+# Govern budgets and usage
+
+Create a tenant-scoped budget with `POST /api/v1/organizations/{organizationId}/budgets`.
+Choose an organization, group, user, API key, application, agent, model, provider, or
+capability scope, a daily/weekly/monthly/custom window, and `HARD_LIMIT`, `SOFT_LIMIT`, or
+`ALERT_ONLY` strategy. Hard limits are reserved transactionally before execution.
+
+Use `GET /api/v1/organizations/{organizationId}/budgets` to inspect spend and active
+reservations. `GET /api/v1/organizations/{organizationId}/usage` returns tenant usage records
+after settlement. All endpoints require the matching access-token organization and
+`budget.manage`; cross-tenant reads fail closed.
+
+Budget reservations are idempotent by principal and idempotency key, use serializable
+transactions and compare-and-set updates, and are settled with measured input/output token
+usage and USD cost. The API-key gateway additionally enforces its own per-key reservation.
+
+## Prerequisites
+
+- An administrator with `budget.manage`.
+- A tenant access token for the organization being managed.
+
+## Steps
+
+1. Create a budget with the desired scope, period, strategy and USD limit.
+2. Review active reservations with the budgets endpoint.
+3. Inspect settled records with the usage endpoint and reconcile them with provider invoices.
+
+## Verify
+
+Attempt a reservation above a hard limit and confirm it is rejected before model execution.
+Repeat an idempotency key and confirm no second reservation is created.
+
+## Troubleshooting
+
+- `budget.manage permission is required` means the caller lacks the administrative permission.
+- A hard-limit rejection means spend plus active reservations reaches the configured limit.

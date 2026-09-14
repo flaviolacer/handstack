@@ -1,0 +1,39 @@
+---
+id: getting-started/identity-plugin-testkit
+title: Validate identity plugins with the contract test kit
+description: Run stable, security-focused contract probes before enabling an identity plugin.
+audience: [platform-operator, developer]
+permissions: [identity.manage]
+features: [identity, plugins, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.45.0
+lastReviewedAt: 2026-09-11
+owner: identity-team
+tags: [identity, plugins, testing]
+---
+
+# Validate identity plugins with the contract test kit
+
+## Prerequisites
+
+- An identity plugin manifest with an `apiVersion`, permissions, configuration schema and capabilities.
+- A test double for the plugin's external systems; tests must not require a live IdP or directory.
+
+## Steps
+
+1. Create a probe implementing `@handstack/plugin-testkit` security checks.
+2. Call `verifyIdentityPluginContract` with the manifest and probe.
+3. Add protocol-specific probes for OIDC callback/state/nonce/PKCE, SAML, LDAP, SCIM, provisioning, mapping and revocation as applicable.
+
+## Expected results
+
+The report includes manifest, tenant-isolation, timeout, fail-closed, secret-leakage and optional protocol checks. A failed check throws `PluginContractError` and the plugin is not eligible for activation.
+
+## Verify
+
+Run the plugin's focused typecheck, lint and contract tests. Repeat against each supported runtime adapter separately; offline conformance does not certify an external provider.
+
+## Troubleshooting
+
+- `manifest` or `apiVersion` indicates an invalid plugin contract.
+- `tenantIsolation`, `failClosed` or `secretLeakage` requires a security fix before release.

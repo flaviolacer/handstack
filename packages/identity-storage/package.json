@@ -1,0 +1,27 @@
+{
+  "name": "@handstack/identity-storage",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint src tests",
+    "test": "vitest run",
+    "test:mongodb": "vitest run --config vitest.mongodb.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@handstack/auth": "file:../auth",
+    "@handstack/database": "file:../database",
+    "@handstack/domain": "file:../domain",
+    "@handstack/identity": "file:../identity",
+    "@handstack/policy": "file:../policy"
+  },
+  "devDependencies": {
+    "@handstack/config": "file:../config"
+  }
+}

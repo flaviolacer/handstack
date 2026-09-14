@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "release": "0.0.0",
+  "baseline": "previous-stable",
+  "status": "review-required",
+  "generatedBy": "release-pipeline",
+  "summary": {
+    "added": [],
+    "removed": [],
+    "changed": [],
+    "unchanged": "permission manifests are compared by the release pipeline"
+  },
+  "review": {
+    "requiredApprover": "security-review",
+    "evidence": "ci"
+  }
+}

@@ -1,0 +1,73 @@
+---
+id: getting-started/knowledge
+title: Build tenant-scoped knowledge bases
+description: Ingest, chunk, embed and search documents through a portable VectorStore.
+audience: [developer, platform-operator]
+permissions: [knowledge.manage, knowledge.search]
+features: [knowledge, rag, embeddings]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.11.0
+lastReviewedAt: 2026-09-10
+owner: ai-platform-team
+tags: [knowledge, rag, vectors]
+---
+
+# Build tenant-scoped knowledge bases
+
+The knowledge package separates ingestion from persistence: `EmbeddingProvider` and `VectorStore`
+are replaceable, so pgvector, Mongo/Qdrant or a local store can be selected without changing the
+primary database adapter.
+
+## Prerequisites
+
+- A tenant KnowledgeBase with chunk size, overlap, strategy and embedding model.
+- An embedding provider and VectorStore implementation.
+
+## Steps
+
+1. Ingest text, URL or file/plugin content as a versioned document.
+2. Chunk using character, token or paragraph strategy.
+3. Embed each chunk and upsert vectors with organization metadata.
+4. Search with a knowledge-base filter, principal identity and pass results to chat or agents.
+5. Apply connector cursors with `KnowledgeSyncService` when a source is deleted or its ACL changes.
+6. Configure `InMemoryKnowledgeDocumentIndex` or a durable adapter to deduplicate by canonical
+   source and content digest; run `KnowledgeReindexService.migrate` after changing embedding models.
+   In database-backed deployments, construct `RepositoryKnowledgeDocumentIndex` and
+   `RepositoryKnowledgeSyncCursorStore` with the adapter repository factory so deduplication and
+   connector cursors survive restarts and remain tenant-scoped. For model migration, create a
+   `KnowledgeReindexJobService` job with a durable `RepositoryKnowledgeReindexJobStore`, run it
+   until `SUCCEEDED`, and publish the active model only after all checkpoints complete. Failed jobs
+   resume from their persisted cursor; cancellation remains durable and never publishes partial work.
+
+Every document, chunk and embedding carries a source id/version, content digest, ACL snapshot,
+classification, residency, ingestion/verification timestamps, retention policy and deletion status.
+The built-in `RagPolicyProvider` rejects prompt-injection markers and common
+PII/secrets before embedding, then rechecks the ACL before returning a match. Results include
+source provenance, a structured citation and a `stale` signal when the source was not verified in
+the last 24 hours. Restricted retrieval requires the policy provider's revalidation hook; sync
+deletion removes vectors and permission changes update their ACL snapshot.
+
+RAG evaluation suites should score recall, precision, groundedness, citation validity, freshness
+and cross-tenant isolation. The evaluation package exposes `scoreRagEvaluation` for deterministic
+case evidence and `validateRagEvaluationCriteria` to fail closed when a gate omits one of these
+metrics.
+
+## Verify
+
+Confirm organization and principal filters prevent cross-tenant or unauthorized matches, unsafe
+content is rejected before embedding, stale results are marked, invalid overlap is rejected, and
+a configured VectorStore remains usable regardless of the primary database adapter. Verify that a
+source cursor is retained and replayed safely after connector restarts.
+
+## Troubleshooting
+
+- Empty results usually indicate an embedding dimension/provider mismatch or missing ingestion.
+- Keep chunk overlap smaller than chunk size to avoid unbounded loops.
+- Store source credentials in the secret manager, never in document metadata.
+- A missing source ACL fails closed; add an explicit read entry (or `*` only for public content).
+- A `stale: true` result requires source re-verification before high-impact use.
+- Reindexing requires a VectorStore with `listByOrganization`; run a durable
+  `KnowledgeReindexJobService` job and verify `scanned`, `reindexed` and `skipped` counts before
+  publishing the new model.
+- A repeated connector token is acknowledged from the durable cursor without replaying its
+  mutation; a new token is persisted only after vector propagation succeeds.

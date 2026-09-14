@@ -1,0 +1,39 @@
+---
+id: getting-started/plugin-provider-validation
+title: Validate provider metadata before registration
+description: Reject malformed provider descriptors before they reach a domain registry or execution boundary.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, providers, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.56.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, providers, validation]
+---
+
+# Validate provider metadata before registration
+
+## Prerequisites
+
+- A plugin host with a provider registration callback.
+- A descriptor with a lowercase stable provider ID, display name, capability and non-empty configuration schema.
+
+## Steps
+
+1. Register the provider from plugin setup.
+2. Let the host call `validateProviderRegistration` before forwarding the descriptor.
+3. Resolve the descriptor into the appropriate domain registry only after validation and policy checks.
+
+## Expected results
+
+Invalid IDs, empty names/capabilities or empty schemas fail before the host callback and create no registration side effect.
+
+## Verify
+
+Run the Plugin SDK contract tests and confirm invalid provider metadata fails closed.
+
+## Troubleshooting
+
+- `Provider id is invalid` means the provider ID is not a stable lowercase identifier.
+- `Provider configuration schema is required` means the host cannot safely configure the provider.

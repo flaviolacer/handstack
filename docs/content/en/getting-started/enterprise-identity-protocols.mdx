@@ -1,0 +1,46 @@
+---
+id: getting-started/enterprise-identity-protocols
+title: Configure enterprise identity protocols
+description: Use the specialized SAML 2.0 and LDAP/LDAPS contracts without coupling HandStack to a vendor SDK.
+audience: [platform-operator, developer]
+permissions: [identity.manage]
+features: [identity, saml, ldap, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.44.0
+lastReviewedAt: 2026-09-11
+owner: identity-team
+tags: [identity, saml, ldap, sso]
+---
+
+# Configure enterprise identity protocols
+
+## Purpose and expected outcome
+
+Use `@handstack/plugin-saml` for SAML 2.0 assertions and `@handstack/plugin-ldap` for traditional Active Directory or another LDAP directory. These are separate protocol boundaries; Entra ID is configured through OIDC, OAuth2 or SAML rather than as LDAP.
+
+## Security prerequisites
+
+- Provide HTTPS SAML issuer and SSO endpoints, the expected audience and the trusted certificate fingerprint.
+- Inject a verifier that performs XML signature, issuer, audience and certificate-chain validation. HandStack consumes only its verified assertion result.
+- Use `ldaps://` and a secret-manager reference for the bind identity. Never put a password in provider configuration.
+- Keep provider and organization IDs tenant-scoped and use bounded operation timeouts.
+
+## Prerequisites
+
+- An organization administrator with `identity.manage`.
+- A configured SAML verifier or LDAPS transport backed by the deployment secret manager.
+
+## Steps
+
+1. Register the protocol-specific provider for one organization.
+2. Validate the provider configuration before enabling login.
+3. Inject the verifier or transport and map the returned identity through the normal authorization boundary.
+
+## Verify
+
+The offline contracts reject HTTP or plain LDAP, cross-organization assertions, expired or replayed SAML assertions, inline LDAP passwords and unbounded timeouts. Injected verifiers and directory transports must still be tested against the real IdP/directory in each deployment.
+
+## Troubleshooting
+
+- `INVALID_CONFIGURATION` means the endpoint, timeout or secret reference violates the protocol boundary.
+- `REPLAYED_ASSERTION` means the same SAML assertion was presented more than once.

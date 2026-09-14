@@ -1,0 +1,52 @@
+---
+id: getting-started/webhooks
+title: Entregar webhooks assinados com segurança
+description: Configure entrega HMAC com retries limitados e evidência em dead-letter.
+audience: [developer, platform-operator]
+permissions: [webhooks.manage]
+features: [webhooks, audit]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.26.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [webhooks, security, operations]
+---
+
+# Entregar webhooks assinados com segurança
+
+`@handstack/webhooks` assina o corpo JSON canônico com HMAC-SHA256. O receptor deve verificar a
+assinatura `sha256=` com comparação em tempo constante antes de processar o evento.
+
+O dispatcher repete falhas transitórias com backoff exponencial limitado. Uma entrega venenosa é
+retida em dead-letter com organização, evento, tentativas e erro redigido para recuperação operacional.
+
+Use um id de entrega único para idempotência e faça rotação dos segredos pelo secret provider.
+
+## Prerequisites
+
+- Endpoint de webhook do tenant e segredo com pelo menos 16 caracteres.
+
+## Steps
+
+1. Registre o endpoint e mantenha o segredo fora do código-fonte.
+2. Envie eventos com id de entrega único.
+3. Verifique `sha256=` antes de aceitar o corpo e deduplicate o id.
+
+A API tenant-scoped expõe `POST /api/v1/organizations/:organizationId/webhooks/configuration`,
+`POST .../webhooks/deliveries`, `GET .../webhooks/deliveries`, `GET .../webhooks/dead-letters` e
+`POST .../webhooks/dead-letters/:deliveryId/replay`. Todas as rotas exigem a permissão
+`webhooks.manage` e o escopo exato da organização.
+
+Use `GET .../webhooks/deliveries?status=DEAD_LETTERED` para consultar o histórico filtrado.
+A resposta é isolada por tenant e nunca inclui os segredos configurados.
+
+## Verify
+
+Force uma falha transitória e confirme que a segunda tentativa funciona; force um endpoint venenoso
+e confirme o estado dead-letter.
+
+## Troubleshooting
+
+- Assinatura inválida indica alteração do corpo bruto ou do segredo antes da verificação.
+- Registros dead-letter exigem replay operacional após corrigir o endpoint.
+- Um `status` inválido na query é rejeitado; use `PENDING`, `DELIVERED`, `RETRYING` ou `DEAD_LETTERED`.

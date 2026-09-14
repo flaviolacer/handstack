@@ -1,0 +1,54 @@
+---
+id: getting-started/distributed-deployment
+title: Deploy HandStack horizontally
+description: Run stateless Web/API/MCP replicas and independently scaled worker classes.
+audience: [platform-operator, security-admin]
+permissions: [deployment.manage]
+features: [deployment, kubernetes, scaling]
+deploymentProfiles: [distributed]
+introducedIn: 0.20.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [kubernetes, hpa, keda, workers]
+---
+
+# Deploy HandStack horizontally
+
+Use the official chart in `deploy/helm/handstack` for production. The fixed
+`deploy/kubernetes/handstack.yaml` remains a baseline for evaluation. Web, API and MCP replicas
+keep no request state in local memory; shared state belongs in the primary database, Redis HA,
+object storage or the encrypted secret provider.
+
+## Prerequisites
+
+- PostgreSQL/Mongo cluster, Redis HA, object storage and external secrets.
+- Ingress/WAF, immutable image tags, metrics-server and an external-metrics adapter for API/MCP
+  signals (requests, latency, event-loop lag, streams and in-flight capability executions); KEDA
+  is recommended for queue backlog.
+- Helm 3; the chart supports PostgreSQL, MySQL, MariaDB, SQL Server and MongoDB.
+
+## Steps
+
+1. Create an external Secret with `database-url` and `redis-url`.
+2. Install with `helm upgrade --install handstack deploy/helm/handstack` and immutable image tags.
+3. Enable/configure Ingress and verify KEDA ScaledObjects for each worker queue.
+4. Verify readiness/liveness and graceful worker shutdown before production traffic.
+
+## Rollback
+
+Keep chart values in version control and run `npm run helm:release:validate` before an upgrade. Use
+`helm history handstack` to identify the last known-good revision, then run
+`helm rollback handstack <REVISION> --wait --timeout 10m`. Confirm API readiness and pod health
+with `kubectl rollout status` and `kubectl get pods`; never delete the release to roll back.
+
+## Verify
+
+Scale API and workers independently, reconnect SSE using its cursor, and confirm queue backlog
+triggers backpressure rather than unbounded process memory.
+
+## Troubleshooting
+
+- A pod failing readiness should be removed from service while replicas remain available.
+- Never compensate for embedding backlog by scaling API replicas; scale `worker-knowledge`.
+- Do not set `externalSecrets.createSecret=true` for production credentials; Helm release history
+  can expose values.

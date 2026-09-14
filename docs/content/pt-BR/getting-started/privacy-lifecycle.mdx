@@ -1,0 +1,41 @@
+---
+id: getting-started/privacy-lifecycle
+title: Governança de privacidade e ciclo de vida
+description: Aplique classificação, retenção, legal hold, pedidos de titulares e residência.
+audience: [developer, platform-operator, security-admin]
+permissions: [privacy.manage, privacy.request]
+features: [privacy, retention, residency]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.17.0
+lastReviewedAt: 2026-09-09
+owner: security-platform-team
+tags: [privacy, retention, compliance]
+---
+
+# Governança de privacidade e ciclo de vida
+
+O pacote privacy oferece contratos independentes de adapter para retenção, legal hold, pedidos de
+titulares e residência. Providers devem manter a organização em toda operação e nunca ignorar hold.
+
+## Prerequisites
+
+- Defina dias de retenção por tipo de recurso e organização.
+- Registre regiões aprovadas e políticas de classificação dos providers.
+- Exija verificação de identidade antes de aprovar pedidos de titulares.
+
+## Steps
+
+1. Planeje ações usando timestamps e política de retenção.
+2. Execute somente após expirar; legal hold ativo não permite exclusão.
+3. Processe acesso/exportação/exclusão com evidência durável.
+4. Autorize residência antes de gravar em banco, vetores, objetos ou filas.
+
+## Verify
+
+Teste mismatch de tenant, bloqueio por hold, pedido não aprovado e região proibida. Configurações
+de privacidade devem controlar separadamente prompts, respostas, payloads de tools e telemetria.
+
+## Troubleshooting
+
+- Exclusão bloqueada por legal hold é esperada; libere o hold por fluxo administrativo auditado.
+- Regiões desconhecidas e pedidos não aprovados são negados por padrão.

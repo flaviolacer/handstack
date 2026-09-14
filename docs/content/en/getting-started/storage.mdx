@@ -1,0 +1,45 @@
+---
+id: getting-started/storage
+title: Store files with tenant isolation
+description: Use the storage provider and upload policy to protect file data.
+audience: [developer, platform-operator]
+permissions: [storage.read, storage.write]
+features: [storage, file-security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.15.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [storage, uploads, security]
+---
+
+# Store files with tenant isolation
+
+The `StorageProvider` contract keeps object operations behind a replaceable boundary. Every
+operation carries an organization id, so a key from another tenant is never returned.
+
+The official adapter names are Local, S3, Cloudflare R2, Azure Blob and GCS. Their SDK clients are
+injected behind the same contract, allowing offline tests to use the in-memory backend.
+
+## Prerequisites
+
+- Configure a provider (object storage in production or `InMemoryStorageProvider` for tests).
+- Define maximum bytes, allowed MIME types and file extensions.
+- Attach a malware scanner hook when uploads are accepted.
+
+## Steps
+
+1. Validate filename, MIME type and size with `validateUpload`.
+2. Scan the bytes before calling `put`.
+3. Persist the returned object metadata and use `signedUrl` for time-limited downloads.
+4. Delete objects through the provider when retention or privacy workflows require it.
+
+## Verify
+
+Confirm objects cannot be read or signed across organizations, expiry is positive, and scanner
+failures reject the upload without persisting it.
+
+## Troubleshooting
+
+- An object-not-found error can indicate the wrong organization context, not a missing key.
+- Keep provider credentials in the secret manager and never in object metadata.
+- Production adapters must enforce the same MIME, extension and malware policy as local tests.
