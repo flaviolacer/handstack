@@ -1,0 +1,1 @@
+{"state":"progress","summary":"M263 concluído: o PluginHost agora encaminha registros tipados de tools durante o enable, mantendo handlers atrás do limite comum de execução. Documentação e catálogo atualizados.","next_step":"Avançar para o próximo requisito MUST ainda não implementado.","blockers":[],"completed_requirements":["HS-CORE-014"],"all_requirements_verified":false}

@@ -1,0 +1,43 @@
+---
+id: getting-started/mcp-server
+title: Publicar capabilities via MCP
+description: Sirva capabilities tenant-bound pelo endpoint JSON-RPC MCP autenticado.
+audience: [developer, platform-operator]
+permissions: [capability.execute]
+features: [mcp, capabilities, audit]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.9.0
+lastReviewedAt: 2026-09-10
+owner: platform-team
+tags: [mcp, json-rpc, tools]
+---
+
+# Publicar capabilities via MCP
+
+A API expõe `/mcp` e `/mcp/:organizationId` como endpoints JSON-RPC autenticados. O servidor
+expõe somente capabilities permitidas no canal MCP e delega cada chamada ao engine comum.
+
+## Prerequisites
+
+- Access token HandStack válido e associação à organização.
+- Capability publicada com `MCP` em `allowedChannels`.
+
+## Steps
+
+1. Envie `initialize` para negociar o protocolo MCP.
+2. Chame `tools/list` para consultar schemas da organização.
+3. Chame `tools/call` com slug da capability e argumentos JSON.
+4. Use `resources/list` e `prompts/list` para metadados MCP configurados.
+
+## Verify
+
+Confirme que tokens Bearer ausentes/inválidos falham, mismatches de organização são rejeitados,
+capabilities somente API não aparecem e chamadas emitem os hooks normais do engine. O endpoint de
+métricas conta `tools/call` em `handstack_mcp_calls_total`; falhas de tools também incrementam
+`handstack_plugin_errors_total`. Descoberta não é contada como chamada de tool.
+
+## Troubleshooting
+
+- `MCP authentication required` indica que o guard não estabeleceu um principal.
+- Lista vazia indica ausência de capability publicada para `MCP` na organização.
+- Erros JSON-RPC são sanitizados; consulte o request id nos logs de auditoria.

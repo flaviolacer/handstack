@@ -1,0 +1,48 @@
+---
+id: getting-started/official-plugin-implementations
+title: Verify official plugin implementations
+description: Confirm that every critical extension point has a built-in HandStack implementation.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, security, operations]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.59.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, contracts, built-in]
+---
+
+# Verify official plugin implementations
+
+HandStack keeps critical extension points usable without third-party packages. The
+plugin test kit publishes the canonical suite-to-package mapping and rejects an empty
+or non-built-in implementation entry.
+
+## Prerequisites
+
+- `@handstack/plugin-testkit` is built.
+- The plugin contract suite coverage check is available.
+- The deployment profile has the referenced core packages.
+
+## Steps
+
+1. Import `assertOfficialBuiltInImplementations`.
+2. Run it during the plugin contract conformance check.
+3. Use the returned mapping to show the owning core package for each suite.
+4. Block release when a mapping is missing or not marked built-in.
+
+## Expected results
+
+All ten official suites resolve to a non-empty HandStack package and `builtIn: true`.
+The check raises `PluginContractError` with `built-in-implementation` if the invariant
+is violated.
+
+## Verify
+
+Run the plugin test kit typecheck, build and focused tests. Confirm that the mapping
+contains ten entries and that every entry is marked built-in.
+
+## Troubleshooting
+
+Do not replace a missing mapping with a third-party package. Add or repair the official
+core implementation and keep the mapping tied to its package path.

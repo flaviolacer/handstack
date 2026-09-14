@@ -1,0 +1,4 @@
+{"type":"thread.started","thread_id":"01a08c06-f851-7e91-aefe-5fe3133b0f93"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"state\":\"blocked\",\"summary\":\"O bloqueio M193 permanece inalterado; não há novo passo local executável sem permissões ou runtime acessível.\",\"next_step\":\"Disponibilizar permissões de leitura/execução no store ou runtime/cache; então executar os gates pendentes.\",\"blockers\":[\"tsc, Vitest e Prettier inacessíveis por EPERM.\",\"pnpm exec bloqueado por EACCES no registry; pnpm embutido sem saída.\",\"Conformance externa depende de adapters, serviços e credenciais.\"],\"completed_requirements\":[],\"all_requirements_verified\":false}"}}
+{"type":"turn.completed","usage":{"input_tokens":213202,"cached_input_tokens":211712,"cache_write_input_tokens":0,"output_tokens":178,"reasoning_output_tokens":44}}

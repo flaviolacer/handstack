@@ -1,0 +1,16 @@
+{
+    "cachedInputTokens":  138815232,
+    "startedAtUtc":  "2026-09-10T20:02:03.7331279Z",
+    "lastOutcome":  "progress",
+    "reasoningOutputTokens":  110386,
+    "requirementsCompleted":  26,
+    "updatedAtUtc":  "2026-09-11T04:28:42.5212271Z",
+    "outputTokens":  536114,
+    "requirementsTotal":  81,
+    "lastRun":  "C:\\Users\\flavi\\Desktop\\handstack\\.handstack-codex\\history-v2\\20260911-012728-879-359245d021b0417ba1bccb746d82b908",
+    "inputTokens":  144268312,
+    "completionPercent":  32.1,
+    "attempts":  458,
+    "prompts":  458,
+    "totalTokens":  144804426
+}

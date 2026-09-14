@@ -1,0 +1,84 @@
+---
+id: getting-started/authentication-sessions
+title: Configurar sessões de autenticação local
+description: Configure o tratamento seguro de access e refresh tokens na API HandStack.
+audience:
+  - platform-operator
+  - developer
+permissions: []
+features:
+  - identity
+deploymentProfiles:
+  - compact
+  - distributed
+introducedIn: 0.2.0
+lastReviewedAt: 2026-09-01
+owner: identity-team
+tags:
+  - authentication
+  - security
+---
+
+# Configurar sessões de autenticação local
+
+## Purpose and expected outcome
+
+Configure a API para que usuários locais recebam um access token curto e uma credencial de refresh rotativa que nunca é exposta em resposta JSON.
+
+## Prerequisites
+
+- Uma organização ativa e um usuário local com senha Argon2id.
+- TLS no limite público da API, pois cookies de refresh são sempre `Secure`.
+- Dois secrets aleatórios e independentes com pelo menos 32 caracteres.
+
+## Steps
+
+1. Defina `HANDSTACK_ACCESS_TOKEN_SECRET` e `HANDSTACK_TOKEN_PEPPER`. O startup de produção rejeita valores ausentes.
+2. Envie o ID da organização, username e senha para `POST /auth/login`.
+3. Mantenha o access token retornado somente na memória da aplicação. A API define a credencial de refresh em cookie `HttpOnly`, `Secure`, `SameSite=Strict` limitado a `/auth`.
+4. Envie `POST /auth/refresh` com o cookie e `x-handstack-csrf: 1`. A resposta substitui o cookie; nunca reutilize uma credencial de refresh anterior.
+5. Envie o access token como `Authorization: Bearer <token>` às rotas protegidas. Use `POST /auth/logout` para revogar sua sessão persistente.
+
+Para OIDC, persista um provider da organização com issuer e callback URI HTTPS. Guarde somente uma referência `env://HANDSTACK_SECRET_*` em `clientSecretReference`; coloque o valor real nessa variável de ambiente. `GET /auth/oidc/{organizationId}/providers` retorna opções seguras de login e `/auth/oidc/{organizationId}/{providerSlug}/start` inicia Authorization Code com PKCE. O callback valida state, nonce, issuer, audience, assinatura e a política de linking/JIT antes de emitir o mesmo formato de sessão HandStack.
+
+Defina a política de login da organização como `LOCAL_ALLOWED`, `LOCAL_DISABLED`, `SSO_REQUIRED` ou `SPECIFIC_IDP_REQUIRED`. Uma policy de provider específico deve referenciar um provider habilitado na mesma organização. Acesso local de emergência continua negado até que break-glass seja habilitado explicitamente, o usuário seja registrado dentro do limite configurado e receba uma senha dedicada de pelo menos 20 caracteres. Desabilite o registro imediatamente após o incidente.
+
+Administradores de identidade usam `/organizations/{organizationId}/identity/providers`, `/login-policy` e `/break-glass/{userId}` com uma sessão Bearer cujo principal possua `identity.manage`. A organização na rota deve ser igual à organização do token. Respostas de provider expõem `hasClientSecret`, mas nunca a referência nem o valor do secret.
+
+A página responsiva `/settings/identity-providers` oferece os mesmos controles de provider e enforcement. Seu formulário de sessão administrativa mantém organização e token Bearer apenas na memória da página; recarregar apaga ambos. Operações de disable exigem confirmação e todos os estados apontam para este guia.
+
+Mappings de group e role são linhas explícitas de allowlist no formato `claim=value|GROUP ou ROLE|target ID`. Configure-os no card do provider ou pela API `/mappings` do provider. No JIT, linking por e-mail verificado e logins posteriores, valores string exatos adicionam assignments mapeados e removem assignments obsoletos criados pelo IdP. Memberships e roles manuais existentes nunca são removidos.
+
+Antes de habilitar um provider, use **Test connection** ou `POST /organizations/{organizationId}/identity/providers/{providerId}/test-connection`. A verificação baixa o documento discovery padrão e o JWKS sob timeout de cinco segundos, rejeita redirects e endpoints sem HTTPS, exige issuer idêntico e pelo menos uma chave tipada e limita cada documento a 256 KiB. A resposta contém somente estágio e código fechados; URLs remotas, corpos de resposta, erros de transporte, client IDs e referências de secret nunca são retornados nem auditados.
+
+Para remover o acesso de um usuário desligado, chame `PATCH /organizations/{organizationId}/identity/users/{userId}/deprovision` com `identity.manage`. A transação desabilita usuário, principal e membership da organização e revoga todas as sessões, API keys e acesso break-glass. Vínculos de identidade externa e histórico de auditoria são preservados deliberadamente. Repetir a operação é seguro e informa zero credenciais revogadas novamente.
+
+## Verify
+
+Consulte `GET /auth/session` com o access token e confirme os IDs esperados de sujeito, organização e sessão. Depois do logout, o mesmo access token deve receber HTTP 401.
+
+## Troubleshooting
+
+- HTTP 401 no login indica username/senha inválidos ou usuário desativado.
+- HTTP 403 no refresh indica ausência do header CSRF.
+- O replay de uma credencial de refresh revoga sua sessão; faça novo login.
+- Se o linking OIDC for negado, habilite explicitamente linking por e-mail verificado ou JIT no provider; ambos vêm desabilitados por padrão.
+- Um teste de conexão falho informa se discovery ou JWKS falhou. Confira configuração e disponibilidade no console do IdP; o HandStack omite deliberadamente detalhes da resposta remota.
+
+## Security, budget, and audit implications
+
+Nunca coloque access ou refresh tokens em `localStorage`. Respostas de autenticação usam `Cache-Control: no-store`; somente hashes de refresh tokens são persistidos. Este fluxo não consome budget de modelo.
+
+Alterações de Identity Provider e policy, logins bem-sucedidos e falhos, criação JIT, linking externo e atividade break-glass são gravados no audit store tenant-aware. Os detalhes de auditoria excluem senhas, tokens, client secrets e claims de identidade.
+
+Registros de identidade e autenticação usam o adapter de banco canônico configurado. Os namespaces de repository são versionados e estáveis entre upgrades; execute `handstack migrate` antes de iniciar uma versão mais nova e inclua os registros de identidade no fluxo padrão de backup portátil.
+
+Quando o OpenTelemetry opt-in está habilitado, início/callback SSO e administração de identidade emitem `handstack_identity_operations_total`, `handstack_identity_operation_duration_ms` e spans limitados. As dimensões exportadas contêm somente o nome fechado da operação e outcome de sucesso/falha; mensagens de exceção, identificadores de organização/usuário/provider, claims e credenciais são excluídos.
+
+## Rollback
+
+Revogue a sessão afetada ou todas as sessões do principal. Rotacione os dois secrets do servidor durante uma janela de manutenção coordenada para invalidar todas as credenciais existentes.
+
+## Related articles
+
+- [Visão geral do HandStack](/help/getting-started/overview)

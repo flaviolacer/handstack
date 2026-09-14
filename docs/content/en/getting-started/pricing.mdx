@@ -1,0 +1,49 @@
+---
+id: getting-started/pricing
+title: Configure versioned model pricing
+description: Register tenant-scoped provider and model prices and estimate governed usage cost.
+audience: [platform-operator, developer]
+permissions: [models.manage, budget.manage]
+features: [models, budgets, pricing]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.39.0
+lastReviewedAt: 2026-09-11
+owner: ai-platform-team
+tags: [pricing, models, usage]
+---
+
+# Configure versioned model pricing
+
+## Purpose and expected outcome
+
+Keep provider and model pricing tenant-scoped and historically reproducible by resolving the latest version effective at the time of usage.
+
+## Prerequisites
+
+- An organization with registered providers and model definitions.
+- `models.manage` to register prices and `budget.manage` to reconcile usage.
+
+## Steps
+
+1. Register a `ProviderPricing` or `ModelPricing` record with an effective date and currency.
+2. Set input, output, cached-input, image, audio and request prices using the documented units.
+3. Add a new effective-dated version when a provider changes price; do not rewrite historical records.
+4. Resolve pricing at the usage timestamp and pass the estimate into the normal budget settlement pipeline.
+
+## Verify
+
+Resolve before and after a price change and confirm each timestamp selects the correct version. Confirm that a tenant cannot resolve another tenant's price and that negative usage is rejected.
+
+## Troubleshooting
+
+- No effective price means no record exists on or before the requested timestamp.
+- A duplicate-version error means the same tenant/resource/effective date already exists.
+- A validation error means a price or usage dimension is negative or non-finite.
+
+## Security, budget, and audit implications
+
+Pricing is organization-scoped and contains no credentials. Estimates are inputs to budget reservation/settlement; the pricing catalog does not bypass authorization, budget or audit controls.
+
+## Rollback
+
+Register a new effective-dated price version. Preserve earlier records so historical reconciliation remains reproducible.

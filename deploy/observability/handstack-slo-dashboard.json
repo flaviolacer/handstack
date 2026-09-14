@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "title": "HandStack SLO and saturation",
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": "http",
+      "title": "Request rate, errors and p95 latency by route",
+      "metrics": [
+        "handstack_requests_total",
+        "handstack_http_requests_per_second",
+        "handstack_http_request_p95_latency_seconds"
+      ]
+    },
+    {
+      "id": "streams",
+      "title": "Active SSE/WebSocket/MCP streams",
+      "metrics": ["handstack_active_streams"]
+    },
+    {
+      "id": "runtime",
+      "title": "Event-loop lag and memory pressure",
+      "metrics": ["handstack_event_loop_lag_seconds", "handstack_memory_pressure_ratio"]
+    },
+    {
+      "id": "autoscaling",
+      "title": "HPA/KEDA desired versus available replicas",
+      "metrics": [
+        "kube_deployment_status_replicas",
+        "kube_deployment_status_replicas_available",
+        "kube_horizontalpodautoscaler_status_desired_replicas"
+      ]
+    },
+    {
+      "id": "queues",
+      "title": "Queue depth, oldest age, retries and dead letters",
+      "metrics": [
+        "handstack_queue_depth",
+        "handstack_queue_oldest_age_seconds",
+        "handstack_worker_jobs_failed_total"
+      ]
+    },
+    {
+      "id": "workers",
+      "title": "Worker concurrency and execution duration",
+      "metrics": ["handstack_worker_concurrency", "handstack_worker_execution_duration_seconds"]
+    },
+    {
+      "id": "redis",
+      "title": "Redis latency, memory, failover and stream lag",
+      "metrics": [
+        "handstack_redis_latency_seconds",
+        "redis_memory_used_bytes",
+        "handstack_redis_stream_lag"
+      ]
+    },
+    {
+      "id": "database",
+      "title": "Database connections, replication lag and slow queries",
+      "metrics": [
+        "handstack_database_connections",
+        "handstack_database_replication_lag_seconds",
+        "handstack_database_slow_queries_total"
+      ]
+    },
+    {
+      "id": "providers",
+      "title": "Provider quotas, 429s and circuit breakers",
+      "metrics": [
+        "handstack_provider_quota_ratio",
+        "handstack_provider_rate_limited_total",
+        "handstack_provider_circuit_breaker_state"
+      ]
+    },
+    {
+      "id": "budgets",
+      "title": "Budget reservation latency and conflicts",
+      "metrics": [
+        "handstack_budget_reservation_latency_seconds",
+        "handstack_budget_reservation_conflicts_total"
+      ]
+    },
+    {
+      "id": "storage",
+      "title": "Storage latency and error rate",
+      "metrics": ["handstack_storage_latency_seconds", "handstack_storage_errors_total"]
+    },
+    {
+      "id": "slo",
+      "title": "Control-plane SLOs",
+      "metrics": [
+        "handstack_requests_total",
+        "handstack_queue_oldest_age_seconds",
+        "handstack_plugin_errors_total"
+      ]
+    }
+  ]
+}

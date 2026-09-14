@@ -1,0 +1,38 @@
+---
+id: getting-started/redis-streams
+title: Configurar Redis Streams e filas duráveis
+description: Conecte Redis Streams e transports compatíveis com BullMQ sem acoplar os pacotes centrais a um SDK Redis.
+audience: [developer, platform-operator]
+permissions: [jobs.manage, audit.read]
+features: [redis, event-bus, queues]
+deploymentProfiles: [distributed]
+introducedIn: 0.23.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [redis, streams, bullmq, at-least-once]
+---
+
+# Configurar Redis Streams e filas duráveis
+
+Injete um `RedisStreamsTransport` no `RedisStreamsEventBus` e um
+`DurableJobTransport` no `DistributedJobQueue`. Os adapters podem usar clientes
+Redis Streams e BullMQ, enquanto os contratos mantêm os testes locais sem SDK.
+
+## Prerequisites
+
+- Redis HA/Sentinel ou Redis gerenciado com persistência e política de rede.
+
+## Steps
+
+1. Configure endpoint Redis de alta disponibilidade e consumer group por classe de worker.
+2. Anexe eventos antes de responder à requisição; handlers fazem ACK somente após sucesso.
+3. Encaminhe eventos problemáticos e jobs terminais para stream/fila dead-letter retida.
+4. Defina backlog limitado e respeite `BackpressureError.retryAfterSeconds`.
+
+## Verify
+
+Exercite redelivery, falha/DLQ, admissão limitada e encerramento gracioso dos workers.
+
+## Troubleshooting
+
+- Um ACK ausente será redeliverado pelo consumer group; investigue o handler antes de elevar retries.

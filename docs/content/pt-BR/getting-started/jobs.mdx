@@ -1,0 +1,47 @@
+---
+id: getting-started/jobs
+title: Operar jobs em background com limites
+description: Configure filas, retries, backpressure, checkpoints e retenção em DLQ.
+audience: [developer, platform-operator]
+permissions: [jobs.manage, jobs.read]
+features: [jobs, queues, backpressure]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.19.0
+lastReviewedAt: 2026-09-10
+owner: platform-team
+tags: [jobs, bullmq, workers, dlq]
+---
+
+# Operar jobs em background com limites
+
+As filas separam cargas de agents, embeddings, documentos, plugins, webhooks, audit, billing,
+cleanup e indexing. Cada fila limita backlog, prioridade, retries com jitter, timeout, idempotência
+e retenção de dead-letter.
+
+## Prerequisites
+
+- Execute workers separados para agents, knowledge, integrações, webhooks, audit/billing e manutenção.
+- Configure capacidade, concorrência, retries e retenção conforme o perfil de deployment.
+
+## Steps
+
+1. Enfileire com chave de idempotência e rejeite quando atingir capacidade com `Retry-After`.
+2. Processe com cancelamento, heartbeat e checkpoints.
+3. Faça retry exponencial de falhas transitórias e inspecione jobs terminais na DLQ.
+4. Encerre workers graciosamente concluindo ou devolvendo o job ativo.
+
+## Verify
+
+Teste enqueue duplicado, backpressure, transições retry/DLQ, timeout e cancelamento.
+
+## Coletar métricas do worker
+
+O worker expõe o formato de texto do Prometheus em `GET /metrics`, na porta
+`HANDSTACK_WORKER_METRICS_PORT` (padrão `9091`). O endpoint contém somente métricas agregadas de
+jobs ativos, concluídos, falhos e heartbeat; payloads nunca são incluídos. Proteja a porta com a
+política de rede da plataforma e configure o Prometheus para coletar cada instância do worker.
+
+## Troubleshooting
+
+- Backpressure protege contra memória ilimitada; respeite seu atraso de retry.
+- Mantenha payloads pequenos e armazene artefatos grandes em object storage.

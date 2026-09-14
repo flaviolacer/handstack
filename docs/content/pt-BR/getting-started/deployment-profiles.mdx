@@ -1,0 +1,49 @@
+---
+id: getting-started/deployment-profiles
+title: Escolher um perfil de deployment do HandStack
+description: Execute o perfil compacto single-container ou os perfis distribuídos de Compose e Kubernetes.
+audience: [platform-operator, developer]
+permissions: [deployment.manage]
+features: [deployment, infrastructure, operations]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.41.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [docker, compose, kubernetes, helm]
+---
+
+# Escolher um perfil de deployment do HandStack
+
+## Purpose and expected outcome
+
+Selecione um perfil compacto sem infraestrutura para desenvolvimento ou o perfil distribuído stateless para produção.
+
+## Prerequisites
+
+- Docker para os perfis compacto e Compose.
+- Kubernetes, Helm, banco gerenciado, Redis HA e object storage para produção distribuída.
+
+## Steps
+
+1. Use `docker run handstack/handstack` para o perfil compacto API/UI/SQLite sem Redis.
+2. Use `docker compose -f deploy/docker-compose/compose.yaml up` para desenvolvimento; selecione exatamente um perfil `postgres` ou `mongodb` quando necessário.
+3. Use o Helm chart oficial em produção e configure SecretProvider externo, imagens imutáveis, adapter de banco e topologia Redis.
+4. Mantenha probes `/health/live` e `/health/ready` habilitados e nunca coloque credenciais de produção em imagens, values ou histórico de release.
+
+## Verify
+
+Execute `node scripts/validate_container_contract.mjs` e `node scripts/validate_helm_chart.mjs`. Confirme que o modo compacto tem somente API/UI/SQLite e que o chart renderiza Deployments, Services, HPA, KEDA, PDB e NetworkPolicy.
+
+## Troubleshooting
+
+- O perfil de banco deve corresponder a `HANDSTACK_DATABASE_ADAPTER` e sua URL externa.
+- Falhas no chart de produção geralmente indicam SecretProvider, metrics-server ou KEDA ausente.
+- Falha de readiness remove a réplica do tráfego; falha de liveness reinicia somente o processo não saudável.
+
+## Security, budget, and audit implications
+
+Secrets são injetados externamente. Réplicas distribuídas permanecem stateless e continuam usando o pipeline normal de autorização, budget, auditoria e telemetria.
+
+## Rollback
+
+Faça rollback da imagem Compose ou release Helm para a última revisão imutável conhecida; nunca apague estado de banco, auditoria ou object storage.

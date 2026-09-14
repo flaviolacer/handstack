@@ -1,0 +1,80 @@
+{
+  "apiVersion": "monitoring.handstack.dev/v1",
+  "groups": [
+    {
+      "name": "handstack.slo",
+      "rules": [
+        {
+          "alert": "HandStackApiP95LatencyHigh",
+          "expr": "handstack_http_request_p95_latency_seconds > 0.3",
+          "for": "10m",
+          "severity": "warning",
+          "runbook": "docs/operations/observability-and-alerts.md"
+        },
+        {
+          "alert": "HandStackApiAvailabilityBudgetBurn",
+          "expr": "(sum(rate(handstack_requests_total{status=~\"5..\"}[5m])) / sum(rate(handstack_requests_total[5m]))) > 0.001",
+          "for": "10m",
+          "severity": "critical",
+          "runbook": "docs/operations/observability-and-alerts.md"
+        },
+        {
+          "alert": "HandStackQueueWaitHigh",
+          "expr": "handstack_queue_oldest_age_seconds > 5",
+          "for": "10m",
+          "severity": "warning",
+          "runbook": "docs/operations/observability-and-alerts.md"
+        },
+        {
+          "alert": "HandStackQueueDeadLetters",
+          "expr": "rate(handstack_worker_jobs_failed_total[5m]) > 0",
+          "for": "5m",
+          "severity": "warning",
+          "runbook": "docs/operations/observability-and-alerts.md"
+        },
+        {
+          "alert": "HandStackRuntimeSaturated",
+          "expr": "handstack_event_loop_lag_seconds > 0.1 or handstack_memory_pressure_ratio > 0.9",
+          "for": "10m",
+          "severity": "warning",
+          "runbook": "docs/operations/observability-and-alerts.md"
+        },
+        {
+          "alert": "HandStackMaxReplicasSaturated",
+          "expr": "kube_horizontalpodautoscaler_status_desired_replicas >= kube_horizontalpodautoscaler_spec_max_replicas and kube_horizontalpodautoscaler_status_current_replicas >= kube_horizontalpodautoscaler_spec_max_replicas",
+          "for": "15m",
+          "severity": "critical",
+          "runbook": "docs/operations/observability-and-alerts.md"
+        },
+        {
+          "alert": "HandStackRedisDegraded",
+          "expr": "handstack_redis_latency_seconds > 0.1 or handstack_redis_stream_lag > 1000",
+          "for": "10m",
+          "severity": "critical",
+          "runbook": "docs/operations/observability-and-alerts.md"
+        },
+        {
+          "alert": "HandStackDatabaseReplicationLag",
+          "expr": "handstack_database_replication_lag_seconds > 30",
+          "for": "10m",
+          "severity": "critical",
+          "runbook": "docs/operations/observability-and-alerts.md"
+        },
+        {
+          "alert": "HandStackProviderQuotaExhaustion",
+          "expr": "handstack_provider_quota_ratio > 0.9 or rate(handstack_provider_rate_limited_total[5m]) > 0",
+          "for": "10m",
+          "severity": "warning",
+          "runbook": "docs/operations/observability-and-alerts.md"
+        },
+        {
+          "alert": "HandStackStorageErrors",
+          "expr": "rate(handstack_storage_errors_total[5m]) > 0",
+          "for": "5m",
+          "severity": "critical",
+          "runbook": "docs/operations/observability-and-alerts.md"
+        }
+      ]
+    }
+  ]
+}

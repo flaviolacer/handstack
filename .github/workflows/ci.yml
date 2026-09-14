@@ -1,0 +1,186 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Node ${{ matrix.node }} quality gates
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run release:validate
+      - run: npm run integration:validate
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run docs:validate
+      - name: Validate Compose profiles
+        run: docker compose --profile postgres --profile mongodb --profile distributed -f deploy/docker-compose/compose.yaml config
+      - run: npm test
+      - run: npm run build
+
+  containers:
+    name: Container builds
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/api.Dockerfile
+          push: false
+          tags: handstack/api:ci
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/web.Dockerfile
+          push: false
+          tags: handstack/web:ci
+
+  browser-compatibility:
+    name: Chat UI browser, accessibility, and visual gates
+    runs-on: windows-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm --workspace @handstack/web run build
+      - run: npm --workspace @handstack/web exec -- playwright install chromium firefox webkit
+      - run: npm --workspace @handstack/web run test:e2e
+
+  database-conformance:
+    name: PostgreSQL and MongoDB conformance
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Start PostgreSQL
+        run: |
+          docker run --detach --name handstack-postgres \
+            --env POSTGRES_PASSWORD=handstack \
+            --env POSTGRES_DB=handstack_test \
+            --publish 5432:5432 postgres:17
+          until docker exec handstack-postgres pg_isready --username postgres --dbname handstack_test; do sleep 2; done
+      - name: PostgreSQL repository conformance
+        env:
+          HANDSTACK_TEST_POSTGRESQL_URL: postgresql://postgres:handstack@127.0.0.1:5432/handstack_test
+        run: npm --workspace @handstack/database-typeorm run test:postgresql
+      - name: Start MongoDB replica set
+        run: |
+          docker run --detach --name handstack-mongodb \
+            --publish 27017:27017 mongo:8 \
+            --replSet rs0 --bind_ip_all
+          until docker exec handstack-mongodb mongosh --quiet --eval "db.adminCommand('ping').ok"; do sleep 2; done
+          docker exec handstack-mongodb mongosh --quiet --eval \
+            "rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]})"
+          until docker exec handstack-mongodb mongosh --quiet --eval "rs.isMaster().ismaster" | grep true; do sleep 2; done
+      - name: MongoDB repository conformance
+        env:
+          HANDSTACK_TEST_MONGODB_URL: mongodb://127.0.0.1:27017/handstack_test?replicaSet=rs0
+        run: npm --workspace @handstack/database-mongodb run test:mongodb
+      - name: MongoDB portable round-trip
+        env:
+          HANDSTACK_TEST_MONGODB_URL: mongodb://127.0.0.1:27017/?replicaSet=rs0
+        run: npm --workspace @handstack/database run test:mongodb-portable
+      - name: MongoDB identity storage
+        env:
+          HANDSTACK_TEST_MONGODB_URL: mongodb://127.0.0.1:27017/?replicaSet=rs0
+        run: npm --workspace @handstack/identity-storage run test:mongodb
+
+  official-sql-conformance:
+    name: MySQL, MariaDB, and SQL Server conformance
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Start MySQL
+        run: |
+          docker run --detach --name handstack-mysql \
+            --env MYSQL_ROOT_PASSWORD=handstack \
+            --env MYSQL_DATABASE=handstack_test \
+            --publish 3306:3306 mysql:8.4
+          until docker exec handstack-mysql mysqladmin ping --host=127.0.0.1 --password=handstack --silent; do sleep 2; done
+      - name: MySQL repository conformance
+        env:
+          HANDSTACK_TEST_SQL_ADAPTER: mysql
+          HANDSTACK_TEST_SQL_URL: mysql://root:handstack@127.0.0.1:3306/handstack_test
+        run: npm --workspace @handstack/database-typeorm run test:official-sql
+      - name: Start MariaDB
+        run: |
+          docker run --detach --name handstack-mariadb \
+            --env MARIADB_ROOT_PASSWORD=handstack \
+            --env MARIADB_DATABASE=handstack_test \
+            --publish 3307:3306 mariadb:11
+          until docker exec handstack-mariadb mariadb-admin ping --host=127.0.0.1 --password=handstack --silent; do sleep 2; done
+      - name: MariaDB repository conformance
+        env:
+          HANDSTACK_TEST_SQL_ADAPTER: mariadb
+          HANDSTACK_TEST_SQL_URL: mysql://root:handstack@127.0.0.1:3307/handstack_test
+        run: npm --workspace @handstack/database-typeorm run test:official-sql
+      - name: Start SQL Server
+        env:
+          MSSQL_SA_PASSWORD: HandStack!Passw0rd
+        run: |
+          docker run --detach --name handstack-sqlserver \
+            --env ACCEPT_EULA=Y \
+            --env MSSQL_SA_PASSWORD="$MSSQL_SA_PASSWORD" \
+            --publish 1433:1433 mcr.microsoft.com/mssql/server:2022-latest
+          until docker exec handstack-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -Q "SELECT 1"; do sleep 2; done
+          docker exec handstack-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C \
+            -Q "CREATE DATABASE handstack_test"
+      - name: SQL Server repository conformance
+        env:
+          HANDSTACK_TEST_SQL_ADAPTER: sqlserver
+          HANDSTACK_TEST_SQL_TRUST_CERT: 'true'
+          HANDSTACK_TEST_SQL_URL: mssql://sa:HandStack%21Passw0rd@localhost:1433/handstack_test
+        run: npm --workspace @handstack/database-typeorm run test:official-sql
+
+  graph:
+    name: Structural knowledge graph
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install graphifyy==0.9.53
+      - run: python scripts/build_graph.py
+      - run: python scripts/validate_graph.py
+      - run: python -m graphify diagnose multigraph --graph graphify-out/graph.json --directed --json
+      - run: python -m graphify query "Explain the HandStack module boundaries" --budget 1500 --graph graphify-out/graph.json

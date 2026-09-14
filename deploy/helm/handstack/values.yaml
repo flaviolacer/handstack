@@ -1,0 +1,126 @@
+nameOverride: ''
+fullnameOverride: ''
+
+images:
+  api:
+    repository: ghcr.io/handstack/api
+    tag: '0.1.0'
+    pullPolicy: IfNotPresent
+  web:
+    repository: ghcr.io/handstack/web
+    tag: '0.1.0'
+    pullPolicy: IfNotPresent
+  worker:
+    repository: ghcr.io/handstack/worker
+    tag: '0.1.0'
+    pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+deploymentProfile: distributed
+database:
+  adapter: postgresql
+  url: ''
+objectStorage:
+  endpoint: ''
+  bucket: handstack
+queue:
+  redisUrl: ''
+  topology: sentinel
+externalSecrets:
+  enabled: true
+  secretName: handstack-external
+  createSecret: false
+  annotations: {}
+
+serviceAccount:
+  create: true
+  automount: false
+  annotations: {}
+
+api:
+  replicas: 3
+  port: 3001
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: '1', memory: 1Gi }
+web:
+  replicas: 2
+  port: 3000
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: '1', memory: 512Mi }
+mcp:
+  enabled: true
+  replicas: 2
+  port: 3001
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: '1', memory: 1Gi }
+
+workers:
+  agents: { enabled: true, replicas: 1, queue: agents }
+  knowledge: { enabled: true, replicas: 1, queue: embeddings }
+  integrations: { enabled: true, replicas: 1, queue: plugins }
+  webhooks: { enabled: true, replicas: 1, queue: webhooks }
+  auditBilling: { enabled: true, replicas: 1, queue: audit }
+  maintenance: { enabled: true, replicas: 1, queue: cleanup }
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: '1', memory: 512Mi }
+
+autoscaling:
+  enabled: true
+  api:
+    minReplicas: 3
+    maxReplicas: 50
+    targetCPUUtilizationPercentage: 65
+    externalMetrics:
+      - { name: handstack_http_requests_per_second, type: AverageValue, value: '100' }
+      - { name: handstack_http_request_p95_latency_seconds, type: AverageValue, value: '0.5' }
+      - { name: handstack_event_loop_lag_seconds, type: AverageValue, value: '0.1' }
+      - { name: handstack_in_flight_capability_executions, type: AverageValue, value: '20' }
+  web: { minReplicas: 2, maxReplicas: 20, targetCPUUtilizationPercentage: 65 }
+  mcp:
+    minReplicas: 2
+    maxReplicas: 30
+    targetCPUUtilizationPercentage: 65
+    externalMetrics:
+      - { name: handstack_active_streams, type: AverageValue, value: '20' }
+      - { name: handstack_http_requests_per_second, type: AverageValue, value: '100' }
+      - { name: handstack_http_request_p95_latency_seconds, type: AverageValue, value: '0.5' }
+      - { name: handstack_event_loop_lag_seconds, type: AverageValue, value: '0.1' }
+      - { name: handstack_in_flight_capability_executions, type: AverageValue, value: '20' }
+keda:
+  enabled: true
+  minReplicaCount: 1
+  maxReplicaCount: 100
+  listLength: '20'
+pdb:
+  enabled: true
+  minAvailable: 1
+ingress:
+  enabled: false
+  className: ''
+  annotations: {}
+  host: handstack.example.com
+  tls: []
+networkPolicy:
+  enabled: true
+  allowedExternalCIDRs: []
+  databaseCIDRs: []
+  redisCIDRs: []
+  objectStorageCIDRs: []
+  allowDNS: true
+  allowDatabase: true
+  allowRedis: true
+topologySpread: true
+terminationGracePeriodSeconds:
+  services: 30
+  workers: 60
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile: { type: RuntimeDefault }
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: [ALL] }

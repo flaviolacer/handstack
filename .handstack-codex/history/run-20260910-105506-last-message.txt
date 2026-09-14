@@ -1,0 +1,10 @@
+Progresso realizado:
+
+- Corrigida a injeção de Secrets no chart Helm com `secretKeyRef`.
+- Adicionado `pnpm helm:release:validate`.
+- Documentados upgrade e rollback em EN/pt-BR.
+- Helm lint/render e validações estruturais aprovados.
+- Gates globais aprovados: format, docs, lint, typecheck, testes, build e Graphify.
+- `STATUS.md` atualizado com M145/M146 e pendências.
+
+Próximo passo registrado: auditar resiliência/DR e testes de carga de M18. O marcador `COMPLETE` não foi criado.

@@ -1,0 +1,45 @@
+---
+id: getting-started/observability-and-alerts
+title: Observability and alerts
+description: Operate HandStack with the SLO dashboard and saturation alerts.
+audience: [platform-operator, security-admin]
+permissions: [deployment.manage]
+features: [observability, slo, alerting]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.29.0
+lastReviewedAt: 2026-09-10
+owner: platform-team
+tags: [observability, slo, alerting, operations]
+---
+
+# Observability and alerts
+
+HandStack ships a versioned SLO dashboard and alert contract covering request latency, streams,
+runtime pressure, autoscaling, queues, workers, Redis, the database, providers, budgets, and
+storage. Import `deploy/observability/handstack-slo-dashboard.json` into the approved dashboard
+system and adapt `deploy/observability/handstack-alert-rules.json` to the Prometheus-compatible
+rule format used by your platform.
+
+Run `npm run observability:validate` in release validation. Metrics must not contain prompts,
+payloads, secrets, tenant IDs, user IDs, or model names.
+
+## Prerequisites
+
+You need deployment access and a Prometheus-compatible metrics and alerting system.
+
+## Steps
+
+1. Expose the HandStack `/metrics` endpoint to the approved collector.
+2. Import the SLO dashboard JSON and adapt the alert rules to the platform format.
+3. Configure the alert destinations and link each alert to the supplied runbook.
+
+## Verify
+
+Run `npm run observability:validate` and confirm the dashboard loads all panels and every alert
+references a catalogued metric.
+
+## Troubleshooting
+
+If a metric or panel is missing, compare the deployed revision with the versioned catalog and
+rerun the validation gate. Do not add sensitive request data as a label to resolve a cardinality
+or filtering issue.

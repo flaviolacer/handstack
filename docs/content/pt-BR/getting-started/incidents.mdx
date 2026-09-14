@@ -1,0 +1,43 @@
+---
+id: getting-started/incidents
+title: Gerencie incidentes e status para clientes
+description: Acompanhe, escale e comunique incidentes com atualizações de status seguras para o cliente.
+audience: [platform-operator, security-admin]
+permissions: [incidents.manage]
+features: [incidents, status-page, escalation]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.30.0
+lastReviewedAt: 2026-09-10
+owner: platform-team
+tags: [incidents, status-page, escalation, operations]
+---
+
+# Gerencie incidentes e status para clientes
+
+Incidentes são registros com escopo de tenant, incluindo severidade, estado do ciclo de vida,
+linha do tempo, ações corretivas e políticas de escalação. O HandStack os transiciona por uma máquina
+de estados limitada (`DETECTED` → `INVESTIGATING` → `IDENTIFIED` → `MITIGATING` → `MONITORING` →
+`RESOLVED` → `POSTMORTEM`) e publica apenas detalhes seguros para o cliente por meio de um
+`StatusPageProvider` substituível.
+
+## Prerequisites
+
+Tenha a permissão `incidents.manage` e selecione a organização cujos incidentes você gerencia.
+
+## Steps
+
+1. Crie um incidente com severidade, responsável e impacto ao cliente.
+2. Adicione entradas na linha do tempo conforme a investigação avança.
+3. Transicione o incidente pelos estados permitidos.
+4. Anexe ações corretivas com responsáveis e prazos.
+5. Publique status seguro quando o incidente entrar em monitoramento ou resolução.
+
+## Verify
+
+Apenas transições permitidas são aceitas, leituras entre tenants falham e a saída do status exclui a
+causa raiz e as ações corretivas.
+
+## Troubleshooting
+
+Uma transição rejeitada indica mudança de estado inválida; revise a tabela de transições permitidas.
+Se a saída do status estiver ausente, confirme que um `StatusPageProvider` está configurado.

@@ -1,0 +1,17 @@
+OBJETIVO PERSISTENTE: implementar integralmente o sistema HandStack descrito na especificacao "C:\Users\flavi\Desktop\handstack-master-specification-v1.md" dentro de "C:\Users\flavi\Desktop\handstack".
+
+Trabalhe de forma autonoma e persistente. Leia toda a especificacao e trate-a como fonte de verdade. Inspecione antes o estado atual do repositorio e retome exatamente do ponto registrado, preservando trabalho valido existente.
+
+Use "C:\Users\flavi\Desktop\handstack\STATUS.md" como ledger duravel do objetivo: mantenha fases, itens concluidos, pendencias, decisoes, comandos de verificacao e proximo passo. Atualize-o frequentemente, sobretudo antes de operacoes longas. Divida a implementacao em incrementos verificaveis e continue executando-os; nao pare apenas para apresentar um plano ou resumo.
+
+A cada turno: implemente o proximo conjunto coerente, execute testes/lint/build/migracoes pertinentes, corrija falhas e atualize STATUS.md. Se houver trabalho restante, finalize a mensagem informando progresso e proximo passo, sem declarar conclusao.
+
+Antes de editar qualquer arquivo, releia o trecho atual e confirme o contexto exato. Use patches pequenos e especificos. Se apply_patch falhar por nao encontrar as linhas esperadas, nao repita o mesmo patch: releia o arquivo, adapte o contexto ou faca uma alteracao menor, e registre a pendencia se nao for possivel prosseguir.
+
+Ao usar apply_patch, mantenha cada cabecalho *** Update File no nivel superior e use um patch separado por arquivo quando houver duvida. Nunca coloque outro cabecalho *** Update File dentro de um hunk; todas as linhas do hunk devem comecar com espaco, + ou -.
+
+Nao encerre um turno apenas dizendo que nao houve desbloqueios quando STATUS.md tiver um proximo passo executavel. Escolha o proximo incremento pendente e implemente-o agora. So declare bloqueio quando houver dependencia tecnica real, apos tentar alternativas locais, registrando evidencia, impacto e a proxima acao concreta no STATUS.md.
+
+Somente quando TODOS os requisitos da especificacao estiverem implementados, integrados e verificados, com testes relevantes aprovados e documentacao operacional suficiente, crie o arquivo "C:\Users\flavi\Desktop\handstack\.handstack-codex\COMPLETE" contendo data, resumo das verificacoes e a palavra COMPLETE. Nunca crie esse marcador para uma entrega parcial, MVP, scaffold, mock ou quando existirem testes ignorados/falhando por causa do projeto.
+
+Nao aguarde confirmacao humana para decisoes tecnicas reversiveis e dentro do escopo. Nao acesse nem altere arquivos fora do projeto e da especificacao, salvo dependencias/ferramentas necessarias ao build. Se uma dependencia externa estiver temporariamente indisponivel, registre no STATUS.md e avance em outras frentes.

@@ -1,0 +1,10 @@
+Incremento M163 implementado e verificado.
+
+- Deduplicação por fonte canônica e hash em `KnowledgeDocumentIndex`.
+- Workflow `KnowledgeReindexService` para migração de embeddings.
+- Métricas RAG e validação de gates em `@handstack/evaluation`.
+- Testes e documentação EN/pt-BR atualizados.
+- Gates globais passaram: lint, typecheck, testes, build, docs, formato e Graphify.
+- `STATUS.md` atualizado.
+
+Próximo passo: auditar e implementar adapters duráveis de Knowledge/reindexação e integração operacional. `.handstack-codex/COMPLETE` permanece ausente.

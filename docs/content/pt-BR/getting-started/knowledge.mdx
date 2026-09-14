@@ -1,0 +1,72 @@
+---
+id: getting-started/knowledge
+title: Criar knowledge bases tenant-scoped
+description: Faça ingestão, chunking, embeddings e busca por um VectorStore portável.
+audience: [developer, platform-operator]
+permissions: [knowledge.manage, knowledge.search]
+features: [knowledge, rag, embeddings]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.11.0
+lastReviewedAt: 2026-09-10
+owner: ai-platform-team
+tags: [knowledge, rag, vectors]
+---
+
+# Criar knowledge bases tenant-scoped
+
+O pacote knowledge separa ingestão de persistência: `EmbeddingProvider` e `VectorStore` são
+substituíveis, permitindo pgvector, Mongo/Qdrant ou store local sem trocar o adapter principal.
+
+## Prerequisites
+
+- KnowledgeBase tenant-scoped com tamanho, overlap, estratégia e modelo de embedding.
+- Embedding provider e implementação de VectorStore.
+
+## Steps
+
+1. Faça ingestão de texto, URL ou arquivo/plugin como documento versionado.
+2. Divida por estratégia character, token ou paragraph.
+3. Gere embedding e faça upsert com metadata da organização.
+4. Busque com filtro da knowledge base e identidade do principal, enviando resultados ao chat/agents.
+5. Aplique cursores do conector com `KnowledgeSyncService` quando a fonte for excluída ou sua ACL mudar.
+6. Configure `InMemoryKnowledgeDocumentIndex` ou um adapter durável para deduplicar por fonte
+   canônica e digest do conteúdo; execute `KnowledgeReindexService.migrate` ao trocar o modelo.
+   Em implantações com banco, construa `RepositoryKnowledgeDocumentIndex` e
+   `RepositoryKnowledgeSyncCursorStore` com a factory de repositories do adapter para sobreviver
+   a restarts mantendo deduplicação, cursores e isolamento por organização. Para migração de
+   modelo, crie um job de `KnowledgeReindexJobService` com `RepositoryKnowledgeReindexJobStore`
+   durável e execute-o até `SUCCEEDED`; publique o modelo ativo somente após todos os checkpoints.
+   Jobs falhos retomam do cursor persistido; cancelamentos são duráveis e nunca publicam trabalho parcial.
+
+Documento, chunk e embedding carregam id/versão da fonte, digest do conteúdo, snapshot de ACL,
+classificação, residência, timestamps de ingestão/verificação, política de retenção e status de
+exclusão. O `RagPolicyProvider` padrão rejeita marcadores de prompt injection e PII/segredos comuns
+antes do embedding, e revalida a ACL antes de retornar cada resultado. Os resultados incluem a
+proveniência, uma citação estruturada e o sinal `stale` quando ela não é verificada há 24 horas.
+Consultas `RESTRICTED` exigem o hook de revalidação do provider; a sincronização remove vetores
+excluídos e atualiza o snapshot de ACL quando permissões mudam.
+
+Suites de avaliação RAG devem medir recall, precision, groundedness, validade de citação,
+freshness e isolamento cross-tenant. O pacote evaluation expõe `scoreRagEvaluation` para pontuar
+evidências deterministicamente e `validateRagEvaluationCriteria` para falhar fechado quando faltar
+qualquer métrica do gate.
+
+## Verify
+
+Confirme filtros de organização e principal contra acesso indevido, rejeição de conteúdo inseguro
+antes do embedding, marcação de resultados stale, rejeição de overlap inválido e funcionamento do
+VectorStore independentemente do adapter de banco principal. Confirme também que o cursor da fonte
+é retido e reaplicável após reinício do conector.
+
+## Troubleshooting
+
+- Resultado vazio geralmente indica dimensão/provider incompatível ou ingestão ausente.
+- Mantenha overlap menor que chunk size para evitar loops sem limite.
+- Credenciais de fontes ficam no secret manager, nunca em metadata de documentos.
+- ACL ausente falha fechado; adicione uma entrada de leitura explícita (ou `*` apenas para conteúdo público).
+- Resultado `stale: true` exige reverificação da fonte antes de uso de alto impacto.
+- Reindexação exige um VectorStore com `listByOrganization`; execute um job durável de
+  `KnowledgeReindexJobService` e verifique as contagens `scanned`, `reindexed` e `skipped` antes
+  de publicar o novo modelo.
+- Um token de conector repetido é reconhecido pelo cursor durável sem reaplicar a mutação; um token
+  novo só é persistido depois que a propagação para vetores termina com sucesso.

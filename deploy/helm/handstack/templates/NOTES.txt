@@ -1,0 +1,10 @@
+HandStack distributed profile installed.
+
+API: kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "handstack.fullname" . }}-api {{ .Values.api.port }}:{{ .Values.api.port }}
+Web: kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "handstack.fullname" . }}-web {{ .Values.web.port }}:{{ .Values.web.port }}
+
+Verify readiness with:
+  kubectl -n {{ .Release.Namespace }} get deploy, pods, hpa
+{{- if .Values.keda.enabled }}
+KEDA is enabled; verify ScaledObjects and the KEDA operator before accepting queue traffic.
+{{- end }}

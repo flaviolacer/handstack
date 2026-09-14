@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["state", "summary", "next_step", "blockers", "completed_requirements", "all_requirements_verified"],
+  "properties": {
+    "state": {"type": "string", "enum": ["progress", "blocked", "complete"]},
+    "summary": {"type": "string"},
+    "next_step": {"type": "string"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "completed_requirements": {"type": "array", "items": {"type": "string"}},
+    "all_requirements_verified": {"type": "boolean"}
+  }
+}

@@ -1,0 +1,1 @@
+O objetivo permanece em andamento, com estado e pendências no `STATUS.md`. As dependências externas necessárias ainda não estão disponíveis, portanto `COMPLETE` continua ausente.

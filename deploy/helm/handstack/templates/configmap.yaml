@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "handstack.fullname" . }}-config
+  labels:
+    {{- include "handstack.labels" . | nindent 4 }}
+data:
+  HANDSTACK_DEPLOYMENT_PROFILE: {{ .Values.deploymentProfile | quote }}
+  HANDSTACK_DATABASE_ADAPTER: {{ .Values.database.adapter | quote }}
+  HANDSTACK_REDIS_TOPOLOGY: {{ .Values.queue.topology | quote }}
+  HANDSTACK_OBJECT_STORAGE_ENDPOINT: {{ .Values.objectStorage.endpoint | quote }}
+  HANDSTACK_OBJECT_STORAGE_BUCKET: {{ .Values.objectStorage.bucket | quote }}
+  HANDSTACK_API_PORT: {{ .Values.api.port | quote }}
+  HANDSTACK_MCP_PORT: {{ .Values.mcp.port | quote }}

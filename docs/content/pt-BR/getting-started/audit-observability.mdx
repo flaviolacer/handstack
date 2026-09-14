@@ -1,0 +1,50 @@
+---
+id: getting-started/audit-observability
+title: Operar audit append-only e telemetria
+description: Registre eventos por tenant e exporte evidência redigida para SIEM.
+audience: [developer, platform-operator, security-admin]
+permissions: [audit.read, audit.write]
+features: [audit, observability, siem]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.18.0
+lastReviewedAt: 2026-09-09
+owner: security-platform-team
+tags: [audit, observability, siem]
+---
+
+# Operar audit append-only e telemetria
+
+Registre eventos de autenticação, modelo, agente, tool, MCP, plugin, policy e budget. Eventos são
+imutáveis e por organização; traces OpenTelemetry podem usar `traceId` sem prompts ou secrets.
+
+## Prerequisites
+
+- Registre um `AuditSink` e configure retenção separada de traces e usage.
+- Configure exportador OTLP/SIEM com chaves explícitas de redaction. Defina
+  `HANDSTACK_TELEMETRY_ENABLED=true` e `HANDSTACK_OTLP_ENDPOINT=http://otel-collector:4318` para
+  exportar traces e métricas por OTLP/HTTP.
+
+## Steps
+
+1. Faça append após cada decisão governada.
+2. Consulte somente com organização autenticada.
+3. Exporte metadata sanitizada ao SIEM e retenha evidência local imutável.
+4. Verifique a cadeia e crie um checkpoint assinado antes da exportação de compliance:
+   `handstack audit verify --tenant <organizationId>` e
+   `handstack audit checkpoint --tenant <organizationId>`.
+5. Exporte somente o tenant selecionado em JSON Lines:
+   `handstack audit export --tenant <organizationId> --output audit.ndjson`.
+
+## Verify
+
+Confira isolamento de tenant, append-only, redaction de prompt/response/token/secret e se a
+verificação retorna `valid: true`. Um evento alterado deve fazer a verificação falhar fechada.
+O endpoint `/metrics` da API expõe os contadores canônicos `handstack_*` em texto Prometheus;
+ele não contém payloads de requests, credenciais, ids de tenant ou ids de usuário.
+
+## Troubleshooting
+
+- Eventos ausentes normalmente indicam sink não registrado antes do request.
+- Nunca exporte payloads crus de tools ou credenciais de providers.
+- Um checkpoint exige ao menos um evento e `HANDSTACK_PORTABLE_SIGNING_KEY`; mantenha essa chave
+  fora dos arquivos de configuração e faça a rotação pelo gerenciador de secrets do deployment.

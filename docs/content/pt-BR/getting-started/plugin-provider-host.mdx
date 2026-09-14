@@ -1,0 +1,39 @@
+---
+id: getting-started/plugin-provider-host
+title: Conectar registro de providers ao host
+description: Encaminhe descritores tipados de model, embedding, storage e notification pelo ciclo de vida do PluginHost.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, providers, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.53.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, providers, host]
+---
+
+# Conectar registro de providers ao host
+
+## Prerequisites
+
+- Uma definição de plugin com descritor de provider tipado.
+- Um callback do host que valide o provider e o encaminhe ao registry correto.
+
+## Steps
+
+1. Passe `registerProvider` ao `PluginHost`.
+2. Registre provider de model, embedding, storage, notification ou outro por `context.providers.register`.
+3. Aplique política tenant e o limite de execução específico antes de disponibilizar o provider.
+
+## Expected results
+
+Descritores são publicados somente durante o setup de plugin habilitado e não são confundidos com instâncias executáveis.
+
+## Verify
+
+Execute os testes do Plugin SDK e confirme que o callback recebe cada descritor uma vez quando o plugin é habilitado.
+
+## Troubleshooting
+
+- Sem callback, o plugin não foi habilitado ou o runner isolado está indisponível.
+- Registrar provider não autoriza acesso; a política normal de model, storage ou notification continua obrigatória.

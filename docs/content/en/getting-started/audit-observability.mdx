@@ -1,0 +1,50 @@
+---
+id: getting-started/audit-observability
+title: Operate append-only audit and telemetry
+description: Record tenant-scoped audit events and export redacted evidence to SIEM systems.
+audience: [developer, platform-operator, security-admin]
+permissions: [audit.read, audit.write]
+features: [audit, observability, siem]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.18.0
+lastReviewedAt: 2026-09-09
+owner: security-platform-team
+tags: [audit, observability, siem]
+---
+
+# Operate append-only audit and telemetry
+
+Append audit events for authentication, model, agent, tool, MCP, plugin, policy and budget
+decisions. Events are immutable and organization-scoped; OpenTelemetry traces may link through
+`traceId` without carrying prompts or secrets.
+
+## Prerequisites
+
+- Register an `AuditSink` and configure retention separately from traces and usage.
+- Configure an OTLP/SIEM exporter with explicit redaction keys. Set `HANDSTACK_TELEMETRY_ENABLED=true`
+  and `HANDSTACK_OTLP_ENDPOINT=http://otel-collector:4318` to export traces and metrics over OTLP/HTTP.
+
+## Steps
+
+1. Append an event after each governed decision.
+2. Query only with the authenticated organization id.
+3. Export sanitized metadata to SIEM and retain the local immutable evidence.
+4. Verify the chain and create a signed checkpoint before compliance export:
+   `handstack audit verify --tenant <organizationId>` and
+   `handstack audit checkpoint --tenant <organizationId>`.
+5. Export only the selected tenant as JSON Lines:
+   `handstack audit export --tenant <organizationId> --output audit.ndjson`.
+
+## Verify
+
+Check tenant isolation, append-only behavior, redaction of prompt/response/token/secret fields,
+and that verification reports `valid: true`. A changed event must make verification fail closed.
+The API `/metrics` endpoint exposes the canonical `handstack_*` counters in Prometheus text format;
+it contains no request payloads, credentials, tenant ids, or user ids.
+
+## Troubleshooting
+
+- Missing events usually indicate the sink was not registered before the request lifecycle.
+- Never export raw tool payloads or provider credentials.
+- A checkpoint requires at least one event and `HANDSTACK_PORTABLE_SIGNING_KEY`; keep this key
+  outside configuration files and rotate it through the deployment secret manager.

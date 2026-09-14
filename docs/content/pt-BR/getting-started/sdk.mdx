@@ -1,0 +1,97 @@
+---
+id: getting-started/sdk
+title: Usar o SDK TypeScript do HandStack
+description: Autentique e chame a API REST e o gateway compatível com OpenAI do HandStack a partir de TypeScript ou JavaScript.
+audience: [developer]
+permissions: [capability.execute, models.execute]
+features: [sdk, api, capabilities, agents, models]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.35.0
+lastReviewedAt: 2026-09-10
+owner: platform-team
+tags: [sdk, typescript, api, developer, gateway]
+---
+
+# Usar o SDK TypeScript do HandStack
+
+O pacote `@handstack/sdk` é um cliente TypeScript tipado e sem dependências para o HandStack. Ele
+atende duas superfícies com a mesma instância `HandStack`: o gateway compatível com OpenAI em
+`/v1` e a API REST com escopo de organização em `/api/v1`. As API keys permanecem apenas em
+memória e são enviadas exclusivamente no header `authorization`.
+
+## Prerequisites
+
+- Node.js 18 ou mais recente.
+- Uma API key do HandStack (`hs_live_...` ou `hs_test_...`) com as permissões necessárias.
+- O pacote instalado a partir do workspace: `@handstack/sdk`.
+
+## Steps
+
+1. Construa um cliente com `baseUrl` e `apiKey`:
+
+   ```ts
+   import { HandStack } from '@handstack/sdk';
+
+   const hs = new HandStack({ baseUrl: 'https://handstack.example.com', apiKey: 'hs_live_...' });
+   ```
+
+2. Liste os modelos disponíveis para uma virtual key pelo gateway compatível com OpenAI:
+
+   ```ts
+   const models = await hs.openai.models.list();
+   ```
+
+3. Execute uma capability governada pelo endpoint com escopo de organização:
+
+   ```ts
+   const result = await hs.capabilities.run('acme', 'security.review', { repository: 'acme/app' });
+   ```
+
+4. Gere uma resposta neutra de modelo com uma classificação de dados explícita:
+
+   ```ts
+   const response = await hs.models.response('acme', {
+     model: 'coding-large',
+     dataClassification: 'INTERNAL',
+     messages: [{ role: 'user', content: 'Resuma este design' }],
+   });
+   ```
+
+5. Transmita uma conclusão e consuma os chunks de Server-Sent Events:
+
+   ```ts
+   for await (const chunk of hs.openai.chat.completions.stream({
+     model: 'fast',
+     messages: [{ role: 'user', content: 'Explique capabilities' }],
+   })) {
+     // chunk.delta.content chega de forma incremental
+   }
+   ```
+
+6. Trate falhas com o `HandStackApiError` tipado, que carrega `status`, `code`, `requestId`,
+   `traceId` e um `helpArticleId` opcional:
+
+   ```ts
+   try {
+     await hs.openai.models.list();
+   } catch (error) {
+     if (error instanceof HandStackApiError) {
+       console.error(error.code, error.requestId, error.helpArticleId);
+     }
+   }
+   ```
+
+## Verify
+
+Confirme que um header `authorization` bearer é anexado a toda requisição, que uma capability
+governada executa por `POST /api/v1/organizations/:organizationId/capabilities/:slug/run` e que
+uma resposta 429 ou 502 surge como erro tipado com status, code e requestId originais.
+
+## Troubleshooting
+
+- Um `HandStackSdkError` indica falha de transporte (rede, timeout ou aborto); configure
+  `timeoutMs` e repita apenas operações idempotentes.
+- Um `HandStackApiError` preserva o status e o code estável do servidor; use `helpArticleId` para
+  abrir o artigo exato de solução de problemas.
+- O streaming para de forma limpa no sentinela `[DONE]`; um stream interrompido pode ser repetido
+  a partir do último chunk processado.

@@ -1,0 +1,9 @@
+{
+    "exitCode":  -1,
+    "completed":  false,
+    "failed":  false,
+    "usage":  null,
+    "errors":  [
+                   "Processo excedeu o watchdog de 600 segundos e foi encerrado."
+               ]
+}

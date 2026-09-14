@@ -1,0 +1,12 @@
+node_modules
+dist
+.next
+coverage
+graphify-out
+.handstack-codex
+.turbo
+.pnpm-store
+.pnpm-store-incomplete
+.dependency-backup-*
+pnpm-lock.yaml
+deploy/helm/handstack/templates

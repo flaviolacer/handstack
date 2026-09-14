@@ -1,0 +1,43 @@
+---
+id: getting-started/mcp-client
+title: Conectar tools MCP governadas
+description: Descubra e exponha tools MCP externas por capabilities tenant-scoped.
+audience: [developer, platform-operator]
+permissions: [mcp.use, capability.execute]
+features: [mcp, capabilities, agents]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.8.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [mcp, tools, agents]
+---
+
+# Conectar tools MCP governadas
+
+Registre um servidor MCP tenant-scoped usando Streamable HTTP ou stdio. A descoberta é explícita
+e cobre tools, resources e prompts. O cliente suporta none, API key, tokens Bearer/OAuth/OIDC e
+headers customizados; segredos ficam apenas em memória de runtime e nunca são retornados.
+
+## Prerequisites
+
+- Servidor pertencente à mesma organização e credencial MCP restrita.
+- `mcp.use` e `capability.execute` concedidos ao principal.
+- AgentVersion publicada quando as tools forem usadas por agent.
+
+## Steps
+
+1. Registre o servidor com transporte e política de autenticação.
+2. Execute `tools/list` via `discover` e revise os schemas retornados.
+3. Materialize as tools descobertas com `registerCapabilities`; elas são capabilities somente AGENT.
+4. Inclua os nomes na allowlist da AgentVersion e execute pelo AgentHarness.
+
+## Verify
+
+Confirme o header Authorization com o esquema configurado, rejeição de chamadas entre organizações,
+rejeição de tools não descobertas e os eventos normais de auditoria e budget na chamada do agent.
+
+## Troubleshooting
+
+- `MCP tools must be discovered first` indica que a descoberta ainda não ocorreu.
+- Negação de permissão indica falta de alguma permissão exigida pelo servidor/tool.
+- Erros de protocolo HTTP/stdio são sanitizados; consulte logs do servidor pelo request id.

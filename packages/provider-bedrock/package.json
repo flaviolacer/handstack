@@ -1,0 +1,24 @@
+{
+  "name": "@handstack/provider-bedrock",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint src tests",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock": "^3.883.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.883.0",
+    "@handstack/models": "file:../models"
+  },
+  "devDependencies": {
+    "@handstack/provider-testkit": "file:../provider-testkit"
+  }
+}

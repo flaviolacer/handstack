@@ -1,0 +1,50 @@
+---
+id: getting-started/plugin-contract-suites
+title: Suites oficiais de contratos de plugins
+description: Valide contratos transversais de plugins antes de publicar uma extensao.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, security, operations]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.58.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, contracts, validation]
+---
+
+# Suites oficiais de contratos de plugins
+
+Extensoes HandStack DEVEM cobrir as suites transversais oficiais antes da publicacao.
+O test kit expoe a lista canonica e falha de forma fechada quando falta uma suite.
+
+## Prerequisites
+
+- Um pacote de plugin com manifesto e probes de contrato.
+- `@handstack/plugin-testkit` disponivel para o pacote.
+- Uma lista de suites declarada e revisada pelo responsavel do plugin.
+
+## Steps
+
+1. Importe `officialPluginContractSuites` e `assertOfficialPluginContractCoverage`.
+2. Execute os probes de identidade e os especificos do provider.
+3. Passe os IDs declarados para `assertOfficialPluginContractCoverage`.
+4. Bloqueie a publicacao quando a funcao lancar `PluginContractError`.
+
+As suites oficiais cobrem policy, guardrails, avaliacao, ciclo de privacidade,
+sandbox, exportacao de auditoria/SIEM, politica de Knowledge/RAG, compensacao de workflow,
+transporte de webhook e comportamento de incidentes/status page.
+
+## Expected results
+
+Uma declaracao completa retorna os dez IDs canonicos. Uma declaracao incompleta lanca
+um erro tipado listando todas as suites ausentes, sem aprovar o plugin.
+
+## Verify
+
+Execute o typecheck e os testes focais do pacote. Confirme que uma declaracao completa
+passa e que uma declaracao com apenas uma suite falha de forma fechada.
+
+## Troubleshooting
+
+Se faltar uma suite, adicione o probe e a entrada correspondente em vez de silenciar o
+erro. Mantenha os IDs exatamente como exportados pelo test kit.

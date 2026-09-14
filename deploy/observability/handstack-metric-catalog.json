@@ -1,0 +1,243 @@
+{
+  "schemaVersion": 1,
+  "privacyPolicy": {
+    "forbiddenLabels": [
+      "authorization",
+      "password",
+      "secret",
+      "token",
+      "prompt",
+      "payload",
+      "tenant_id",
+      "user_id",
+      "model"
+    ],
+    "labelPolicy": "bounded-operational-dimensions-only"
+  },
+  "metrics": [
+    {
+      "name": "handstack_requests_total",
+      "type": "counter",
+      "source": "runtime",
+      "allowedLabels": ["method", "status"]
+    },
+    {
+      "name": "handstack_llm_requests_total",
+      "type": "counter",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_tokens_input_total",
+      "type": "counter",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_tokens_output_total",
+      "type": "counter",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    { "name": "handstack_cost_total", "type": "counter", "source": "runtime", "allowedLabels": [] },
+    {
+      "name": "handstack_agent_runs_total",
+      "type": "counter",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_tool_calls_total",
+      "type": "counter",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_mcp_calls_total",
+      "type": "counter",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_policy_denied_total",
+      "type": "counter",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_plugin_errors_total",
+      "type": "counter",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_http_requests_per_second",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_http_request_p95_latency_seconds",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_active_streams",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_event_loop_lag_seconds",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_memory_pressure_ratio",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_in_flight_capability_executions",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    { "name": "handstack_queue_depth", "type": "gauge", "source": "runtime", "allowedLabels": [] },
+    {
+      "name": "handstack_queue_oldest_age_seconds",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_worker_concurrency",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_worker_execution_duration_seconds",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_redis_latency_seconds",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_redis_stream_lag",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_database_connections",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_database_replication_lag_seconds",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_provider_quota_ratio",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_provider_rate_limited_total",
+      "type": "counter",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_budget_reservation_latency_seconds",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_budget_reservation_conflicts_total",
+      "type": "counter",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_storage_latency_seconds",
+      "type": "gauge",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_storage_errors_total",
+      "type": "counter",
+      "source": "runtime",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_worker_jobs_failed_total",
+      "type": "counter",
+      "source": "worker-exporter",
+      "allowedLabels": ["queue"]
+    },
+    {
+      "name": "handstack_database_slow_queries_total",
+      "type": "counter",
+      "source": "database-exporter",
+      "allowedLabels": []
+    },
+    {
+      "name": "handstack_provider_circuit_breaker_state",
+      "type": "gauge",
+      "source": "provider-exporter",
+      "allowedLabels": ["provider"]
+    },
+    {
+      "name": "kube_deployment_status_replicas",
+      "type": "gauge",
+      "source": "kube-state-metrics",
+      "allowedLabels": ["deployment", "namespace"]
+    },
+    {
+      "name": "kube_deployment_status_replicas_available",
+      "type": "gauge",
+      "source": "kube-state-metrics",
+      "allowedLabels": ["deployment", "namespace"]
+    },
+    {
+      "name": "kube_horizontalpodautoscaler_status_desired_replicas",
+      "type": "gauge",
+      "source": "kube-state-metrics",
+      "allowedLabels": ["horizontalpodautoscaler", "namespace"]
+    },
+    {
+      "name": "kube_horizontalpodautoscaler_spec_max_replicas",
+      "type": "gauge",
+      "source": "kube-state-metrics",
+      "allowedLabels": ["horizontalpodautoscaler", "namespace"]
+    },
+    {
+      "name": "kube_horizontalpodautoscaler_status_current_replicas",
+      "type": "gauge",
+      "source": "kube-state-metrics",
+      "allowedLabels": ["horizontalpodautoscaler", "namespace"]
+    },
+    {
+      "name": "redis_memory_used_bytes",
+      "type": "gauge",
+      "source": "redis-exporter",
+      "allowedLabels": ["instance"]
+    }
+  ]
+}

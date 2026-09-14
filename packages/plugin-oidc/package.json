@@ -1,0 +1,30 @@
+{
+  "name": "@handstack/plugin-oidc",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint src tests",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@handstack/auth": "file:../auth",
+    "@handstack/core": "file:../core",
+    "@handstack/domain": "file:../domain",
+    "@handstack/identity": "file:../identity",
+    "@handstack/identity-sdk": "file:../identity-sdk",
+    "@handstack/identity-storage": "file:../identity-storage",
+    "jose": "^6.2.10"
+  },
+  "devDependencies": {
+    "@handstack/config": "file:../config",
+    "@handstack/database": "file:../database",
+    "@handstack/identity-service": "file:../identity-service"
+  }
+}

@@ -1,0 +1,39 @@
+---
+id: getting-started/plugin-tool-host
+title: Connect plugin tools to the host
+description: Forward typed tool registrations through the governed PluginHost lifecycle.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, tools, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.52.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, tools, host]
+---
+
+# Connect plugin tools to the host
+
+## Prerequisites
+
+- A plugin definition with a typed tool handler.
+- A host callback that applies tool policy and registers the handler with the capability execution boundary.
+
+## Steps
+
+1. Pass `registerTool` to `PluginHost`.
+2. Register the tool from plugin `setup` through `context.tools.register`.
+3. Apply authorization, rate limits, budgets, guardrails, audit and telemetry before invoking the handler.
+
+## Expected results
+
+Tools are published only during enabled plugin setup and travel through the same lifecycle and isolation boundary as other plugin capabilities.
+
+## Verify
+
+Run the Plugin SDK contract tests and confirm the host callback receives each tool once when the plugin is enabled.
+
+## Troubleshooting
+
+- No callback means the plugin was not enabled or an isolated runner is unavailable.
+- The callback must not invoke the handler directly without the common capability execution boundary.

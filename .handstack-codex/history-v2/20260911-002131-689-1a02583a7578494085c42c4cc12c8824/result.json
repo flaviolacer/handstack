@@ -1,0 +1,1 @@
+{"state":"progress","summary":"M265 concluído: capabilities agora possuem contrato tipado e são encaminhadas pelo PluginHost durante o enable, separadas da execução direta. Documentação e catálogo atualizados.","next_step":"Avançar para o próximo requisito MUST ainda não implementado.","blockers":[],"completed_requirements":["HS-CORE-016"],"all_requirements_verified":false}

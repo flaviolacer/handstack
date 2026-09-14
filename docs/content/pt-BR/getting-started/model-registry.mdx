@@ -1,0 +1,112 @@
+---
+id: getting-started/model-registry
+title: Registrar e avaliar modelos
+description: Configure definições de modelos associadas a providers e promova-as por evaluation gates.
+audience: [platform-operator, developer]
+permissions: []
+features: [models, evaluations]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.3.0
+lastReviewedAt: 2026-09-01
+owner: ai-platform-team
+tags: [models, providers, evaluations]
+---
+
+# Registrar e avaliar modelos
+
+## Purpose and expected outcome
+
+Crie definições tenant-aware de providers e modelos sem acoplar regras do produto a nomes de modelos de vendors e promova um modelo somente após aprovação de um evaluation gate versionado.
+
+## Prerequisites
+
+- Um adapter de banco canônico inicializado.
+- Secret do provider armazenado por referência de `SecretProvider` quando credenciais forem necessárias.
+- Uma evaluation suite versionada e dataset aprovado.
+
+## Steps
+
+1. Registre um `ProviderDefinition` com adapter, classificações de dados permitidas e referência opcional de secret.
+2. Registre um `ModelDefinition` em `DRAFT` com ID do vendor, aliases, capabilities, context window e pricing normalizado em USD.
+3. Registre um dataset aprovado e versionado com classificação, proveniência, owner e retenção. Casos derivados de produção também exigem base legal explícita e sanitização.
+4. Registre e execute a suite afetada por `CoreEvaluationProvider`. Todo gate de modelo inclui os critérios mínimos de produto para qualidade, schema/tools, segurança contra prompt injection/vazamento, latência, tokens e custo.
+5. Registre o gate versionado usando o resultado retornado. O registry pede ao provider que releia e valide run, suite e dataset persistidos; booleanos fornecidos pelo caller não satisfazem o gate. Um gate falho mantém o modelo em `DRAFT`; um gate aprovado move-o para `EVALUATED`.
+6. Aprove o modelo avaliado e publique-o. A publicação revalida que o gate referenciado existe, passou e corresponde à versão registrada da suite.
+
+A execução da aplicação deve passar por `ModelExecutionRuntime` com Organization ID, ID interno ou alias do modelo e classificação dos dados do request. O runtime resolve a definição publicada e o provider habilitado naquela organização, verifica a allowlist de classificação, cria o adapter registrado e somente então mapeia para `providerModel`. O secret resolver recebe a organização e a referência persistida do provider; callers nunca fornecem IDs de modelo externos ou valores de secret.
+
+Use `createOfficialProviderFactories` para conectar o conjunto inicial de providers. Valores públicos específicos ficam em `ProviderDefinition.configuration`: `resourceName` e `apiVersion` para Azure OpenAI, `region` para Bedrock e `applicationUrl`/`applicationName` opcionais para OpenRouter. URLs compatíveis customizadas permanecem em `baseUrl`. Bedrock deve usar workload identity ou credential chain AWS e rejeita secret reference persistida. A construção da factory não resolve credenciais; o adapter chama o resolver tenant-scoped somente quando envia um request.
+
+Para APIs OpenAI-compatible, use `OpenAICompatibleProvider` ou o wrapper `createOpenAIProvider`. Use `createOllamaProvider` para o endpoint loopback do Ollama. Endpoints remotos exigem HTTPS; HTTP simples é aceito somente para host loopback explicitamente habilitado. API keys são resolvidas a cada request e nunca entram no body, registry ou erros de diagnóstico.
+
+Para APIs nativas, use `createAnthropicProvider` ou `createGeminiProvider`. Ambos traduzem os contratos neutros de mensagens, instrução de sistema, tools, streaming, finish reason e usage para o envelope do vendor. Os resolvers assíncronos de chave executam em cada request; Anthropic usa `x-api-key` e Gemini usa `x-goog-api-key`, portanto credenciais nunca aparecem em URLs ou payloads.
+
+Azure OpenAI, OpenRouter e vLLM usam `createAzureOpenAIProvider`, `createOpenRouterProvider` e `createVllmProvider`. Azure exige resource, deployment e versão de API explícitos e envia a chave somente em `api-key`; o deployment conhecido forma seu catálogo de modelos. OpenRouter aceita headers públicos opcionais de atribuição da aplicação. vLLM permite HTTP simples somente em URL loopback explícita.
+
+AWS Bedrock usa `createBedrockProvider` com região explícita. Seu transporte padrão delega assinatura, session tokens e renovação de credenciais temporárias à credential provider chain do SDK oficial AWS, traduzindo depois o catálogo e os envelopes Converse/ConverseStream para o mesmo contrato neutro. Nunca persista credenciais AWS no model registry; configure workload identity ou um credential provider AWS aprovado externamente.
+
+## API administrativa
+
+Conceda `models.manage` ao principal administrativo, obtenha um bearer access token de curta duração e use estes endpoints versionados:
+
+- `GET|POST /api/v1/organizations/{organizationId}/providers`
+- `GET|POST /api/v1/organizations/{organizationId}/models`
+- `GET|POST /api/v1/organizations/{organizationId}/prompts`
+- `GET|POST /api/v1/organizations/{organizationId}/prompts/{promptId}/versions`
+- `GET|POST /api/v1/organizations/{organizationId}/evaluation-datasets`
+- `GET|POST /api/v1/organizations/{organizationId}/evaluation-suites`
+- `POST /api/v1/organizations/{organizationId}/evaluation-runs`
+- `POST /api/v1/organizations/{organizationId}/models/{modelId}/evaluation-gates`
+- `POST /api/v1/organizations/{organizationId}/models/{modelId}/approve`
+- `POST /api/v1/organizations/{organizationId}/models/{modelId}/publish`
+- `POST /api/v1/organizations/{organizationId}/prompt-versions/{promptVersionId}/evaluation-gates`
+- `POST /api/v1/organizations/{organizationId}/prompt-versions/{promptVersionId}/approve`
+- `POST /api/v1/organizations/{organizationId}/prompt-versions/{promptVersionId}/publish`
+- `POST /api/v1/organizations/{organizationId}/model-responses`
+- `GET /api/openapi.json`
+
+A organização da rota deve coincidir exatamente com a organização do access token. A criação do provider aceita `secretReference` somente como entrada de escrita; respostas expõem apenas `hasSecret`. Coloque em `configuration` somente configuração pública de transporte. Chaves semelhantes a passwords, tokens, credentials, API keys ou secrets são rejeitadas, e leituras também as removem defensivamente. Campos desconhecidos são rejeitados. Novos modelos sempre começam em `DRAFT` e apontam para provider habilitado da mesma organização.
+
+Respostas de dataset expõem metadata de governança e `caseCount`, mas nunca inputs, resultados esperados ou o texto da base legal dos casos. O registro exige aprovação, proveniência, owner, retenção, classificação e pelo menos um caso com ID único. Datasets derivados de produção exigem também sanitização e base legal explícitas. Suites vinculam ID e versão exatos do dataset e devem incluir todas as métricas mínimas de modelo do produto com thresholds finitos e não duplicados. Execução da avaliação e transições de lifecycle são operações separadas; clientes nunca enviam scores de runs.
+
+Cada caso executável usa `input.messages` no formato neutro de chat e pode incluir `input.tools` neutras e `input.dataClassification` explícita (caso contrário, vale a classificação do dataset). Expectativas declarativas podem conter `content` exato, `contentIncludes`, `contentExcludes`, `jsonObject` e `toolCalls` ordenadas com arguments opcionais. O runner oficial resolve o modelo draft e o provider habilitado dentro da mesma organização, aplica a allowlist de classificação do provider, executa o adapter oficial e deriva scores de task/schema/tools/segurança/injection/vazamento, latência, tokens e custo em USD da resposta real. Somente digests de evidência são persistidos. Métricas que exigem scorer ausente no runner oficial falham de forma fechada, sem nota inventada.
+
+Crie um run somente com `modelDefinitionId`, `suiteId` e `suiteVersion`. Registre o gate somente com o `runId` de 64 caracteres retornado; o servidor relê o run e reconstrói o gate, portanto bodies contendo scores são rejeitados. Aprovação exige gate persistido aprovado, e publicação exige que esse gate continue presente, aprovado e atual. Referências de credencial de modelo suportadas pelo runtime da API usam `env://HANDSTACK_SECRET_<NAME>`; a resolução é lazy e os valores nunca entram no registry, registros de evaluation, respostas ou erros.
+
+Conceda `models.execute` separadamente aos callers da aplicação. Envie alias interno do modelo, classificação de dados, `messages` neutras e `tools` neutras opcionais para `model-responses`; callers nunca enviam adapter, ID externo do modelo, endpoint ou credencial. A rota resolve somente modelo publicado na organização do token e retorna o envelope comum `ChatResponse`. A mesma rota é testada após promoção por avaliação real através dos adapters OpenAI-compatible, Anthropic e Gemini. Modelos draft, classificações não permitidas, acesso cross-tenant e falta da permissão de execução falham de forma fechada.
+
+A administração de prompts exige `prompts.manage`. Um `Prompt` possui slug estável, enquanto cada `PromptVersion` é um snapshot imutável de conteúdo, variáveis declaradas, digest e model route interno. Placeholders usam `{{variable}}` e devem corresponder exatamente às declarações. Execute o endpoint normal de avaliação com `promptVersionId`; o servidor vincula seu digest e rejeita model route divergente. Registre, aprove e publique aquela versão exata pelos endpoints de lifecycle. Conteúdo ou model route novo começa em outra versão `DRAFT`, sem herdar ou reutilizar o run ou gate anterior.
+
+## Verify
+
+Resolva o modelo por ID e alias e confirme que ele aparece somente em sua organização. Tentativas de registrar run fabricado, omitir métrica mínima, aprovar ou publicar sem gate persistido aprovado devem falhar.
+
+Chame `model-responses` com o mesmo request neutro e três aliases publicados associados a OpenAI-compatible, Anthropic e Gemini. Confirme que os três retornam o formato comum e que a chamada contra um alias draft falha antes de qualquer request ao provider.
+
+Consulte também `/api/openapi.json`, confirme as collections versionadas e operações de lifecycle e verifique que token sem permissão ou de outra organização recebe `403` sem retornar dados de provider ou evaluation. Confirme também que aprovação antes da avaliação, score map fornecido no request e digest de run inexistente falham.
+
+## Troubleshooting
+
+- Colisão de alias indica que outro modelo da organização já possui esse alias.
+- “Enabled provider not found” indica provider ausente, desabilitado ou pertencente a outra organização.
+- Falha de gate obsoleto exige nova execução da versão atual da suite.
+- Falha `audit unavailable` indica que a mutação administrativa sofreu rollback porque o evento obrigatório não pôde ser persistido; restaure o caminho de banco/auditoria antes de tentar novamente.
+- `MODEL_NOT_FOUND`, `MODEL_NOT_PUBLISHED`, `PROVIDER_UNAVAILABLE`, `CLASSIFICATION_DENIED` ou `ADAPTER_NOT_REGISTERED` indica bloqueio local antes de tráfego ao provider. `PROVIDER_FAILURE` oculta deliberadamente a falha upstream.
+- `ProviderRequestError` expõe apenas `TIMEOUT`, `CANCELLED`, `NETWORK`, `HTTP` ou `INVALID_RESPONSE` e status opcional. Inspecione o provider de forma privada porque bodies upstream são descartados deliberadamente.
+- Erros dos adapters nativos expõem o mesmo conjunto fechado por `AnthropicProviderError` ou `GeminiProviderError`; nenhum deles retém body upstream, URL, headers ou mensagens de rede.
+
+## Security, budget, and audit implications
+
+O registry contém referências de secret, nunca seus valores. A classificação de dados é explícita no boundary do provider. O endpoint OpenAI-compatible `/v1/embeddings` aplica as mesmas verificações de modelo publicado e virtual key do chat, reservando e liquidando o budget com base nos tokens de prompt reportados pelo provider. Providers sem capability de embeddings falham de forma fechada. Avaliações podem consumir budget e devem reportar esse uso pelo pipeline comum.
+
+Registro de provider e modelo, registro de dataset e suite, conclusão da avaliação, registro de gate, aprovação e publicação adicionam um audit event tenant-aware no mesmo banco. A mutação administrativa e a persistência de auditoria são atômicas: se o evento obrigatório não puder ser gravado, a mutação sofre rollback. Reruns reutilizam o run determinístico e não duplicam seu evento.
+
+O metadata de auditoria contém somente proveniência escalar aprovada, como IDs internos, versões de suite/dataset, transições de lifecycle, classificação, outcome e contagens. Nunca contém prompts, casos do dataset, scores, evidências, respostas do provider, IDs externos de modelo, referências de secret ou credenciais. `AiGovernanceOpenTelemetry` emite spans, contador de operações e histograma de duração usando apenas atributos fechados de operação/outcome para registry, evaluation, chat e streaming.
+
+## Rollback
+
+Deprecie o modelo afetado e restaure a última combinação aprovada de definição e gate. Nunca reescreva resultados históricos de gates.
+
+## Related articles
+
+- [Autenticação e sessões](/help/getting-started/authentication-sessions)

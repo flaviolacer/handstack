@@ -1,0 +1,49 @@
+---
+id: getting-started/observability-exporters
+title: Configure observability exporters
+description: Export redacted tenant-scoped traces, metrics and logs through replaceable official transports.
+audience: [platform-operator, developer]
+permissions: [observability.manage]
+features: [observability, telemetry]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.40.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [observability, telemetry, exporters]
+---
+
+# Configure observability exporters
+
+## Purpose and expected outcome
+
+Send bounded, redacted observability events to OTLP, Langfuse, Datadog, Grafana or New Relic through an injected transport.
+
+## Prerequisites
+
+- An enabled telemetry runtime and an organization-scoped event producer.
+- `observability.manage` to configure the exporter.
+
+## Steps
+
+1. Select an exporter kind: `otlp`, `langfuse`, `datadog`, `grafana` or `new_relic`.
+2. Inject the provider transport and configure a finite batch size.
+3. Emit only trace, metric or log events with internal names and bounded attributes.
+4. Use fanout when the same redacted event must reach more than one destination.
+
+## Verify
+
+Confirm that events are batched, sensitive keys are replaced with `[REDACTED]`, all destinations receive the same sanitized shape, and invalid events or transport failures fail closed.
+
+## Troubleshooting
+
+- `INVALID_EVENT` means organization, name, timestamp or numeric value is invalid.
+- `TRANSPORT` means the provider transport rejected the batch; retry through the job boundary.
+- Missing data usually indicates the exporter was not registered or the telemetry runtime is disabled.
+
+## Security, budget, and audit implications
+
+Exporters never receive credentials embedded in event attributes, and known secret, prompt, response, claim and exception keys are redacted recursively. The durable audit sink remains authoritative; exporters are replaceable delivery paths.
+
+## Rollback
+
+Disable the exporter or remove it from the fanout. Existing durable audit and local telemetry remain available according to retention policy.

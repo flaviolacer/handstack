@@ -1,0 +1,25 @@
+{
+  "name": "@handstack/chat",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint src tests",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@handstack/database": "file:../database",
+    "@handstack/domain": "file:../domain",
+    "@handstack/model-runtime": "file:../model-runtime",
+    "@handstack/models": "file:../models"
+  },
+  "devDependencies": {
+    "@handstack/config": "file:../config"
+  }
+}

@@ -1,0 +1,63 @@
+---
+id: getting-started/release-operations
+title: Operate and certify a HandStack release
+description: Publish support, lifecycle, integrity, and upgrade evidence for every release.
+audience: [platform-operator, security-admin]
+permissions: [deployment.manage]
+features: [release-operations, support-matrix, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.0.0
+lastReviewedAt: 2026-09-10
+owner: release-engineering
+tags: [release, sbom, provenance, support]
+---
+
+# Operate and certify a HandStack release
+
+Every release must publish the versioned contract in
+`deploy/release/handstack-release-manifest.json`. It records supported runtime and infrastructure
+ranges, tested versions, lifecycle notices, and the names of integrity and verification evidence.
+
+## Local verification
+
+Run `npm run release:validate` before publishing. The gate checks that the support matrix is complete,
+the SBOM identifies the release, provenance binds the source checksum, and verification entries
+have evidence or an approval owner. It also checks that deprecations name a replacement and removal
+version.
+
+The development manifest may carry a pipeline-required signature marker. A production release must
+replace it with a signature verifiable by the published signing-key history and retain the generated
+SBOM, checksum file, and SLSA/in-toto provenance as immutable release assets.
+
+The manifest also points to redacted operational evidence for rolling database and event compatibility
+with the previous two stable minor releases, security remediation SLAs and coordinated disclosure,
+and rotation, overlap, revocation, and recovery for certificates, signing/master keys, provider and
+service-account credentials, API keys, and webhook secrets. These offline contracts are required for
+release review; live database, cluster, penetration-test, and recovery-drill evidence must be attached
+by the release pipeline or operating team.
+
+## Upgrade and lifecycle
+
+Run the Helm release gate, test rolling compatibility across the declared database and event
+windows, and keep the previous release available for rollback. Announce deprecation at least 90
+days before removal and end-of-life at least 180 days before support ends. Security remediation
+SLAs and key/certificate rotation evidence belong in the release record.
+
+## Prerequisites
+
+Have the release manifest, generated artifacts, operational evidence and rollback owner available.
+
+## Steps
+
+Run `npm run release:validate`, the Helm release gate, and the applicable database, event and recovery
+checks before publishing the release.
+
+## Verify
+
+The release contract passes, production signatures are verifiable, and live evidence is attached
+for every check that cannot be performed offline.
+
+## Troubleshooting
+
+Do not publish when a required artifact, signature, evidence reference or compatibility window is
+missing. Restore the prior release and record the incident when a rolling check fails.

@@ -1,0 +1,44 @@
+---
+id: getting-started/governance-workflows
+title: Governar ações e retomar workflows
+description: Combine decisões ABAC, aprovações humanas e execução durável de workflows.
+audience: [developer, platform-operator]
+permissions: [policy.manage, workflow.manage]
+features: [policy, approvals, workflows]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.13.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [policy, approvals, workflows]
+---
+
+# Governar ações e retomar workflows
+
+A avaliação de policy é deny-by-default e suporta tenant, principal, grupo, horário e atributos.
+Grafo de workflow pode pausar em Human Approval e retomar somente após todos os aprovadores.
+
+## Prerequisites
+
+- Policies da organização e identidades de aprovadores.
+- Workflow publicado com trigger suportado.
+
+## Steps
+
+1. Avalie resource/action com `PolicyEngine` e atributos explícitos.
+2. Inicie workflow manual, API, webhook, schedule ou event.
+3. Persista execução e approval id no nó humano.
+4. Aprove e retome usando mesma organização e execution id.
+5. Leia `GET /api/v1/organizations/{organizationId}/workflows/{workflowId}/executions/{executionId}/steps`
+   para consultar o histórico de checkpoints isolado por tenant após restart ou falha.
+
+## Verify
+
+Verifique precedência de deny, isolamento cross-tenant, quorum e recuperação após restart com o
+repository configurado. A resposta de steps deve conter apenas checkpoints da execução solicitada e
+preservar as transições `RUNNING`, `COMPLETED`, `WAITING_APPROVAL` ou `FAILED`.
+
+## Troubleshooting
+
+- `no matching policy` é deny intencional, não erro transitório.
+- Resume exige todos os aprovadores e approval não expirado.
+- Edges inválidos ou node ids duplicados falham antes da publicação.

@@ -1,0 +1,9 @@
+M142 foi implementado e verificado.
+
+- Hooks de observabilidade corrigidos em MCP client/server e filas.
+- Testes focais: 21 aprovados, sem skips.
+- Gates globais aprovados: lint, typecheck, testes, build, documentação e grafo.
+- Grafo: 5.630 nós, 7.805 links, 0 tokens.
+- Ledger atualizado em [STATUS.md](C:\Users\flavi\Desktop\handstack\STATUS.md).
+
+Próximo passo registrado: auditar a próxima lacuna local de M18 na integração entre observabilidade e runtime MCP/filas. `.handstack-codex/COMPLETE` permanece ausente.

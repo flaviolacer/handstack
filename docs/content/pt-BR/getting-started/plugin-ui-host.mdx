@@ -1,0 +1,39 @@
+---
+id: getting-started/plugin-ui-host
+title: Conectar registro de UI de plugins ao host
+description: Encaminhe descritores tipados de UI pelo ciclo de vida governado do PluginHost.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, ui, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.51.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, ui, host]
+---
+
+# Conectar registro de UI de plugins ao host
+
+## Prerequisites
+
+- Uma definição de plugin com descritor de UI tipado.
+- Um callback do host que aplique política e exponha descritores aprovados ao shell da UI.
+
+## Steps
+
+1. Passe `registerUiExtension` ao `PluginHost`.
+2. Registre o descritor no `setup` do plugin por `context.ui.register`.
+3. Resolva o descritor por `PluginUiRegistry.listAuthorized` antes de renderizar.
+
+## Expected results
+
+Extensões UI atravessam o ciclo de vida e isolamento normal do plugin. Plugins desabilitados e runtimes isolados indisponíveis não publicam descritores UI.
+
+## Verify
+
+Execute os testes do Plugin SDK e confirme que o callback recebe o descritor somente quando o plugin é habilitado.
+
+## Troubleshooting
+
+- Sem callback, o plugin não foi habilitado ou o runtime isolado está indisponível.
+- O callback deve persistir apenas descritores validados e não pode ignorar o filtro de permissões.

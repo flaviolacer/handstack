@@ -1,0 +1,1200 @@
+---
+# Source: handstack/templates/networkpolicy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: handstack-default-deny
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Source: handstack/templates/networkpolicy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: handstack-internal
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: handstack
+      app.kubernetes.io/instance: handstack
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: handstack
+              app.kubernetes.io/instance: handstack
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: handstack
+              app.kubernetes.io/instance: handstack
+      ports:
+        - { protocol: TCP, port: 3000 }
+        - { protocol: TCP, port: 3001 }
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+---
+# Source: handstack/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: handstack-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: handstack
+      app.kubernetes.io/instance: handstack
+      app.kubernetes.io/component: api
+---
+# Source: handstack/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: handstack-web
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: handstack
+      app.kubernetes.io/instance: handstack
+      app.kubernetes.io/component: web
+---
+# Source: handstack/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: handstack-mcp
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: handstack
+      app.kubernetes.io/instance: handstack
+      app.kubernetes.io/component: mcp
+---
+# Source: handstack/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: handstack
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: false
+---
+# Source: handstack/templates/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: handstack-external
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+type: Opaque
+stringData:
+  database-url: "postgresql://db/handstack"
+  redis-url: "redis://redis:6379"
+---
+# Source: handstack/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: handstack-config
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+data:
+  HANDSTACK_DEPLOYMENT_PROFILE: "distributed"
+  HANDSTACK_DATABASE_ADAPTER: "postgresql"
+  HANDSTACK_REDIS_TOPOLOGY: "sentinel"
+  HANDSTACK_OBJECT_STORAGE_ENDPOINT: ""
+  HANDSTACK_OBJECT_STORAGE_BUCKET: "handstack"
+  HANDSTACK_API_PORT: "3001"
+  HANDSTACK_MCP_PORT: "3001"
+---
+# Source: handstack/templates/services.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: handstack-api
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 3001
+      targetPort: http
+---
+# Source: handstack/templates/services.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: handstack-web
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: web
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/component: web
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+---
+# Source: handstack/templates/services.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: handstack-mcp
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: mcp
+spec:
+  selector:
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/component: mcp
+  ports:
+    - name: http
+      port: 3001
+      targetPort: http
+---
+# Source: handstack/templates/deployments.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: handstack-api
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: handstack
+      app.kubernetes.io/instance: handstack
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: handstack
+        app.kubernetes.io/instance: handstack
+        app.kubernetes.io/component: api
+    spec:
+      serviceAccountName: handstack
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: api
+              topologyKey: topology.kubernetes.io/zone
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: handstack
+              app.kubernetes.io/instance: handstack
+              app.kubernetes.io/component: api
+      containers:
+        - name: api
+          image: ghcr.io/handstack/api:0.1.0
+          
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 3001
+          envFrom:
+            - configMapRef: { name: handstack-config }
+          env:
+            - name: HANDSTACK_DEPLOYMENT_PROFILE
+              value: "distributed"
+            - name: HANDSTACK_DATABASE_ADAPTER
+              value: "postgresql"
+            - name: HANDSTACK_REDIS_TOPOLOGY
+              value: "sentinel"
+            - name: HANDSTACK_DATABASE_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: database-url } }
+            - name: HANDSTACK_REDIS_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: redis-url } }
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+---
+# Source: handstack/templates/deployments.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: handstack-mcp
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: mcp
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: handstack
+      app.kubernetes.io/instance: handstack
+      app.kubernetes.io/component: mcp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: handstack
+        app.kubernetes.io/instance: handstack
+        app.kubernetes.io/component: mcp
+    spec:
+      serviceAccountName: handstack
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: mcp
+              topologyKey: topology.kubernetes.io/zone
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: handstack
+              app.kubernetes.io/instance: handstack
+              app.kubernetes.io/component: mcp
+      containers:
+        - name: mcp
+          image: ghcr.io/handstack/api:0.1.0
+          args: ["mcp-server"]
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 3001
+          envFrom:
+            - configMapRef: { name: handstack-config }
+          env:
+            - name: HANDSTACK_DEPLOYMENT_PROFILE
+              value: "distributed"
+            - name: HANDSTACK_DATABASE_ADAPTER
+              value: "postgresql"
+            - name: HANDSTACK_REDIS_TOPOLOGY
+              value: "sentinel"
+            - name: HANDSTACK_DATABASE_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: database-url } }
+            - name: HANDSTACK_REDIS_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: redis-url } }
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+---
+# Source: handstack/templates/deployments.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: handstack-web
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: web
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: handstack
+      app.kubernetes.io/instance: handstack
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: handstack
+        app.kubernetes.io/instance: handstack
+        app.kubernetes.io/component: web
+    spec:
+      serviceAccountName: handstack
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: web
+              topologyKey: topology.kubernetes.io/zone
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: handstack
+              app.kubernetes.io/instance: handstack
+              app.kubernetes.io/component: web
+      containers:
+        - name: web
+          image: ghcr.io/handstack/web:0.1.0
+          
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef: { name: handstack-config }
+          env:
+            - name: HANDSTACK_API_URL
+              value: http://handstack-api:3001
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+---
+# Source: handstack/templates/deployments.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: handstack-worker-agents
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: worker-agents
+spec:
+  replicas: 1
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: handstack
+      app.kubernetes.io/instance: handstack
+      app.kubernetes.io/component: worker-agents
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: handstack
+        app.kubernetes.io/instance: handstack
+        app.kubernetes.io/component: worker-agents
+    spec:
+      serviceAccountName: handstack
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: worker-agents
+              topologyKey: topology.kubernetes.io/zone
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: handstack
+              app.kubernetes.io/instance: handstack
+              app.kubernetes.io/component: worker-agents
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:0.1.0
+          imagePullPolicy: IfNotPresent
+          args: ["agents"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          envFrom:
+            - configMapRef: { name: handstack-config }
+          env:
+            - name: HANDSTACK_DEPLOYMENT_PROFILE
+              value: "distributed"
+            - name: HANDSTACK_DATABASE_ADAPTER
+              value: "postgresql"
+            - name: HANDSTACK_REDIS_TOPOLOGY
+              value: "sentinel"
+            - name: HANDSTACK_DATABASE_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: database-url } }
+            - name: HANDSTACK_REDIS_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: redis-url } }
+          livenessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 20 }
+          readinessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 10 }
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+---
+# Source: handstack/templates/deployments.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: handstack-worker-audit-billing
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: worker-audit-billing
+spec:
+  replicas: 1
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: handstack
+      app.kubernetes.io/instance: handstack
+      app.kubernetes.io/component: worker-audit-billing
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: handstack
+        app.kubernetes.io/instance: handstack
+        app.kubernetes.io/component: worker-audit-billing
+    spec:
+      serviceAccountName: handstack
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: worker-audit-billing
+              topologyKey: topology.kubernetes.io/zone
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: handstack
+              app.kubernetes.io/instance: handstack
+              app.kubernetes.io/component: worker-audit-billing
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:0.1.0
+          imagePullPolicy: IfNotPresent
+          args: ["auditBilling"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          envFrom:
+            - configMapRef: { name: handstack-config }
+          env:
+            - name: HANDSTACK_DEPLOYMENT_PROFILE
+              value: "distributed"
+            - name: HANDSTACK_DATABASE_ADAPTER
+              value: "postgresql"
+            - name: HANDSTACK_REDIS_TOPOLOGY
+              value: "sentinel"
+            - name: HANDSTACK_DATABASE_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: database-url } }
+            - name: HANDSTACK_REDIS_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: redis-url } }
+          livenessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 20 }
+          readinessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 10 }
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+---
+# Source: handstack/templates/deployments.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: handstack-worker-integrations
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: worker-integrations
+spec:
+  replicas: 1
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: handstack
+      app.kubernetes.io/instance: handstack
+      app.kubernetes.io/component: worker-integrations
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: handstack
+        app.kubernetes.io/instance: handstack
+        app.kubernetes.io/component: worker-integrations
+    spec:
+      serviceAccountName: handstack
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: worker-integrations
+              topologyKey: topology.kubernetes.io/zone
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: handstack
+              app.kubernetes.io/instance: handstack
+              app.kubernetes.io/component: worker-integrations
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:0.1.0
+          imagePullPolicy: IfNotPresent
+          args: ["integrations"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          envFrom:
+            - configMapRef: { name: handstack-config }
+          env:
+            - name: HANDSTACK_DEPLOYMENT_PROFILE
+              value: "distributed"
+            - name: HANDSTACK_DATABASE_ADAPTER
+              value: "postgresql"
+            - name: HANDSTACK_REDIS_TOPOLOGY
+              value: "sentinel"
+            - name: HANDSTACK_DATABASE_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: database-url } }
+            - name: HANDSTACK_REDIS_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: redis-url } }
+          livenessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 20 }
+          readinessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 10 }
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+---
+# Source: handstack/templates/deployments.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: handstack-worker-knowledge
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: worker-knowledge
+spec:
+  replicas: 1
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: handstack
+      app.kubernetes.io/instance: handstack
+      app.kubernetes.io/component: worker-knowledge
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: handstack
+        app.kubernetes.io/instance: handstack
+        app.kubernetes.io/component: worker-knowledge
+    spec:
+      serviceAccountName: handstack
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: worker-knowledge
+              topologyKey: topology.kubernetes.io/zone
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: handstack
+              app.kubernetes.io/instance: handstack
+              app.kubernetes.io/component: worker-knowledge
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:0.1.0
+          imagePullPolicy: IfNotPresent
+          args: ["knowledge"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          envFrom:
+            - configMapRef: { name: handstack-config }
+          env:
+            - name: HANDSTACK_DEPLOYMENT_PROFILE
+              value: "distributed"
+            - name: HANDSTACK_DATABASE_ADAPTER
+              value: "postgresql"
+            - name: HANDSTACK_REDIS_TOPOLOGY
+              value: "sentinel"
+            - name: HANDSTACK_DATABASE_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: database-url } }
+            - name: HANDSTACK_REDIS_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: redis-url } }
+          livenessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 20 }
+          readinessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 10 }
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+---
+# Source: handstack/templates/deployments.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: handstack-worker-maintenance
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: worker-maintenance
+spec:
+  replicas: 1
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: handstack
+      app.kubernetes.io/instance: handstack
+      app.kubernetes.io/component: worker-maintenance
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: handstack
+        app.kubernetes.io/instance: handstack
+        app.kubernetes.io/component: worker-maintenance
+    spec:
+      serviceAccountName: handstack
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: worker-maintenance
+              topologyKey: topology.kubernetes.io/zone
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: handstack
+              app.kubernetes.io/instance: handstack
+              app.kubernetes.io/component: worker-maintenance
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:0.1.0
+          imagePullPolicy: IfNotPresent
+          args: ["maintenance"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          envFrom:
+            - configMapRef: { name: handstack-config }
+          env:
+            - name: HANDSTACK_DEPLOYMENT_PROFILE
+              value: "distributed"
+            - name: HANDSTACK_DATABASE_ADAPTER
+              value: "postgresql"
+            - name: HANDSTACK_REDIS_TOPOLOGY
+              value: "sentinel"
+            - name: HANDSTACK_DATABASE_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: database-url } }
+            - name: HANDSTACK_REDIS_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: redis-url } }
+          livenessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 20 }
+          readinessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 10 }
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+---
+# Source: handstack/templates/deployments.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: handstack-worker-webhooks
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: worker-webhooks
+spec:
+  replicas: 1
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: handstack
+      app.kubernetes.io/instance: handstack
+      app.kubernetes.io/component: worker-webhooks
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: handstack
+        app.kubernetes.io/instance: handstack
+        app.kubernetes.io/component: worker-webhooks
+    spec:
+      serviceAccountName: handstack
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: worker-webhooks
+              topologyKey: topology.kubernetes.io/zone
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: handstack
+              app.kubernetes.io/instance: handstack
+              app.kubernetes.io/component: worker-webhooks
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:0.1.0
+          imagePullPolicy: IfNotPresent
+          args: ["webhooks"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          envFrom:
+            - configMapRef: { name: handstack-config }
+          env:
+            - name: HANDSTACK_DEPLOYMENT_PROFILE
+              value: "distributed"
+            - name: HANDSTACK_DATABASE_ADAPTER
+              value: "postgresql"
+            - name: HANDSTACK_REDIS_TOPOLOGY
+              value: "sentinel"
+            - name: HANDSTACK_DATABASE_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: database-url } }
+            - name: HANDSTACK_REDIS_URL
+              valueFrom: { secretKeyRef: { name: handstack-external, key: redis-url } }
+          livenessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 20 }
+          readinessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 10 }
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+---
+# Source: handstack/templates/autoscaling.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: handstack-api
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: handstack-api }
+  minReplicas: 3
+  maxReplicas: 50
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 65 }
+    - type: External
+      external:
+        metric: { name: handstack_http_requests_per_second }
+        target: { type: AverageValue, averageValue: "100" }
+    - type: External
+      external:
+        metric: { name: handstack_http_request_p95_latency_seconds }
+        target: { type: AverageValue, averageValue: "0.5" }
+    - type: External
+      external:
+        metric: { name: handstack_event_loop_lag_seconds }
+        target: { type: AverageValue, averageValue: "0.1" }
+    - type: External
+      external:
+        metric: { name: handstack_in_flight_capability_executions }
+        target: { type: AverageValue, averageValue: "20" }
+---
+# Source: handstack/templates/autoscaling.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: handstack-web
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: handstack-web }
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 65 }
+---
+# Source: handstack/templates/autoscaling.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: handstack-mcp
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: handstack-mcp }
+  minReplicas: 2
+  maxReplicas: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 65 }
+    - type: External
+      external:
+        metric: { name: handstack_active_streams }
+        target: { type: AverageValue, averageValue: "20" }
+    - type: External
+      external:
+        metric: { name: handstack_http_requests_per_second }
+        target: { type: AverageValue, averageValue: "100" }
+    - type: External
+      external:
+        metric: { name: handstack_http_request_p95_latency_seconds }
+        target: { type: AverageValue, averageValue: "0.5" }
+    - type: External
+      external:
+        metric: { name: handstack_event_loop_lag_seconds }
+        target: { type: AverageValue, averageValue: "0.1" }
+    - type: External
+      external:
+        metric: { name: handstack_in_flight_capability_executions }
+        target: { type: AverageValue, averageValue: "20" }
+---
+# Source: handstack/templates/keda.yaml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: handstack-worker-agents
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef: { name: handstack-worker-agents }
+  minReplicaCount: 1
+  maxReplicaCount: 100
+  pollingInterval: 15
+  cooldownPeriod: 60
+  triggers:
+    - type: redis
+      metadata:
+        addressFromEnv: HANDSTACK_REDIS_URL
+        listName: "agents"
+        listLength: "20"
+---
+# Source: handstack/templates/keda.yaml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: handstack-worker-audit-billing
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef: { name: handstack-worker-audit-billing }
+  minReplicaCount: 1
+  maxReplicaCount: 100
+  pollingInterval: 15
+  cooldownPeriod: 60
+  triggers:
+    - type: redis
+      metadata:
+        addressFromEnv: HANDSTACK_REDIS_URL
+        listName: "audit"
+        listLength: "20"
+---
+# Source: handstack/templates/keda.yaml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: handstack-worker-integrations
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef: { name: handstack-worker-integrations }
+  minReplicaCount: 1
+  maxReplicaCount: 100
+  pollingInterval: 15
+  cooldownPeriod: 60
+  triggers:
+    - type: redis
+      metadata:
+        addressFromEnv: HANDSTACK_REDIS_URL
+        listName: "plugins"
+        listLength: "20"
+---
+# Source: handstack/templates/keda.yaml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: handstack-worker-knowledge
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef: { name: handstack-worker-knowledge }
+  minReplicaCount: 1
+  maxReplicaCount: 100
+  pollingInterval: 15
+  cooldownPeriod: 60
+  triggers:
+    - type: redis
+      metadata:
+        addressFromEnv: HANDSTACK_REDIS_URL
+        listName: "embeddings"
+        listLength: "20"
+---
+# Source: handstack/templates/keda.yaml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: handstack-worker-maintenance
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef: { name: handstack-worker-maintenance }
+  minReplicaCount: 1
+  maxReplicaCount: 100
+  pollingInterval: 15
+  cooldownPeriod: 60
+  triggers:
+    - type: redis
+      metadata:
+        addressFromEnv: HANDSTACK_REDIS_URL
+        listName: "cleanup"
+        listLength: "20"
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: handstack-worker-webhooks
+  labels:
+    helm.sh/chart: handstack-0.1.0
+    app.kubernetes.io/name: handstack
+    app.kubernetes.io/instance: handstack
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef: { name: handstack-worker-webhooks }
+  minReplicaCount: 1
+  maxReplicaCount: 100
+  pollingInterval: 15
+  cooldownPeriod: 60
+  triggers:
+    - type: redis
+      metadata:
+        addressFromEnv: HANDSTACK_REDIS_URL
+        listName: "webhooks"
+        listLength: "20"

@@ -1,0 +1,38 @@
+---
+id: getting-started/redis-streams
+title: Configure Redis Streams and durable queues
+description: Connect Redis Streams and BullMQ-compatible transports without coupling core packages to a Redis SDK.
+audience: [developer, platform-operator]
+permissions: [jobs.manage, audit.read]
+features: [redis, event-bus, queues]
+deploymentProfiles: [distributed]
+introducedIn: 0.23.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [redis, streams, bullmq, at-least-once]
+---
+
+# Configure Redis Streams and durable queues
+
+Inject a `RedisStreamsTransport` into `RedisStreamsEventBus` and a
+`DurableJobTransport` into `DistributedJobQueue`. The adapters may use Redis
+Streams and BullMQ clients, while the contracts keep local tests SDK-free.
+
+## Prerequisites
+
+- Redis HA/Sentinel or managed Redis with persistence and network policy.
+
+## Steps
+
+1. Configure a highly available Redis endpoint and consumer group per worker class.
+2. Append events before acknowledging the HTTP request; handlers ACK only after success.
+3. Route poison events and terminal jobs to a retained dead-letter stream/queue.
+4. Set bounded backlog and honor `BackpressureError.retryAfterSeconds`.
+
+## Verify
+
+Exercise consumer redelivery, handler failure/DLQ, bounded admission and graceful worker shutdown.
+
+## Troubleshooting
+
+- A missing ACK is redelivered by the consumer group; inspect handler errors before increasing retries.

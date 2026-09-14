@@ -1,0 +1,42 @@
+---
+id: getting-started/plugins
+title: Instalar plugins governados
+description: Valide, aprove e gerencie o lifecycle de plugins confiáveis ou isolados.
+audience: [developer, platform-operator]
+permissions: [plugin.manage]
+features: [plugins, capabilities, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.10.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [plugins, sdk, supply-chain]
+---
+
+# Instalar plugins governados
+
+`@handstack/plugin-sdk` valida manifesto, registra checksum SHA-256 dos bytes e exige aprovação
+administrativa de cada permissão declarada. Plugins oficiais trusted podem rodar no processo;
+plugins comunitários exigem runner RPC isolado.
+
+## Prerequisites
+
+- Pacote que exponha `definePlugin` com manifesto compatível.
+- Aprovação para permissões de rede, filesystem, secrets, database, identidade, MCP ou models.
+
+## Steps
+
+1. Defina e valide manifesto e lifecycle hooks.
+2. Instale com bytes imutáveis e revise o checksum registrado.
+3. Aprove apenas permissões solicitadas e habilite no modo escolhido.
+4. Desabilite ou desinstale pelo host ao retirar o plugin.
+
+## Verify
+
+Confirme checksum, impossibilidade de elevar permissões, falha fechada do modo isolado sem runner
+RPC e execução ordenada dos hooks.
+
+## Troubleshooting
+
+- `isolated plugin runner is unavailable` indica ausência de fronteira worker/RPC.
+- Nome duplicado exige desinstalar ou versionar a instalação existente.
+- Nunca coloque valores secretos no manifesto ou metadata de auditoria.

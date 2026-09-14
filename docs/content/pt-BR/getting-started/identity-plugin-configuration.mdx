@@ -1,0 +1,40 @@
+---
+id: getting-started/identity-plugin-configuration
+title: Armazenar configuração de plugin de identidade por tenant
+description: Persista a configuração do provedor por organização mantendo segredos atrás de referências opacas.
+audience: [platform-operator, developer]
+permissions: [identity.manage]
+features: [plugins, identity, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.48.0
+lastReviewedAt: 2026-09-11
+owner: identity-team
+tags: [plugins, identity, configuration]
+---
+
+# Armazenar configuração de plugin de identidade por tenant
+
+## Prerequisites
+
+- Um plugin de identidade registrado e um administrador da organização.
+- Uma referência ao gerenciador de segredos, como `secret://vault/idp-client`, para campos confidenciais.
+
+## Steps
+
+1. Crie um `InMemoryIdentityProviderConfigurationStore` para uso local/offline ou implemente o mesmo contrato para armazenamento durável.
+2. Defina a configuração com `organizationId` e ID do provedor.
+3. Coloque somente referências `secret://` nos campos chamados password, secret, token ou private key.
+4. Resolva a configuração com o mesmo escopo de organização e provedor antes de iniciar o adapter.
+
+## Expected results
+
+A configuração não pode ser lida entre organizações, escopos vazios falham fechados e valores confidenciais inline são rejeitados. O store não resolve nem persiste material secreto.
+
+## Verify
+
+Execute os testes de contrato do plugin SDK e confirme que uma organização diferente não retorna configuração.
+
+## Troubleshooting
+
+- `Identity provider secret field ... must be a reference` indica valor confidencial inline.
+- `Identity provider configuration scope is invalid` indica ID de organização ou provedor inválido.

@@ -1,0 +1,40 @@
+---
+id: getting-started/identity-plugin-configuration
+title: Store tenant-scoped identity plugin configuration
+description: Persist identity provider configuration by organization while keeping secret values behind opaque references.
+audience: [platform-operator, developer]
+permissions: [identity.manage]
+features: [plugins, identity, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.48.0
+lastReviewedAt: 2026-09-11
+owner: identity-team
+tags: [plugins, identity, configuration]
+---
+
+# Store tenant-scoped identity plugin configuration
+
+## Prerequisites
+
+- A registered identity provider plugin and an organization administrator.
+- A secret manager reference such as `secret://vault/idp-client` for confidential fields.
+
+## Steps
+
+1. Create an `InMemoryIdentityProviderConfigurationStore` for local/offline use or implement the same adapter contract for durable storage.
+2. Set configuration with both `organizationId` and provider ID.
+3. Put only opaque `secret://` references in fields named password, secret, token or private key.
+4. Resolve configuration by the same organization and provider scope before starting the adapter.
+
+## Expected results
+
+Configuration cannot be read across organizations, empty scopes fail closed and inline confidential values are rejected. The store never resolves or persists secret material.
+
+## Verify
+
+Run the plugin SDK contract tests and confirm that an organization mismatch returns no configuration.
+
+## Troubleshooting
+
+- `Identity provider secret field ... must be a reference` means a confidential value was supplied inline.
+- `Identity provider configuration scope is invalid` means the organization or provider ID is malformed.

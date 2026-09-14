@@ -1,0 +1,39 @@
+---
+id: getting-started/identity-plugin-validation
+title: Validate identity provider metadata before registration
+description: Reject malformed identity provider descriptors before they reach organization configuration.
+audience: [platform-operator, developer]
+permissions: [plugins.manage, identity.manage]
+features: [plugins, identity, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.57.0
+lastReviewedAt: 2026-09-11
+owner: identity-team
+tags: [plugins, identity, validation]
+---
+
+# Validate identity provider metadata before registration
+
+## Prerequisites
+
+- A plugin host with an identity provider registration callback.
+- A descriptor with a stable provider ID, display name, capabilities, configuration schema and unique permissions.
+
+## Steps
+
+1. Register the provider from plugin setup.
+2. Let the host call `validateIdentityProviderRegistration` before forwarding the descriptor.
+3. Accept organization configuration only after registration validation and host policy.
+
+## Expected results
+
+Invalid IDs, empty metadata, empty schemas or duplicate permissions fail before the host callback and create no side effect.
+
+## Verify
+
+Run the Plugin SDK contract tests and confirm malformed identity metadata fails closed.
+
+## Troubleshooting
+
+- `Identity provider permissions must be unique and non-empty` means authorization metadata is incomplete or duplicated.
+- `Identity provider configuration schema is required` means the provider cannot be safely configured.

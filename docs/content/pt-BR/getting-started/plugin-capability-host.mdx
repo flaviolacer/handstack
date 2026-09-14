@@ -1,0 +1,39 @@
+---
+id: getting-started/plugin-capability-host
+title: Conectar registro de capabilities ao host
+description: Encaminhe descritores versionados e permissionados pelo ciclo de vida governado do PluginHost.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, capabilities, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.54.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, capabilities, host]
+---
+
+# Conectar registro de capabilities ao host
+
+## Prerequisites
+
+- Uma definição de plugin com descritor de capability versionado.
+- Um callback do host que valide permissões e conecte a capability ao engine comum.
+
+## Steps
+
+1. Passe uma implementação tipada de `registerCapabilities` ao `PluginHost`.
+2. Registre ID, versão, descrição e permissões no `setup` do plugin.
+3. Aplique autenticação, autorização, rate limits, budgets, guardrails, auditoria e telemetria antes da execução.
+
+## Expected results
+
+Metadados de capability chegam ao host somente durante o setup habilitado e permanecem separados de código executável arbitrário.
+
+## Verify
+
+Execute os testes do Plugin SDK e confirme que o host recebe o descritor versionado uma vez.
+
+## Troubleshooting
+
+- Callback ausente indica que o host não configurou o registro de capabilities.
+- Registro é descoberta, não autorização; o engine comum continua obrigatório.

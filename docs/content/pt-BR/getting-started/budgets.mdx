@@ -1,0 +1,50 @@
+---
+id: getting-started/budgets
+title: Governança de budgets e uso
+description: Configure budgets por tenant e consulte registros de uso antes de habilitar cargas de modelos dispendiosas.
+audience: [platform-operator, developer]
+permissions: [budget.manage]
+features: [budgets, usage, governance]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.5.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [budgets, usage, cost]
+---
+
+# Governança de budgets e uso
+
+Crie um budget por tenant com `POST /api/v1/organizations/{organizationId}/budgets`.
+Escolha escopo de organização, grupo, usuário, API key, aplicação, agente, modelo, provider
+ou capability, janela diária/semanal/mensal/custom e estratégia `HARD_LIMIT`, `SOFT_LIMIT` ou
+`ALERT_ONLY`. Limites rígidos reservam valor de forma transacional antes da execução.
+
+Use `GET /api/v1/organizations/{organizationId}/budgets` para consultar gasto e reservas
+ativas. `GET /api/v1/organizations/{organizationId}/usage` retorna registros após settlement.
+Todas as rotas exigem access-token da organização correspondente e `budget.manage`; leituras
+cross-tenant falham fechadas.
+
+Reservas são idempotentes por principal e chave, usam transação serializável e compare-and-set,
+e são liquidadas com tokens e custo USD medidos. O gateway de API key também aplica a reserva
+própria da chave.
+
+## Prerequisites
+
+- Administrador com `budget.manage`.
+- Access-token do tenant que será administrado.
+
+## Steps
+
+1. Crie o budget com escopo, período, estratégia e limite USD.
+2. Consulte reservas ativas pela rota de budgets.
+3. Consulte registros liquidados pela rota de usage e reconcilie com o provider.
+
+## Verify
+
+Tente reservar acima de um limite rígido e confirme rejeição antes da execução. Repita uma
+chave de idempotência e confirme que não surge uma segunda reserva.
+
+## Troubleshooting
+
+- `budget.manage permission is required` indica ausência da permissão administrativa.
+- Rejeição de hard limit indica que gasto mais reservas ativas atingiu o limite.

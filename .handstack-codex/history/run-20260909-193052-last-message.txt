@@ -1,0 +1,1 @@
+O trabalho permanece parcialmente implementado, com progresso e pendências mantidos no `STATUS.md`. As dependências externas e conformance necessárias continuam indisponíveis; `COMPLETE` não foi criado.

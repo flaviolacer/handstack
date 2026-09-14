@@ -1,0 +1,64 @@
+---
+id: getting-started/scim
+title: Provisionar identidades com SCIM 2.0
+description: Provisione e desprovisione usuários e grupos pelo endpoint HTTP dedicado SCIM 2.0.
+audience: [platform-operator, security-admin]
+permissions: [identity.provision]
+features: [identity, provisioning, scim]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.35.0
+lastReviewedAt: 2026-09-10
+owner: identity-team
+tags: [scim, provisionamento, identidade, sso]
+---
+
+# Provisionar identidades com SCIM 2.0
+
+O HandStack expõe um endpoint SCIM 2.0 (RFC 7644) em `/scim/v2` para que um provedor de identidade
+corporativo, como Microsoft Entra ID ou Okta, envie usuários, grupos e memberships sem exigir primeiro
+login. Cada organização possui um token bearer dedicado; o token bruto é retornado exatamente uma vez e
+apenas seu digest HMAC-SHA256 com chave é armazenado. Toda mutação é isolada por tenant, limitada por
+taxa, auditada e protegida por concorrência otimista via `ETag` e `If-Match`.
+
+## Prerequisites
+
+- Um principal com a permissão `identity.manage` para emitir ou rotacionar a credencial SCIM.
+- O identificador da organização usado ao emitir a credencial.
+
+## Steps
+
+1. Emita uma credencial dedicada como administrador `identity.manage`:
+   `POST /api/v1/organizations/:organizationId/scim/credential`. Guarde o `token` retornado uma única
+   vez.
+2. Configure o IdP corporativo com o endpoint `https://<handstack-host>/scim/v2` e o token como segredo
+   `OAuth Bearer Token`. O IdP também precisa da URL do tenant, por exemplo
+   `https://<handstack-host>/scim/v2/Users`.
+3. Provisione um usuário com `POST /scim/v2/Users` usando `userName`, `displayName` e o `externalId` do
+   IdP. A resposta retorna `201`, um header `Location` e uma versão `ETag`.
+4. Crie grupos com `POST /scim/v2/Groups` e adicione membros pelo id do usuário usando uma operação
+   `PATCH` com path `members`.
+5. Atualize, desative (`active: false`) e reative usuários e passe a versão `ETag` atual no header
+   `If-Match` em toda mutação.
+
+## Verify
+
+```text
+curl -i https://<handstack-host>/scim/v2/ServiceProviderConfig \
+  -H "Authorization: Bearer <token>"
+
+curl -i https://<handstack-host>/scim/v2/Users \
+  -H "Authorization: Bearer <token>"
+```
+
+Confirme que o token de outra organização retorna lista vazia, que um `If-Match` obsoleto retorna
+`409`, um id desconhecido retorna `404`, um token ausente retorna `401` e que usuários excluídos não
+aparecem mais nas listas.
+
+## Troubleshooting
+
+- `401` significa que o token bearer está ausente, malformado, revogado ou pertence a outra organização.
+- `409` significa que a versão do `If-Match` está obsoleta; busque o recurso novamente e repita com o
+  `ETag` atual.
+- `429` significa que o limite de taxa por organização foi atingido; repita após a janela configurada.
+- `403` no endpoint administrativo significa que o principal não tem `identity.manage` ou acessou outra
+  organização.

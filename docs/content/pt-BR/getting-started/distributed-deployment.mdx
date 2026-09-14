@@ -1,0 +1,55 @@
+---
+id: getting-started/distributed-deployment
+title: Fazer deployment horizontal do HandStack
+description: Execute Web/API/MCP stateless e workers escaláveis de forma independente.
+audience: [platform-operator, security-admin]
+permissions: [deployment.manage]
+features: [deployment, kubernetes, scaling]
+deploymentProfiles: [distributed]
+introducedIn: 0.20.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [kubernetes, hpa, keda, workers]
+---
+
+# Fazer deployment horizontal do HandStack
+
+Use o chart oficial em `deploy/helm/handstack` em produção. O manifesto fixo
+`deploy/kubernetes/handstack.yaml` continua disponível para avaliação. Réplicas Web, API e MCP não
+guardam estado local; estado compartilhado fica no banco, Redis HA, object storage ou secret
+provider criptografado.
+
+## Prerequisites
+
+- Cluster PostgreSQL/Mongo, Redis HA, object storage e secrets externos.
+- Ingress/WAF, imagens imutáveis, metrics-server e um adaptador de métricas externas para os sinais
+  de API/MCP (requisições, latência, event-loop lag, streams e execuções de capability em voo);
+  KEDA é recomendado para backlog.
+- Helm 3; o chart suporta PostgreSQL, MySQL, MariaDB, SQL Server e MongoDB.
+
+## Steps
+
+1. Crie um Secret externo com `database-url` e `redis-url`.
+2. Instale com `helm upgrade --install handstack deploy/helm/handstack` e tags imutáveis.
+3. Habilite/configure Ingress e verifique os ScaledObjects KEDA de cada fila.
+4. Verifique readiness/liveness e shutdown gracioso dos workers.
+
+## Rollback
+
+Mantenha os valores do chart sob controle de versão e execute
+`npm run helm:release:validate` antes do upgrade. Use `helm history handstack` para identificar a
+última revisão saudável e execute `helm rollback handstack <REVISION> --wait --timeout 10m`.
+Confirme readiness da API e saúde dos pods com `kubectl rollout status` e `kubectl get pods`; nunca
+apague o release para fazer rollback.
+
+## Verify
+
+Escale API e workers separadamente, reconecte SSE pelo cursor e confirme backpressure quando o
+backlog atingir o limite.
+
+## Troubleshooting
+
+- Pod sem readiness deve sair do tráfego enquanto réplicas continuam disponíveis.
+- Não escale API para compensar backlog de embeddings; escale `worker-knowledge`.
+- Não use `externalSecrets.createSecret=true` com credenciais de produção; o histórico do Helm pode
+  expor valores.

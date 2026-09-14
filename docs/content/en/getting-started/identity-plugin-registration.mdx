@@ -1,0 +1,39 @@
+---
+id: getting-started/identity-plugin-registration
+title: Register an identity provider plugin
+description: Declare identity provider capabilities, configuration and permissions through the typed plugin SDK boundary.
+audience: [platform-operator, developer]
+permissions: [plugins.manage, identity.manage]
+features: [plugins, identity, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.47.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, identity, providers]
+---
+
+# Register an identity provider plugin
+
+## Prerequisites
+
+- A plugin manifest approved by the plugin host.
+- A protocol adapter and configuration schema for the identity provider.
+
+## Steps
+
+1. Create an `IdentityProviderRegistry` at the host boundary.
+2. Register a stable provider ID, display name, protocol capabilities, configuration schema and required permissions.
+3. Resolve the registration before accepting organization configuration and enforce the declared permissions during use.
+
+## Expected results
+
+The host can discover identity providers without executing provider code, while incomplete metadata and duplicate IDs fail closed.
+
+## Verify
+
+Run the plugin SDK contract tests and confirm each registered provider exposes only its declared capabilities and permissions.
+
+## Troubleshooting
+
+- `Identity provider permissions are required` means the provider requested no authorization boundary.
+- `Identity provider is already registered` means the provider ID is not unique in this host.

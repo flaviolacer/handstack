@@ -1,0 +1,47 @@
+---
+id: getting-started/frontend-platform
+title: Validar o contrato da plataforma frontend
+description: Verifique comportamento responsivo, acessível e offline do workspace HandStack.
+audience: [platform-operator, workspace-admin]
+permissions: [workspace.read]
+features: [frontend, help-center, accessibility]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.0.0
+lastReviewedAt: 2026-09-10
+owner: frontend-platform
+tags: [frontend, acessibilidade, offline, browsers]
+---
+
+# Validar o contrato da plataforma frontend
+
+A aplicação Web visa as duas versões estáveis mais recentes de Chrome, Edge, Firefox e Safari,
+suporta viewport de 360px, operação por teclado e leitor de tela e práticas WCAG 2.2 AA.
+
+## Verificação
+
+1. Execute `npm run frontend:validate` para verificar o service worker offline do Help Center, CSS
+   responsivo, projetos de navegador, caminho de teclado, varredura axe e contrato visual.
+2. Execute `npm --workspace @handstack/web run test` para testes de rotas e componentes.
+3. Execute `npm --workspace @handstack/web run test:e2e` com os navegadores Playwright suportados instalados.
+4. Desconecte a rede após abrir `/help` e confirme que os artigos armazenados continuam legíveis.
+
+O service worker é limitado a `/help`; chat e ações administrativas nunca indicam sucesso sem
+confirmação do servidor. Mantenha secrets fora do armazenamento do navegador e respeite reduced motion.
+
+## Prerequisites
+
+Instale as dependências do workspace e os navegadores Playwright exigidos pela suíte E2E local.
+
+## Steps
+
+Execute o gate do contrato, depois os testes unitários/de componentes do Web e a suíte E2E Playwright.
+
+## Verify
+
+O gate passa, a varredura axe não possui violações, os snapshots de 360px permanecem estáveis e
+as páginas armazenadas do Help Center continuam legíveis após desconectar a rede.
+
+## Troubleshooting
+
+Se os navegadores E2E não estiverem disponíveis, execute primeiro o contrato offline e os testes
+unitários; depois instale o navegador Playwright ausente. Corrija qualquer falha axe ou snapshot antes do release.

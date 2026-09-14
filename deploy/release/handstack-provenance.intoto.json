@@ -1,0 +1,20 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "handstack-source.tar.gz",
+      "digest": { "sha256": "4f7f1c9e4c3e8ad5e32fd9a8cc4f4dbe3a5ea1b1ebde2bf76b2e0dd8a2a2b0c1" }
+    }
+  ],
+  "predicateType": "https://slsa.dev/provenance/v1",
+  "predicate": {
+    "buildDefinition": {
+      "buildType": "https://handstack.dev/release/pnpm",
+      "externalParameters": { "node": ">=22 <25" }
+    },
+    "runDetails": {
+      "builder": { "id": "https://github.com/handstack/handstack/actions" },
+      "metadata": { "reproducible": true }
+    }
+  }
+}

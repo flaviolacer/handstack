@@ -1,0 +1,39 @@
+---
+id: getting-started/identity-plugin-host
+title: Connect identity registration to the plugin host
+description: Forward identity provider registrations through the governed plugin host boundary.
+audience: [platform-operator, developer]
+permissions: [plugins.manage, identity.manage]
+features: [plugins, identity, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.49.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, identity, host]
+---
+
+# Connect identity registration to the plugin host
+
+## Prerequisites
+
+- A plugin definition with an identity provider registration.
+- A host callback that applies registration policy and persists approved metadata.
+
+## Steps
+
+1. Pass `registerIdentityProvider` to `PluginHost`.
+2. Register the provider from the plugin `setup` hook through `context.identity.register`.
+3. Apply organization configuration only after the host callback accepts the declared provider metadata.
+
+## Expected results
+
+Identity registration crosses the same lifecycle and isolation boundary as tools and capabilities. Isolated plugins still require the configured RPC runner before their setup can execute.
+
+## Verify
+
+Run the Plugin SDK contract tests and confirm the host callback receives the provider exactly once when the plugin is enabled.
+
+## Troubleshooting
+
+- No callback means the plugin was not enabled or the isolated runner was not configured.
+- Registration policy failures must reject the provider before organization configuration is accepted.

@@ -1,0 +1,39 @@
+---
+id: getting-started/identity-plugin-host
+title: Conectar registro de identidade ao host de plugins
+description: Encaminhe registros de provedores de identidade pelo limite governado do host de plugins.
+audience: [platform-operator, developer]
+permissions: [plugins.manage, identity.manage]
+features: [plugins, identity, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.49.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, identity, host]
+---
+
+# Conectar registro de identidade ao host de plugins
+
+## Prerequisites
+
+- Uma definição de plugin com registro de provedor de identidade.
+- Um callback do host que aplique política e persista metadados aprovados.
+
+## Steps
+
+1. Passe `registerIdentityProvider` ao `PluginHost`.
+2. Registre o provedor no hook `setup` do plugin por `context.identity.register`.
+3. Aplique a configuração da organização somente após o callback aceitar os metadados declarados.
+
+## Expected results
+
+O registro de identidade atravessa o mesmo limite de ciclo de vida e isolamento de tools e capabilities. Plugins isolados continuam exigindo o RPC runner configurado antes do setup.
+
+## Verify
+
+Execute os testes de contrato do Plugin SDK e confirme que o callback do host recebe o provedor uma vez quando o plugin é habilitado.
+
+## Troubleshooting
+
+- Sem callback, o plugin não foi habilitado ou o runner isolado não foi configurado.
+- Falhas da política de registro devem rejeitar o provedor antes da configuração da organização.

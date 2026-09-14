@@ -1,0 +1,1 @@
+{"state":"progress","summary":"M259 concluído: configuração de identity plugins tenant/provider-scoped no plugin-sdk, com referências secret:// e rejeição de segredos inline. Documentação e catálogo atualizados.","next_step":"Avançar para o próximo requisito MUST ainda não implementado.","blockers":[],"completed_requirements":["HS-CORE-010"],"all_requirements_verified":false}

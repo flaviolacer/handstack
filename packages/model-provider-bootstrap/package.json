@@ -1,0 +1,24 @@
+{
+  "name": "@handstack/model-provider-bootstrap",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint src tests",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@handstack/model-runtime": "file:../model-runtime",
+    "@handstack/models": "file:../models",
+    "@handstack/provider-anthropic": "file:../provider-anthropic",
+    "@handstack/provider-bedrock": "file:../provider-bedrock",
+    "@handstack/provider-gemini": "file:../provider-gemini",
+    "@handstack/provider-openai-compatible": "file:../provider-openai-compatible"
+  }
+}

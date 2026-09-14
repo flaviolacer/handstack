@@ -1,0 +1,47 @@
+---
+id: getting-started/integration-security
+title: Governar integrações externas com segurança
+description: Valide isolamento de tenant, entregas limitadas e tratamento de secrets nas integrações externas.
+audience: [platform-operator, security-admin, developer]
+permissions: [webhooks.manage, incidents.manage]
+features: [integrations, security, webhooks, notifications]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.0.0
+lastReviewedAt: 2026-09-10
+owner: security-platform-team
+tags: [integrations, security, webhooks, oidc]
+---
+
+# Governar integrações externas com segurança
+
+O HandStack acessa sistemas externos por boundaries substituíveis. O contrato de integração mantém
+autorização deny-by-default, escopo por organização, retries limitados e secrets em um
+`SecretProvider`, nunca em configuração ou logs.
+
+## Prerequisites
+
+- Acesso ao repositório e ao gerenciador de secrets do deployment.
+- Endpoint ou configuração de identity provider revisado para a organização alvo.
+
+## Steps
+
+1. Revise `deploy/integrations/handstack-integration-contract.json` para o boundary da integração.
+2. Configure credenciais pelo secret provider externo; nunca faça commit de valores de credenciais.
+3. Configure allowlists de endpoints e timeout adequado ao serviço externo.
+4. Execute `npm run integration:validate` antes do release.
+5. Exercite o provider com teste por tenant e inspecione somente metadata redigida de entrega/audit.
+
+## Verify
+
+O gate deve reportar integrações deny-by-default, por tenant e sem valores que pareçam credenciais.
+Webhooks devem usar HMAC-SHA256, retries limitados, idempotência e dead-letter. OIDC deve declarar
+validação de state, nonce e PKCE. Uma segunda organização não pode resolver ou repetir a entrega da
+primeira.
+
+## Troubleshooting
+
+- Arquivo ausente indica que o boundary do adapter mudou sem atualizar o contrato.
+- Falha de redaction bloqueia o release até que headers e campos sensíveis sejam excluídos de logs,
+  traces e métricas.
+- Conformance real com PagerDuty, StatusPage, Redis e providers exige credenciais e infraestrutura;
+  o gate offline não afirma que esses sistemas externos estão disponíveis.

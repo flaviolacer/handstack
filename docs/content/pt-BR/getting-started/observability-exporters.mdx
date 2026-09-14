@@ -1,0 +1,49 @@
+---
+id: getting-started/observability-exporters
+title: Configurar exporters de observabilidade
+description: Exporte traces, métricas e logs tenant-scoped com redaction por transports oficiais substituíveis.
+audience: [platform-operator, developer]
+permissions: [observability.manage]
+features: [observability, telemetry]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.40.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [observability, telemetry, exporters]
+---
+
+# Configurar exporters de observabilidade
+
+## Purpose and expected outcome
+
+Envie eventos de observabilidade limitados e redigidos para OTLP, Langfuse, Datadog, Grafana ou New Relic através de um transport injetado.
+
+## Prerequisites
+
+- Um runtime de telemetria habilitado e um produtor de eventos escopado por organização.
+- `observability.manage` para configurar o exporter.
+
+## Steps
+
+1. Escolha o tipo `otlp`, `langfuse`, `datadog`, `grafana` ou `new_relic`.
+2. Injete o transport do provider e configure um tamanho de lote finito.
+3. Emita somente eventos de trace, métrica ou log com nomes internos e atributos limitados.
+4. Use fanout quando o mesmo evento redigido precisar chegar a mais de um destino.
+
+## Verify
+
+Confirme que os eventos são agrupados, chaves sensíveis viram `[REDACTED]`, os destinos recebem o mesmo formato sanitizado e eventos inválidos ou falhas de transport falham fechados.
+
+## Troubleshooting
+
+- `INVALID_EVENT` indica organização, nome, timestamp ou valor numérico inválido.
+- `TRANSPORT` indica rejeição do lote pelo transport; faça retry pela fronteira de jobs.
+- Dados ausentes geralmente indicam exporter não registrado ou runtime de telemetria desabilitado.
+
+## Security, budget, and audit implications
+
+Exporters nunca recebem credenciais em atributos de eventos; chaves conhecidas de secret, prompt, response, claim e exception são redigidas recursivamente. O audit durável continua autoritativo; exporters são caminhos substituíveis de entrega.
+
+## Rollback
+
+Desabilite o exporter ou remova-o do fanout. Audit durável e telemetria local permanecem disponíveis conforme a política de retenção.

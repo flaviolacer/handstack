@@ -1,0 +1,49 @@
+---
+id: getting-started/deployment-profiles
+title: Choose a HandStack deployment profile
+description: Run the compact single-container profile or the distributed Compose and Kubernetes profiles.
+audience: [platform-operator, developer]
+permissions: [deployment.manage]
+features: [deployment, infrastructure, operations]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.41.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [docker, compose, kubernetes, helm]
+---
+
+# Choose a HandStack deployment profile
+
+## Purpose and expected outcome
+
+Select a zero-infrastructure compact profile for development or the stateless distributed profile for production.
+
+## Prerequisites
+
+- Docker for the compact and Compose profiles.
+- Kubernetes, Helm, managed database, Redis HA and object storage for distributed production.
+
+## Steps
+
+1. Use `docker run handstack/handstack` for the compact API/UI/SQLite profile without Redis.
+2. Use `docker compose -f deploy/docker-compose/compose.yaml up` for development; select exactly one `postgres` or `mongodb` profile when needed.
+3. Use the official Helm chart for production and configure an external SecretProvider, immutable images, database adapter and Redis topology.
+4. Keep `/health/live` and `/health/ready` probes enabled and do not put production credentials in images, values or release history.
+
+## Verify
+
+Run `node scripts/validate_container_contract.mjs` and `node scripts/validate_helm_chart.mjs`. Confirm that compact mode has API/UI/SQLite only, while the chart renders Deployments, Services, HPA, KEDA, PDB and NetworkPolicy resources.
+
+## Troubleshooting
+
+- A database profile must match `HANDSTACK_DATABASE_ADAPTER` and its external URL.
+- Production chart failures usually indicate missing external secrets, metrics-server or KEDA.
+- A readiness failure removes a replica from traffic; liveness failure restarts only the unhealthy process.
+
+## Security, budget, and audit implications
+
+Secrets are injected externally. Distributed replicas remain stateless and continue using the normal authorization, budget, audit and telemetry pipeline.
+
+## Rollback
+
+Roll back the Compose image or Helm release to the last known-good immutable revision; never delete database, audit or object-storage state.

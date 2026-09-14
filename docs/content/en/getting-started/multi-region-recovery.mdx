@@ -1,0 +1,50 @@
+---
+id: getting-started/multi-region-recovery
+title: Operate multi-region disaster recovery
+description: Prepare active/standby failover with bounded RPO/RTO and audited failback.
+audience: [platform-operator, security-admin]
+permissions: [deployment.manage, audit.read]
+features: [deployment, resilience, audit]
+deploymentProfiles: [distributed]
+introducedIn: 0.42.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [disaster-recovery, multi-region, resilience]
+---
+
+# Operate multi-region disaster recovery
+
+## Purpose and expected outcome
+
+Maintain one active write region and one warm standby region, with health-based failover that meets RPO ≤5 minutes and RTO ≤15 minutes.
+
+## Prerequisites
+
+- Distributed deployment with HA database and Redis, replicated object storage and an approved secret provider.
+- Health-based global DNS/WAF failover and an audited operations identity.
+
+## Steps
+
+1. Replicate database state, object storage and approved secrets/configuration to the warm standby.
+2. Monitor health and replication lag without allowing the standby to accept writes.
+3. Fence the previous active region before promoting the standby to prevent split-brain budgets, authorization or audit state.
+4. Validate database consistency and run smoke tests before sending traffic through global DNS.
+5. Record the incident, promotion and resulting RPO/RTO; treat failback as a separate audited operation.
+
+## Verify
+
+Run `node scripts/validate_dr_contract.mjs`. During a controlled exercise, measure replication lag, fencing time, consistency checks, smoke-test time and traffic restoration against the RPO/RTO targets.
+
+## Troubleshooting
+
+- A fencing failure blocks promotion; do not accept writes from both regions.
+- A consistency failure blocks traffic; restore from the last valid replicated checkpoint.
+- RPO/RTO breaches require an incident and capacity review, not an untracked DNS switch.
+
+## Security, budget, and audit implications
+
+Only one region writes authoritative state at a time. Secrets use the approved provider, and failover/failback actions are audit records; budget and authorization state must be consistent before traffic is enabled.
+
+## Rollback
+
+Keep the promoted region active until the original region is fenced, repaired and caught up. Perform failback separately with consistency validation, smoke tests and an audit record.

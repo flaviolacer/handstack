@@ -1,0 +1,9 @@
+﻿{
+    "startedAtUtc":  "2026-08-31T18:40:25.2330000Z",
+    "prompts":  1548,
+    "inputTokens":  449359118,
+    "cachedInputTokens":  438107136,
+    "outputTokens":  1115154,
+    "reasoningOutputTokens":  167611,
+    "totalTokens":  450474272
+}

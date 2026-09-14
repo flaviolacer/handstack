@@ -1,0 +1,52 @@
+{
+  "name": "handstack",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "packages/database/*",
+    "plugins/*"
+  ],
+  "packageManager": "npm@11.19.0",
+  "description": "Open-source AI workspace, agent runtime and capability gateway",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "scripts": {
+    "build": "turbo run build --filter=./apps/* --filter=./packages/*",
+    "dev": "turbo run dev --filter=./apps/* --filter=./packages/*",
+    "docs:validate": "npm --prefix packages/docs-engine run validate",
+    "helm:validate": "node scripts/validate_helm_chart.mjs",
+    "helm:release:validate": "node scripts/validate_helm_release.mjs",
+    "release:validate": "node scripts/validate_release_contract.mjs",
+    "resilience:validate": "node scripts/validate_resilience.mjs",
+    "observability:validate": "node scripts/validate_observability.mjs",
+    "frontend:validate": "node scripts/validate_frontend_contract.mjs",
+    "integration:validate": "node scripts/validate_integration_contract.mjs",
+    "openapi:generate": "npm run build && node scripts/generate_openapi.mjs",
+    "openapi:validate": "node scripts/validate_openapi.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "graph:build": "python scripts/build_graph.py",
+    "graph:update": "python scripts/build_graph.py --update",
+    "graph:validate": "python scripts/validate_graph.py",
+    "lint": "turbo run lint --filter=./apps/* --filter=./packages/*",
+    "test": "turbo run test --filter=./apps/* --filter=./packages/*",
+    "typecheck": "turbo run typecheck --filter=./apps/* --filter=./packages/*"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@next/eslint-plugin-next": "^15.5.2",
+    "@types/node": "^22.18.1",
+    "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.3.0",
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.6",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.42.0",
+    "vitest": "^3.2.4"
+  }
+}

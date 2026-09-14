@@ -1,0 +1,58 @@
+---
+id: getting-started/gateway
+title: Usar o Gateway compatível com OpenAI
+description: Emita uma virtual API key governada e chame modelos publicados pelo endpoint compatível com OpenAI.
+audience: [developer, platform-operator]
+permissions: [api-key.manage, models.execute]
+features: [gateway, api-keys, models]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.4.0
+lastReviewedAt: 2026-09-09
+owner: gateway-team
+tags: [gateway, openai, api-keys, rate-limits]
+---
+
+# Usar o Gateway compatível com OpenAI
+
+## Purpose and expected outcome
+
+Emita uma chave virtual vinculada à organização e use o contrato padrão da OpenAI sem expor credenciais de providers. O segredo é exibido somente uma vez.
+
+## Prerequisites
+
+- Um administrador com `api-key.manage`.
+- Um modelo publicado e avaliado e a permissão `models.execute`.
+- Pepper configurado em produção (`HANDSTACK_GATEWAY_KEY_PEPPER`).
+
+## Steps
+
+1. Crie a chave com `POST /api/v1/organizations/{organizationId}/gateway/keys`. Informe `ownerId`, `ownerType`, `name`, `environment` (`live` ou `test`) e uma lista que contenha `models.execute`. Opcionalmente informe aliases/IDs de modelos, orçamento em USD, requisições por minuto e expiração RFC 3339.
+2. Armazene imediatamente o `secret` retornado no gerenciador de secrets do caller. Ele tem formato `hs_live_...` ou `hs_test_` e nunca é retornado novamente. Os metadados incluem prefixo e status baseado em HMAC, nunca o segredo completo ou o hash.
+3. Valide a chave chamando `GET /v1/models` com `Authorization: Bearer <secret>`. Somente modelos publicados permitidos pela chave são retornados.
+4. Envie `POST /v1/chat/completions` com o mesmo bearer, ID interno ou alias e `messages` neutras. O Gateway valida chave, tenant, allowlist, publicação, classificação do provider e uso antes da chamada externa.
+5. Use `stream: true` para receber chunks SSE compatíveis com OpenAI e depois `data: [DONE]`. A credencial nunca aparece nos eventos.
+6. Revogue a chave com `POST /api/v1/organizations/{organizationId}/gateway/keys/{keyId}/revoke`. A revogação é vinculada ao tenant e bloqueia novas chamadas imediatamente.
+
+## Verify
+
+Liste os metadados e confirme que não há `secret` nem `secretHash`. Chame `/v1/models` com uma chave válida e uma revogada; a primeira retorna sucesso e a segunda Problem Details 401. Tente um modelo fora da allowlist e confirme 401 sem tráfego ao provider. Confirme que a auditoria contém somente ID da chave, owner, ambiente, resultado e instante.
+
+## Troubleshooting
+
+- `Bearer virtual API key is required` indica header Authorization ausente ou inválido.
+- `Invalid virtual API key` indica prefixo, organização, segredo, expiração, permissão ou revogação inválidos.
+- `Virtual API key rate limit exceeded` indica que a janela de RPM acabou; tente novamente no próximo minuto UTC.
+- `MODEL_NOT_PUBLISHED` indica que o modelo ainda precisa passar pelo gate de avaliação e publicação.
+- Erro de startup para `HANDSTACK_GATEWAY_KEY_PEPPER` indica que um segredo forte não foi configurado em produção.
+
+## Security, budget, and audit implications
+
+Somente um HMAC do segredo é persistido. A autenticação é constant-time, tenant-scoped, consciente de expiração e revogação e limitada por taxa. O runtime de modelos continua impondo publicação, classificação, saúde do provider, uso e futuros budgets; uma virtual key não contorna esses controles. Emissão e revogação geram eventos de auditoria redigidos.
+
+## Rollback
+
+Revogue a chave afetada. Uma substituta gera novo segredo e não recupera o valor antigo.
+
+## Related API/CLI alternatives
+
+Use as rotas administrativas para lifecycle e qualquer SDK OpenAI alterando somente `baseURL` para o host HandStack e `apiKey` para o segredo retornado.

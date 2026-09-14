@@ -1,0 +1,64 @@
+---
+id: getting-started/overview
+title: HandStack overview
+description: Understand the HandStack architecture and verify the repository foundation.
+audience:
+  - platform-operator
+  - developer
+permissions: []
+features:
+  - platform-foundation
+deploymentProfiles:
+  - compact
+  - distributed
+introducedIn: 0.1.0
+lastReviewedAt: 2026-08-31
+owner: core-team
+tags:
+  - getting-started
+  - architecture
+---
+
+# HandStack overview
+
+HandStack is an open-source AI workspace, agent runtime, gateway, and capability platform. A **Capability** is the central abstraction. Web, REST API, MCP, and Agent channels use the same governed execution engine.
+
+## Purpose and expected outcome
+
+Use this procedure to install dependencies and verify the repository foundation. At the end, all available workspace gates should pass.
+
+## Prerequisites
+
+- Node.js 22 or 24 LTS.
+- npm 11.19.0.
+- A local checkout of HandStack. No application credentials are required.
+
+## Steps
+
+1. From the repository root, run `npm ci`. Expect npm to resolve every workspace without peer-dependency errors.
+2. Run `npm run lint`. Expect every package to report a successful lint task.
+3. Run `npm run typecheck`. Expect strict TypeScript checks to complete without diagnostics.
+4. Run `npm test`. Expect all unit and documentation contract tests to pass.
+5. Run `npm run build`. Expect deployable artifacts under each package or application output directory.
+
+## Verify
+
+Start the API and request `/health/live`. A successful response contains `status: "ok"`. `/health/ready` additionally reports configured dependency checks.
+
+## Troubleshooting
+
+- If Node reports an unsupported engine, install Node.js 22 or 24 LTS and reinstall dependencies.
+- If a workspace cannot resolve, remove no files manually; run `npm ci` again and inspect the first dependency error.
+- If readiness reports an unavailable dependency, validate that dependency's configuration before sending traffic.
+
+## Security, budget, and audit implications
+
+Telemetry is opt-in and disabled by default. Foundation verification does not call an LLM, consume model budget, or require secrets. Health endpoints must never expose credentials or connection strings.
+
+## Rollback
+
+This verification is read-only except for generated dependencies and build outputs. Remove only generated `node_modules`, `dist`, `.next`, and `.turbo` directories if a clean rebuild is required.
+
+## Related articles
+
+- [Use the Help Center](/help/user/help-center)

@@ -1,0 +1,21 @@
+Progresso concreto nesta iteração:
+
+- Corrigidos lint/typecheck do Gateway e da API.
+- `@handstack/gateway`: 4 testes aprovados, incluindo bloqueio/liquidação de budget por API key.
+- Criado `@handstack/budgets` com:
+  - budgets tenant-scoped, reservas idempotentes e settlement transacional;
+  - `UsageRecord`/`CostRecord`;
+  - catálogo de pricing versionado por data (`ModelPricing`) e cálculo de custo por tokens.
+- API administrativa adicionada:
+  - `GET/POST /api/v1/organizations/:organizationId/budgets`
+  - `GET /api/v1/organizations/:organizationId/usage`
+  - `POST /api/v1/organizations/:organizationId/pricing/models`
+  - RBAC `budget.manage` e isolamento cross-tenant.
+- Testes de budgets: 3 aprovados.
+- Testes completos da API: 30 aprovados.
+- Documentação EN/pt-BR, catálogo e rastreabilidade atualizados.
+- `docs:validate`: PASS — 14 artigos, 49 requisitos.
+- Graphify atualizado/validado — 3480 nós, 4820 links dirigidos.
+- Prettier nos arquivos alterados: PASS.
+
+O objetivo global permanece em andamento. Ainda faltam a integração de budgets organization/group/user ao runtime de execuções não originadas por API key, dashboards/agregações de usage e os milestones M7–M18. O marcador `.handstack-codex/COMPLETE` não foi criado.

@@ -1,0 +1,50 @@
+---
+id: getting-started/plugin-contract-suites
+title: Official plugin contract suites
+description: Validate cross-cutting plugin contracts before publishing an extension.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, security, operations]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.58.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, contracts, validation]
+---
+
+# Official plugin contract suites
+
+HandStack extensions SHOULD cover the official cross-cutting suites before they are
+published. The test kit exposes the canonical list and fails closed when a suite is missing.
+
+## Prerequisites
+
+- A plugin package with its manifest and contract probes.
+- `@handstack/plugin-testkit` available to the package.
+- A declared suite list reviewed by the plugin owner.
+
+## Steps
+
+1. Import `officialPluginContractSuites` and `assertOfficialPluginContractCoverage`.
+2. Run the identity and provider-specific probes required by the plugin.
+3. Pass the declared suite IDs to `assertOfficialPluginContractCoverage`.
+4. Block publication when the function raises `PluginContractError`.
+
+The official suites are policy, guardrails, evaluation, privacy lifecycle, sandboxing,
+audit/SIEM export, Knowledge/RAG policy, workflow compensation, webhook transport, and
+incident/status-page behavior.
+
+## Expected results
+
+A complete declaration returns all ten canonical suite IDs. An incomplete declaration
+raises a typed error listing every missing suite, without approving the plugin.
+
+## Verify
+
+Run the package typecheck and focused test suite. Confirm that a complete declaration
+passes and that a declaration containing only one suite fails closed.
+
+## Troubleshooting
+
+If a suite is missing, add the corresponding probe and declaration entry rather than
+silencing the error. Keep suite IDs exactly as exported by the test kit.

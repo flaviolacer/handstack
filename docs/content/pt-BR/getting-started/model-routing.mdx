@@ -1,0 +1,49 @@
+---
+id: getting-started/model-routing
+title: Configurar roteamento de modelos
+description: Selecione candidatos de modelos publicados com políticas isoladas por organização.
+audience: [platform-operator, developer]
+permissions: [models.manage, models.execute]
+features: [models, routing]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.38.0
+lastReviewedAt: 2026-09-11
+owner: ai-platform-team
+tags: [models, routing, reliability]
+---
+
+# Configurar roteamento de modelos
+
+## Purpose and expected outcome
+
+Direcione uma execução para um de vários candidatos publicados usando uma política determinística e isolada por organização.
+
+## Prerequisites
+
+- Definições de modelos publicadas e providers habilitados na mesma organização.
+- `models.manage` para criar políticas e `models.execute` para usá-las.
+
+## Steps
+
+1. Crie uma política com IDs únicos de modelos/providers e escolha `fallback`, `round_robin`, `least_cost`, `least_latency`, `weighted`, `priority`, `random`, `custom` ou `semantic`.
+2. Adicione prioridades, pesos, observações de custo/latência e tags de capability quando aplicável.
+3. Exija tags ou forneça um scorer customizado limitado quando precisar de seleção semântica.
+4. Resolva a política imediatamente antes da execução e passe o ID interno retornado ao runtime do modelo.
+
+## Verify
+
+Confirme que candidatos desabilitados ou sem tags são ignorados, que round-robin avança por política, que pesos respeitam a fonte aleatória e que a falta de scorer falha fechada.
+
+## Troubleshooting
+
+- `NO_ROUTE` indica que nenhum candidato habilitado correspondeu às tags exigidas.
+- `CUSTOM_SCORER_REQUIRED` indica que `custom` ou `semantic` exige um scorer.
+- Erro de escopo indica que a organização da política não corresponde à da execução.
+
+## Security, budget, and audit implications
+
+O roteamento nunca aceita credenciais de provider ou IDs externos de modelos. O modelo interno selecionado continua passando pelas verificações normais de autorização, budget, auditoria e classificação.
+
+## Rollback
+
+Desabilite a política ou remova o candidato afetado; decisões históricas permanecem imutáveis como observações da aplicação.

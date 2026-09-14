@@ -1,0 +1,42 @@
+---
+id: getting-started/incidents
+title: Manage incidents and customer-facing status
+description: Track, escalate and communicate incidents with customer-safe status updates.
+audience: [platform-operator, security-admin]
+permissions: [incidents.manage]
+features: [incidents, status-page, escalation]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.30.0
+lastReviewedAt: 2026-09-10
+owner: platform-team
+tags: [incidents, status-page, escalation, operations]
+---
+
+# Manage incidents and customer-facing status
+
+Incidents are tenant-scoped records with severity, lifecycle state, timeline, corrective actions and
+escalation policies. HandStack transitions them through a bounded state machine
+(`DETECTED` → `INVESTIGATING` → `IDENTIFIED` → `MITIGATING` → `MONITORING` → `RESOLVED` →
+`POSTMORTEM`) and publishes only customer-safe details through a replaceable `StatusPageProvider`.
+
+## Prerequisites
+
+Hold the `incidents.manage` permission and select the organization whose incidents you manage.
+
+## Steps
+
+1. Create an incident with severity, owner and customer impact.
+2. Add timeline entries as the investigation proceeds.
+3. Transition the incident through allowed states.
+4. Attach corrective actions with owners and due dates.
+5. Publish customer-safe status when the incident enters monitoring or resolution.
+
+## Verify
+
+Only allowed transitions succeed, cross-tenant reads fail, and status-page output excludes root cause
+and corrective actions.
+
+## Troubleshooting
+
+A rejected transition indicates an invalid state change; review the allowed transition table. If the
+status-page output is missing, confirm a `StatusPageProvider` is attached.

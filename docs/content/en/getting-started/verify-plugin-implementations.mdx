@@ -1,0 +1,47 @@
+---
+id: getting-started/verify-plugin-implementations
+title: Verify built-in plugin packages
+description: Check that the core packages backing official extension points are available at runtime.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, security, operations]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.60.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, contracts, runtime]
+---
+
+# Verify built-in plugin packages
+
+The official mapping is useful only when its core packages are present in the active
+deployment. Use the injected resolver to verify availability without importing package
+code during catalog or API operations.
+
+## Prerequisites
+
+- The official implementation mapping is loaded.
+- A resolver can answer whether a package is available in the active runtime.
+- Package discovery does not execute untrusted plugin code.
+
+## Steps
+
+1. Implement `OfficialPluginImplementationResolver` for the deployment runtime.
+2. Pass it to `verifyOfficialBuiltInImplementations`.
+3. Keep the result as the release conformance evidence.
+4. Block activation when any core package is unavailable.
+
+## Expected results
+
+Every official suite resolves successfully. A missing package raises a typed
+`PluginContractError` with the `built-in-implementation` check.
+
+## Verify
+
+Run the plugin test kit typecheck, build and focused tests. Exercise both an all-present
+resolver and a resolver that rejects one package.
+
+## Troubleshooting
+
+Check the deployment artifact and package manifest. Do not make the resolver import or
+execute third-party plugin code as a workaround.

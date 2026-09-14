@@ -1,0 +1,39 @@
+---
+id: getting-started/plugin-ui-host
+title: Connect plugin UI registration to the host
+description: Forward typed plugin UI descriptors through the governed PluginHost lifecycle.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, ui, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.51.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, ui, host]
+---
+
+# Connect plugin UI registration to the host
+
+## Prerequisites
+
+- A plugin definition with a typed UI descriptor.
+- A host callback that applies policy and exposes approved descriptors to the UI shell.
+
+## Steps
+
+1. Pass `registerUiExtension` to `PluginHost`.
+2. Register the descriptor from plugin `setup` through `context.ui.register`.
+3. Resolve the descriptor through `PluginUiRegistry.listAuthorized` before rendering it.
+
+## Expected results
+
+UI extensions cross the normal plugin lifecycle and isolation boundary. Disabled plugins and unavailable isolated runtimes cannot publish UI descriptors.
+
+## Verify
+
+Run the Plugin SDK contract tests and confirm the host callback receives the descriptor only when the plugin is enabled.
+
+## Troubleshooting
+
+- No callback means the plugin was not enabled or an isolated runtime is unavailable.
+- The callback should persist only validated descriptors and must not bypass permission filtering.

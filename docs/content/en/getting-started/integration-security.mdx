@@ -1,0 +1,47 @@
+---
+id: getting-started/integration-security
+title: Govern external integrations safely
+description: Validate tenant isolation, bounded delivery and secret handling for external integrations.
+audience: [platform-operator, security-admin, developer]
+permissions: [webhooks.manage, incidents.manage]
+features: [integrations, security, webhooks, notifications]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.0.0
+lastReviewedAt: 2026-09-10
+owner: security-platform-team
+tags: [integrations, security, webhooks, oidc]
+---
+
+# Govern external integrations safely
+
+HandStack routes external systems through replaceable boundaries. The integration contract keeps
+authorization deny-by-default, scopes resources by organization, bounds retries and keeps secrets
+in a `SecretProvider` rather than in configuration or logs.
+
+## Prerequisites
+
+- Access to the repository and the deployment secret manager.
+- A reviewed endpoint or identity-provider configuration for the target organization.
+
+## Steps
+
+1. Review `deploy/integrations/handstack-integration-contract.json` for the integration boundary.
+2. Configure credentials through the external secret provider; never commit credential values.
+3. Configure endpoint allowlists and a timeout appropriate to the external service.
+4. Run `npm run integration:validate` before release.
+5. Exercise the provider with a tenant-scoped test and inspect only redacted delivery/audit metadata.
+
+## Verify
+
+The gate must report deny-by-default, tenant-scoped integrations and no credential-shaped values.
+Webhook deliveries must use HMAC-SHA256, bounded retries, idempotency and a dead-letter path.
+OIDC must declare state, nonce and PKCE validation. A second organization must not resolve or replay
+the first organization's delivery.
+
+## Troubleshooting
+
+- A missing referenced file means the adapter boundary changed without updating the contract.
+- A redaction failure means the integration cannot be released until sensitive headers and fields are
+  excluded from logs, traces and metrics.
+- Real PagerDuty, StatusPage, Redis and provider conformance requires credentials and infrastructure;
+  the offline gate does not claim those external systems are available.

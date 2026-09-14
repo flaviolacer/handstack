@@ -1,0 +1,39 @@
+---
+id: getting-started/plugin-capability-validation
+title: Validar metadados de capability antes do registro
+description: Falhe fechado para IDs, versões, descrições ou permissões de capability inválidos antes do registro no host.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, capabilities, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.55.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, capabilities, validation]
+---
+
+# Validar metadados de capability antes do registro
+
+## Prerequisites
+
+- Um host de plugin com callback de registro de capability.
+- Um descritor com ID minúsculo estável, versão major.minor, descrição e permissões únicas.
+
+## Steps
+
+1. Registre a capability no setup do plugin.
+2. Faça o host chamar `validateCapabilityRegistration` antes de encaminhar o descritor.
+3. Envie apenas descritores válidos ao registry e engine comum.
+
+## Expected results
+
+IDs, versões, descrições vazias e permissões vazias ou duplicadas falham antes do callback.
+
+## Verify
+
+Execute os testes do Plugin SDK e confirme que descritor inválido não produz efeito no registro do host.
+
+## Troubleshooting
+
+- `Capability id is invalid` exige ID minúsculo com letras, dígitos, pontos ou hífens.
+- `Capability permissions must be unique and non-empty` exige metadados explícitos de autorização.

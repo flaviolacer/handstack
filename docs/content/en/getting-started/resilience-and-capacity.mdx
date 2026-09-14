@@ -1,0 +1,49 @@
+---
+id: getting-started/resilience-and-capacity
+title: Validate resilience and capacity
+description: Run offline resilience checks and plan external failure drills.
+audience: [platform-operator, security-admin]
+permissions: [deployment.manage]
+features: [resilience, capacity, disaster-recovery]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.28.0
+lastReviewedAt: 2026-09-10
+owner: platform-team
+tags: [resilience, load, capacity, disaster-recovery]
+---
+
+# Validate resilience and capacity
+
+Run `npm run resilience:validate` before a release. The offline gate verifies bounded spike admission,
+stable idempotency keys and retention of accepted jobs in the dead-letter path.
+
+## Prerequisites
+
+- Install the workspace dependencies with Node 22 or 24 and npm 11.19.0.
+- For external drills, provision the distributed profile dependencies and an isolated test tenant.
+
+## Steps
+
+1. Run `npm run resilience:validate` and keep the output with the release evidence.
+2. Run the external scenarios in the capacity report and record topology, traffic and versions.
+3. Stop the release if accepted jobs are lost, side effects duplicate or tenant isolation fails.
+
+## External release drills
+
+Record the environment and results for load, spike, soak, queue saturation, pod termination during
+streams, worker crash, Redis/database failover, network partition, zone outage, backup restore and
+regional failover. Regional recovery must meet RPO of five minutes and RTO of fifteen minutes.
+
+Use the capacity report in `docs/operations/capacity-report-0.1.md` as the result template. Do not
+claim the SLO targets without reproducible hardware, topology, dataset and traffic measurements.
+
+## Verify
+
+Confirm the offline gate is green, queue depth remains bounded, and the recorded p95/p99 values meet
+the targets for the selected profile. Attach external drill logs to the release record.
+
+## Troubleshooting
+
+- A backpressure failure means the queue limit is working; inspect consumers before increasing it.
+- A transport failure is not safe to bypass; restore Redis/database availability and retry.
+- A failed external drill remains a release blocker until evidence shows recovery and isolation.

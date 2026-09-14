@@ -1,0 +1,39 @@
+---
+id: getting-started/operations-api
+title: Usar APIs governadas de operações
+description: Gerencie feature flags, consultas de audit e jobs limitados dentro da organização.
+audience: [developer, platform-operator, security-admin]
+permissions: [feature-flags.manage, audit.read, jobs.manage]
+features: [operations-api, feature-flags, audit, jobs]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.21.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [api, operations, governance]
+---
+
+# Usar APIs governadas de operações
+
+A API expõe operações tenant-scoped em `/api/v1/organizations/:organizationId`. Todo endpoint
+exige bearer token, organização coincidente e decisão explícita de permissão.
+
+## Prerequisites
+
+- Conceda `feature-flags.read/manage`, `audit.read` ou `jobs.manage` pela policy de identidade.
+- Configure Redis/BullMQ e audit durável em produção.
+
+## Steps
+
+1. Use `GET/PUT /feature-flags/:key` para overrides de organização/usuário.
+2. Use `GET /audit` para evidência append-only da organização atual.
+3. Use `POST /jobs/:queue` com chave de idempotência para enfileirar trabalho limitado.
+
+## Verify
+
+Requests cross-tenant, tokens ausentes e permissões negadas devem falhar. Capacidade da fila retorna
+backpressure tipado; audit nunca devolve outro tenant.
+
+## Troubleshooting
+
+- Erro de permissão exige concessão administrativa do escopo exato.
+- Workers processam jobs; a API apenas enfileira e não drena filas locais.

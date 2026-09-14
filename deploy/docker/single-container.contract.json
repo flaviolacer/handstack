@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "image": "handstack/handstack",
+  "command": "docker run handstack/handstack",
+  "profile": "compact",
+  "services": ["api", "web"],
+  "database": "sqlite",
+  "redis": false,
+  "requiredHealthChecks": ["/health/live", "/health/ready"],
+  "secretPolicy": "external-environment-only",
+  "sourceDockerfiles": ["docker/api.Dockerfile", "docker/web.Dockerfile"],
+  "composeContract": "deploy/docker-compose/compose.yaml",
+  "distributedContract": "deploy/helm/handstack"
+}

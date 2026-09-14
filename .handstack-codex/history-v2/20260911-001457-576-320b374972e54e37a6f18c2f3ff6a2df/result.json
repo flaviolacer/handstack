@@ -1,0 +1,1 @@
+{"state":"progress","summary":"M262 concluído: o PluginHost agora encaminha extensões UI registradas por plugins durante o enable, preservando lifecycle e isolamento. Documentação e catálogo atualizados.","next_step":"Avançar para o próximo requisito MUST ainda não implementado.","blockers":[],"completed_requirements":["HS-CORE-013"],"all_requirements_verified":false}

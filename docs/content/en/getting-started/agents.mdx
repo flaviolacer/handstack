@@ -1,0 +1,43 @@
+---
+id: getting-started/agents
+title: Run governed agents
+description: Configure a published agent loop that invokes capabilities through the common execution engine.
+audience: [developer, platform-operator]
+permissions: [agent.run, capability.execute]
+features: [agents, capabilities, budgets]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.7.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [agents, tools, llm]
+---
+
+# Run governed agents
+
+An AgentVersion binds a model, system prompt, declared capability tools, timeout and iteration
+limit. The harness emits lifecycle events and never invokes an undeclared tool.
+
+`AgentOrchestrator` supports sequential, bounded parallel and supervisor delegation. Memory and
+guardrails remain explicit contracts so retention and safety policies can be applied per stage.
+
+## Prerequisites
+
+- A published agent version and an approved model route.
+- `agent.run` and the capability permissions required by its tools.
+
+## Steps
+
+1. Publish the immutable AgentVersion with a bounded iteration and timeout policy.
+2. Submit a prompt to the harness with the tenant and principal context.
+3. Observe `agent.started`, step, tool, completed or failed events.
+
+## Verify
+
+Use a test model that emits a tool call followed by a final answer. Confirm the tool is executed
+through CapabilityExecutionEngine, undeclared tools are rejected, and abort/timeout stops the run.
+
+## Troubleshooting
+
+- `Agent version is not published` means the draft cannot execute.
+- `Agent requested an undeclared tool` means the version tool allowlist must be updated and republished.
+- Iteration-limit and budget failures are terminal and emit `agent.failed`.

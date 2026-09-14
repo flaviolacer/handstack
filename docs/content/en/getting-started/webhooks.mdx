@@ -1,0 +1,53 @@
+---
+id: getting-started/webhooks
+title: Deliver signed webhooks safely
+description: Configure HMAC-signed event delivery with bounded retries and dead-letter evidence.
+audience: [developer, platform-operator]
+permissions: [webhooks.manage]
+features: [webhooks, audit]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.26.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [webhooks, security, operations]
+---
+
+# Deliver signed webhooks safely
+
+`@handstack/webhooks` signs the canonical JSON body with HMAC-SHA256. Receivers must verify the
+`sha256=` signature with a constant-time comparison before processing an event.
+
+The dispatcher retries transient transport failures with bounded exponential backoff. A poison
+delivery is retained in a dead-letter collection with its organization, event, attempt count and
+redacted error for operator recovery.
+
+Use a unique delivery id for idempotency and rotate endpoint secrets through the secret provider.
+
+## Prerequisites
+
+- A tenant webhook endpoint and a secret of at least 16 characters.
+
+## Steps
+
+1. Register the endpoint and keep its secret outside source control.
+2. Dispatch events with a unique delivery id.
+3. Verify `sha256=` before accepting the body and deduplicate the id.
+
+The tenant-scoped API exposes `POST /api/v1/organizations/:organizationId/webhooks/configuration`,
+`POST .../webhooks/deliveries`, `GET .../webhooks/deliveries`, `GET .../webhooks/dead-letters`, and
+`POST .../webhooks/dead-letters/:deliveryId/replay`. All routes require the
+`webhooks.manage` permission and exact organization scope.
+
+Use `GET .../webhooks/deliveries?status=DEAD_LETTERED` to inspect a filtered delivery history.
+The response is tenant-scoped and never includes configured webhook secrets.
+
+## Verify
+
+Force one transient failure and confirm the second attempt succeeds; force a poison endpoint and
+confirm the delivery appears in dead-letter state.
+
+## Troubleshooting
+
+- A signature mismatch means the exact raw body or secret changed before verification.
+- Dead-letter records require operator replay after the endpoint is repaired.
+- An invalid `status` query is rejected; use `PENDING`, `DELIVERED`, `RETRYING`, or `DEAD_LETTERED`.

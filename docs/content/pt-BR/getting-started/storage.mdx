@@ -1,0 +1,45 @@
+---
+id: getting-started/storage
+title: Armazenar arquivos com isolamento por tenant
+description: Use o provider de storage e a política de upload para proteger arquivos.
+audience: [developer, platform-operator]
+permissions: [storage.read, storage.write]
+features: [storage, file-security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.15.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [storage, uploads, security]
+---
+
+# Armazenar arquivos com isolamento por tenant
+
+O contrato `StorageProvider` mantém operações de objetos atrás de uma fronteira substituível.
+Cada operação carrega o id da organização, impedindo leitura de chaves de outro tenant.
+
+Os adapters oficiais são Local, S3, Cloudflare R2, Azure Blob e GCS. Clientes SDK são injetados
+atrás do mesmo contrato, permitindo testes offline com backend em memória.
+
+## Prerequisites
+
+- Configure um provider (object storage em produção ou `InMemoryStorageProvider` em testes).
+- Defina bytes máximos, MIME types e extensões permitidas.
+- Conecte um hook de malware scan antes de aceitar uploads.
+
+## Steps
+
+1. Valide nome, MIME type e tamanho com `validateUpload`.
+2. Faça o scan dos bytes antes de chamar `put`.
+3. Persista os metadados retornados e use `signedUrl` para downloads temporários.
+4. Remova objetos pelo provider em fluxos de retenção ou privacidade.
+
+## Verify
+
+Confirme que objetos não podem ser lidos ou assinados entre organizações, que a expiração é
+positiva e que falhas do scanner rejeitam o upload sem persistência.
+
+## Troubleshooting
+
+- Objeto não encontrado pode indicar contexto de organização incorreto, não chave ausente.
+- Mantenha credenciais no secret manager, nunca em metadados de objetos.
+- Adapters de produção devem aplicar a mesma política de MIME, extensão e malware dos testes.

@@ -1,0 +1,46 @@
+---
+id: getting-started/governance-workflows
+title: Govern actions and resume workflows
+description: Combine ABAC decisions, human approvals and durable workflow execution.
+audience: [developer, platform-operator]
+permissions: [policy.manage, workflow.manage]
+features: [policy, approvals, workflows]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.13.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [policy, approvals, workflows]
+---
+
+# Govern actions and resume workflows
+
+Policy evaluation is deny-by-default and supports tenant, principal, group, time and attribute
+conditions. Workflow graphs can pause at a Human Approval node and resume only after all required
+approvers approve the same request.
+
+## Prerequisites
+
+- Organization-scoped policies and approver identities.
+- A published workflow graph with a supported trigger.
+
+## Steps
+
+1. Evaluate resource/action with `PolicyEngine` and explicit attributes.
+2. Start a manual, API, webhook, schedule or event workflow.
+3. Persist the execution and approval id when a human node pauses it.
+4. Approve and resume using the same organization and execution id.
+5. Read `GET /api/v1/organizations/{organizationId}/workflows/{workflowId}/executions/{executionId}/steps`
+   to inspect the tenant-scoped checkpoint history after a restart or failure.
+
+## Verify
+
+Check explicit deny precedence, cross-tenant denial, approval quorum, and recovery after process
+restart using the configured execution repository. The steps response must contain only checkpoints
+for the requested execution and must preserve the `RUNNING`, `COMPLETED`, `WAITING_APPROVAL` or
+`FAILED` transitions.
+
+## Troubleshooting
+
+- `no matching policy` is an intentional deny, not a transient error.
+- Resume requires every configured approver and a non-expired approval.
+- Invalid graph edges or duplicate node ids fail before publication.

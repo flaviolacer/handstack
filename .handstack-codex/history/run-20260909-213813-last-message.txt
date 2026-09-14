@@ -1,0 +1,1 @@
+Sem novas alterações neste turno. O estado local permanece validado; as pendências externas continuam registradas no `STATUS.md` e impedem a criação de `COMPLETE`.

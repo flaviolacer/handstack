@@ -1,0 +1,17 @@
+Progresso adicional nesta iteração:
+
+- M7 reforçado com `PersistentCapabilityRegistry`, persistindo metadados tenant-scoped e mantendo handlers carregados explicitamente no runtime.
+- Novo package `@handstack/agents`:
+  - `Agent`, `AgentVersion`, `AgentHarness` e `AgentRunResult`;
+  - loop LLM com timeout, `AbortSignal` e limite de iterações;
+  - allowlist de tools;
+  - execução de tools exclusivamente via `CapabilityExecutionEngine` no canal `AGENT`;
+  - eventos de ciclo de vida (`started`, `step`, `tool`, `completed`, `failed`).
+- Testes do Agent Harness: 2 aprovados.
+- API continua validada: lint/typecheck/build e 31 testes aprovados.
+- Documentação EN/pt-BR e rastreabilidade atualizadas para M8.
+- `docs:validate`: PASS — 18 artigos, 51 requisitos.
+- Graphify atualizado/validado — 3661 nós, 5043 links dirigidos.
+- Prettier: PASS.
+
+O objetivo integral ainda está em andamento. Persistência/versionamento completo de Agents, MCP Client/Server, Plugin SDK/UI, Knowledge, Governance, Multi-agent, Workflows, Marketplace e hardening de produção ainda precisam ser implementados. O marcador `.handstack-codex/COMPLETE` permanece inexistente.

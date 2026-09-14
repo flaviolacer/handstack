@@ -1,0 +1,43 @@
+---
+id: getting-started/privacy-lifecycle
+title: Govern privacy and data lifecycle
+description: Apply classification, retention, legal hold, subject requests and residency controls.
+audience: [developer, platform-operator, security-admin]
+permissions: [privacy.manage, privacy.request]
+features: [privacy, retention, residency]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.17.0
+lastReviewedAt: 2026-09-09
+owner: security-platform-team
+tags: [privacy, retention, compliance]
+---
+
+# Govern privacy and data lifecycle
+
+The privacy package provides adapter-neutral contracts for retention planning, legal holds, data
+subject requests and residency authorization. Providers must keep organization scope on every
+operation and must not bypass an active legal hold.
+
+## Prerequisites
+
+- Define retention days per resource type and organization.
+- Register approved regions and provider data-classification policies.
+- Require identity verification before approving subject requests.
+
+## Steps
+
+1. Plan lifecycle actions from resource timestamps and retention policy.
+2. Execute only after retention elapsed; active legal holds return a non-deleting result.
+3. Process access/export/deletion requests with durable evidence.
+4. Authorize placement before writing primary, vector, object or queue data.
+
+## Verify
+
+Test tenant mismatch rejection, legal-hold blocking, approved-request gating and disallowed
+regions. Privacy settings should independently control prompt, response, tool-payload and telemetry
+storage.
+
+## Troubleshooting
+
+- A deletion result blocked by legal hold is expected; release the hold through an audited admin flow.
+- Unknown regions and unapproved requests are denied by default.

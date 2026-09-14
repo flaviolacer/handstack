@@ -1,0 +1,84 @@
+---
+id: getting-started/authentication-sessions
+title: Configure local authentication sessions
+description: Configure secure access and refresh token handling for the HandStack API.
+audience:
+  - platform-operator
+  - developer
+permissions: []
+features:
+  - identity
+deploymentProfiles:
+  - compact
+  - distributed
+introducedIn: 0.2.0
+lastReviewedAt: 2026-09-01
+owner: identity-team
+tags:
+  - authentication
+  - security
+---
+
+# Configure local authentication sessions
+
+## Purpose and expected outcome
+
+Configure the API so local users receive a short-lived access token and a rotating refresh credential that is never exposed in a JSON response.
+
+## Prerequisites
+
+- An active organization and local user with an Argon2id password.
+- TLS at the public API boundary because refresh cookies are always `Secure`.
+- Two independent random secrets of at least 32 characters.
+
+## Steps
+
+1. Set `HANDSTACK_ACCESS_TOKEN_SECRET` and `HANDSTACK_TOKEN_PEPPER`. Production startup rejects missing values.
+2. Send the organization ID, username, and password to `POST /auth/login`.
+3. Keep the returned access token only in application memory. The API sets the refresh credential as an `HttpOnly`, `Secure`, `SameSite=Strict` cookie scoped to `/auth`.
+4. Send `POST /auth/refresh` with the cookie and `x-handstack-csrf: 1`. The response replaces the cookie; never retry an older refresh credential.
+5. Send the access token as `Authorization: Bearer <token>` to protected routes. Use `POST /auth/logout` to revoke its persistent session.
+
+For OIDC, persist an organization provider with an HTTPS issuer and callback URI. Store only an `env://HANDSTACK_SECRET_*` reference in `clientSecretReference`; put the actual value in that environment variable. `GET /auth/oidc/{organizationId}/providers` returns safe login choices, and `/auth/oidc/{organizationId}/{providerSlug}/start` begins Authorization Code with PKCE. The callback validates state, nonce, issuer, audience, signature, and linking/JIT policy before issuing the same HandStack session format.
+
+Set the organization login policy to `LOCAL_ALLOWED`, `LOCAL_DISABLED`, `SSO_REQUIRED`, or `SPECIFIC_IDP_REQUIRED`. A specific-provider policy must reference an enabled provider in the same organization. Local emergency access remains denied unless break-glass is explicitly enabled, the user is registered within the configured account limit, and a dedicated password of at least 20 characters is set. Disable the registration immediately after the incident.
+
+Identity administrators use `/organizations/{organizationId}/identity/providers`, `/login-policy`, and `/break-glass/{userId}` with a Bearer session whose principal has `identity.manage`. The organization in the route must equal the token organization. Provider responses expose `hasClientSecret` but never expose the secret reference or value.
+
+The responsive `/settings/identity-providers` page provides the same provider and enforcement controls. Its administrative session form holds the organization and Bearer token only in page memory; reloading clears both. Disable operations require confirmation and every state links back to this guide.
+
+Group and role mappings are explicit allowlist rows in the form `claim=value|GROUP or ROLE|target ID`. Configure them from each provider card or with the provider `/mappings` API. On JIT, verified-email linking, and later logins, exact string claim values add mapped assignments and remove stale IdP-created assignments. Existing manual memberships and roles are never removed.
+
+Before enabling a provider, use **Test connection** or `POST /organizations/{organizationId}/identity/providers/{providerId}/test-connection`. The check downloads the standard discovery document and JWKS under a five-second timeout, rejects redirects and non-HTTPS endpoints, requires an exact issuer match and at least one typed signing key, and limits each document to 256 KiB. Its response contains only a closed stage and result code; remote URLs, response bodies, transport errors, client IDs, and secret references are never returned or audited.
+
+To remove access for a departing user, call `PATCH /organizations/{organizationId}/identity/users/{userId}/deprovision` with `identity.manage`. The transaction disables the user, principal, and organization membership and revokes all sessions, API keys, and break-glass access. It deliberately preserves external identity links and audit history. Repeating the operation is safe and reports zero newly revoked credentials.
+
+## Verify
+
+Call `GET /auth/session` with the access token and confirm that it returns the expected subject, organization, and session IDs. After logout, the same access token must receive HTTP 401.
+
+## Troubleshooting
+
+- HTTP 401 during login means the username/password pair is invalid or the user is disabled.
+- HTTP 403 during refresh means the CSRF header is missing.
+- A replayed refresh credential revokes its session; perform a new login.
+- If OIDC linking is denied, explicitly enable verified-email linking or JIT for that provider; neither is enabled by default.
+- A failed connection test reports whether discovery or JWKS failed. Check the IdP configuration and availability in its own console; HandStack deliberately omits remote response details.
+
+## Security, budget, and audit implications
+
+Never put access or refresh tokens in `localStorage`. Authentication responses use `Cache-Control: no-store`; only refresh-token hashes are persisted. This flow consumes no model budget.
+
+Identity-provider changes, policy changes, successful and failed logins, JIT creation, external linking, and break-glass activity are written to the tenant-scoped audit store. Audit details exclude passwords, tokens, client secrets, and identity claims.
+
+Identity and authentication records use the configured canonical database adapter. Repository namespaces are versioned and stable across upgrades; run `handstack migrate` before starting a newer release and include identity records in the standard portable backup workflow.
+
+When opt-in OpenTelemetry is enabled, SSO start/callback and identity administration emit `handstack_identity_operations_total`, `handstack_identity_operation_duration_ms`, and bounded spans. Exported dimensions contain only the closed operation name and success/failure outcome; exception messages, organization/user/provider identifiers, claims, and credentials are excluded.
+
+## Rollback
+
+Revoke the affected session or all sessions for the principal. Rotate both server secrets during a coordinated maintenance window to invalidate all existing credentials.
+
+## Related articles
+
+- [HandStack overview](/help/getting-started/overview)

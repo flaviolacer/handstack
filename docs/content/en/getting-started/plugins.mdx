@@ -1,0 +1,43 @@
+---
+id: getting-started/plugins
+title: Install governed plugins
+description: Validate, approve and lifecycle-manage trusted or isolated HandStack plugins.
+audience: [developer, platform-operator]
+permissions: [plugin.manage]
+features: [plugins, capabilities, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.10.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [plugins, sdk, supply-chain]
+---
+
+# Install governed plugins
+
+`@handstack/plugin-sdk` validates a manifest, records a SHA-256 source checksum and requires an
+administrator to approve every declared permission. Official trusted plugins may run in-process;
+community plugins require an isolated RPC runner.
+
+## Prerequisites
+
+- A package exposing `definePlugin` with an API-compatible manifest.
+- Administrator approval for requested network, filesystem, secrets, database, identity, MCP or
+  model permissions.
+
+## Steps
+
+1. Define and validate the manifest and lifecycle hooks.
+2. Install with immutable source bytes and review the recorded checksum.
+3. Approve only the requested permissions, then enable in the intended mode.
+4. Disable or uninstall through the host lifecycle when retiring a plugin.
+
+## Verify
+
+Check that a checksum is recorded, unapproved permissions cannot be elevated, isolated plugins
+fail closed without an RPC runner, and lifecycle hooks execute in order.
+
+## Troubleshooting
+
+- `isolated plugin runner is unavailable` means the deployment has no worker/RPC boundary.
+- A duplicate name requires uninstalling or versioning the existing installation.
+- Never place secret values in a manifest or plugin audit metadata.

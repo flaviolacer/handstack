@@ -1,0 +1,48 @@
+---
+id: getting-started/official-plugin-implementations
+title: Verificar implementacoes oficiais de plugins
+description: Confirme que cada ponto critico de extensao possui implementacao built-in do HandStack.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, security, operations]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.59.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, contracts, built-in]
+---
+
+# Verificar implementacoes oficiais de plugins
+
+O HandStack mantem os pontos criticos utilizaveis sem pacotes de terceiros. O test kit
+publica o mapeamento canonico entre suites e pacotes e rejeita implementacao vazia ou
+que nao seja built-in.
+
+## Prerequisites
+
+- `@handstack/plugin-testkit` compilado.
+- A verificacao de cobertura das suites disponivel.
+- O perfil de deploy com os pacotes core referenciados.
+
+## Steps
+
+1. Importe `assertOfficialBuiltInImplementations`.
+2. Execute-o durante a conformidade dos contratos do plugin.
+3. Use o mapeamento retornado para exibir o pacote core de cada suite.
+4. Bloqueie a release quando faltar mapeamento ou a entrada nao for built-in.
+
+## Expected results
+
+As dez suites oficiais resolvem para um pacote HandStack nao vazio com `builtIn: true`.
+A verificacao lanca `PluginContractError` com `built-in-implementation` se a invariavel
+for violada.
+
+## Verify
+
+Execute typecheck, build e testes focais do test kit. Confirme dez entradas e que todas
+estao marcadas como built-in.
+
+## Troubleshooting
+
+Nao substitua um mapeamento ausente por pacote de terceiros. Adicione ou corrija a
+implementacao oficial core e mantenha o mapeamento ligado ao caminho do pacote.

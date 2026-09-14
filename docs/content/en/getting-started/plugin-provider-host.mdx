@@ -1,0 +1,39 @@
+---
+id: getting-started/plugin-provider-host
+title: Connect provider registration to the host
+description: Forward typed model, embedding, storage and notification provider descriptors through the PluginHost lifecycle.
+audience: [platform-operator, developer]
+permissions: [plugins.manage]
+features: [plugins, providers, security]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.53.0
+lastReviewedAt: 2026-09-11
+owner: platform-team
+tags: [plugins, providers, host]
+---
+
+# Connect provider registration to the host
+
+## Prerequisites
+
+- A plugin definition with a typed provider descriptor.
+- A host callback that validates the provider and routes it to the appropriate registry.
+
+## Steps
+
+1. Pass `registerProvider` to `PluginHost`.
+2. Register a model, embedding, storage, notification or other provider from `context.providers.register`.
+3. Apply tenant policy and the provider-specific execution boundary before the provider is usable.
+
+## Expected results
+
+Provider descriptors are published only during enabled plugin setup and are not confused with executable provider instances.
+
+## Verify
+
+Run the Plugin SDK contract tests and confirm the host callback receives each descriptor once when the plugin is enabled.
+
+## Troubleshooting
+
+- No callback means the plugin was not enabled or an isolated runner is unavailable.
+- Provider registration does not authorize access; the normal model, storage or notification policy still applies.

@@ -1,0 +1,40 @@
+---
+id: getting-started/operations-api
+title: Use governed operations APIs
+description: Manage feature flags, audit queries and bounded jobs within an organization.
+audience: [developer, platform-operator, security-admin]
+permissions: [feature-flags.manage, audit.read, jobs.manage]
+features: [operations-api, feature-flags, audit, jobs]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.21.0
+lastReviewedAt: 2026-09-09
+owner: platform-team
+tags: [api, operations, governance]
+---
+
+# Use governed operations APIs
+
+The API exposes tenant-scoped operations under `/api/v1/organizations/:organizationId`.
+Every endpoint requires a bearer access token, matching organization context and an explicit
+permission decision.
+
+## Prerequisites
+
+- `feature-flags.read/manage`, `audit.read` or `jobs.manage` granted by the identity policy.
+- Redis/BullMQ and durable audit storage configured for production.
+
+## Steps
+
+1. `GET/PUT /feature-flags/:key` to resolve or set organization/user overrides.
+2. `GET /audit` to query append-only evidence for the current organization.
+3. `POST /jobs/:queue` with an idempotency key to enqueue bounded work.
+
+## Verify
+
+Cross-organization requests, missing bearer tokens and denied permissions must fail. Queue capacity
+returns typed backpressure with retry guidance; audit responses never include another tenant.
+
+## Troubleshooting
+
+- A permission error is expected until an administrator grants the exact operation scope.
+- Use the worker deployment for processing; the API only enqueues and never drains local queues.

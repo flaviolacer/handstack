@@ -1,0 +1,15 @@
+{
+    "exitCode":  0,
+    "completed":  true,
+    "failed":  false,
+    "usage":  {
+                  "input_tokens":  115254,
+                  "cached_input_tokens":  69120,
+                  "cache_write_input_tokens":  0,
+                  "output_tokens":  672,
+                  "reasoning_output_tokens":  243
+              },
+    "errors":  [
+
+               ]
+}

@@ -1,0 +1,42 @@
+---
+id: getting-started/portable-backup
+title: Back up and restore HandStack
+description: Create signed, tenant-aware portable backups and restore them safely.
+audience: [platform-operator, security-admin]
+permissions: [database.admin]
+features: [database, backup, portability]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.1.0
+lastReviewedAt: 2026-09-10
+owner: platform-team
+tags: [backup, restore, database, portability]
+---
+
+# Back up and restore HandStack
+
+Use `handstack backup` to create a streaming NDJSON backup. The file contains signed portable
+records plus adapter and schema metadata; secrets are never written in clear text.
+
+## Prerequisites
+
+- Set `HANDSTACK_DATABASE_ADAPTER`, `HANDSTACK_DATABASE_URL` and
+  `HANDSTACK_PORTABLE_SIGNING_KEY` (at least 16 characters).
+- Ensure the destination is protected and has enough free space.
+
+## Steps
+
+1. Create a backup with `handstack backup --output backup.ndjson --export-id backup-2026-09-10`.
+2. Keep the signed file immutable; `handstack restore` verifies all portable frames before commit.
+3. Before restore, run `handstack doctor` against the target database and confirm its adapter and
+   schema are compatible.
+4. Restore with `handstack restore --input backup.ndjson --export-id backup-2026-09-10`.
+
+## Verify
+
+Confirm that the restore reports the expected record count, that the target organization can read
+only its own records, and that a repeated restore resumes or rejects duplicate work safely.
+
+## Troubleshooting
+
+- An adapter mismatch is intentional: restore into a database with the same configured adapter.
+- A signature or checksum error means the backup changed or the signing key is incorrect.
