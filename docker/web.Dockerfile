@@ -3,6 +3,7 @@ WORKDIR /workspace
  
 COPY . .
 RUN npm ci
+RUN npm --workspace @handstack/docs-engine run build
 RUN npm --workspace @handstack/web run build
 
 FROM node:22.19.0-bookworm-slim AS runtime

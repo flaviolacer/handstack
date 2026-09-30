@@ -76,6 +76,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm --workspace @handstack/docs-engine run build
       - run: npm --workspace @handstack/web run build
       - run: npm --workspace @handstack/web exec -- playwright install chromium firefox webkit
       - run: npm --workspace @handstack/web run test:e2e
