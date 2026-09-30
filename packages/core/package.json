@@ -15,6 +15,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "redis": "^5.8.2"
+    "redis": "^6.2.1"
   }
 }
