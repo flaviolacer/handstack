@@ -16,6 +16,6 @@
   },
   "dependencies": {
     "@handstack/domain": "file:../../domain",
-    "mongodb": "^6.19.0"
+    "mongodb": "^7.6.0"
   }
 }
