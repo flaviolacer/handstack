@@ -21,6 +21,6 @@
     "@handstack/config": "file:../config",
     "@handstack/database": "file:../database",
     "yaml": "^2.8.1",
-    "tsx": "^4.20.5"
+    "tsx": "^4.23.15"
   }
 }
