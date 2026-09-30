@@ -14,7 +14,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1132.0",
+    "@aws-sdk/client-s3": "3.1141.0",
     "@handstack/domain": "file:../domain",
     "@handstack/shared": "file:../shared",
     "mongodb": "^6.19.0",
