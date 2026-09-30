@@ -22,3 +22,8 @@ artifacts/certification/
 apps/api/.handstack-data/
 **/*.tsbuildinfo
 apps/web/tests/e2e/snapshots/
+# Local agent instructions are workspace metadata, not project source.
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+COPILOT.md
