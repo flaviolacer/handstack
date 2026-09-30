@@ -11,6 +11,7 @@ const command = process.platform === 'win32' ? 'next.cmd' : 'next';
 const child = spawn(command, [mode, ...extraArgs, '--port', String(port)], {
   env: { ...process.env, PORT: String(port) },
   stdio: 'inherit',
+  shell: process.platform === 'win32',
   windowsHide: true,
 });
 
