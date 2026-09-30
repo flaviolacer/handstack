@@ -46,10 +46,6 @@ const compose = readFileSync(join(root, 'deploy', 'docker-compose', 'compose.yam
 const kubernetes = readFileSync(join(root, 'deploy', 'kubernetes', 'handstack.yaml'), 'utf8');
 const openapi = JSON.parse(readFileSync(join(root, 'docs', 'api', 'openapi.json'), 'utf8'));
 const catalog = readFileSync(join(root, 'docs', 'requirements', 'catalog.yaml'), 'utf8');
-const specificationPath = existsSync(join(root, 'handstack-master-specification-v1.md'))
-  ? join(root, 'handstack-master-specification-v1.md')
-  : join(root, '..', 'handstack-master-specification-v1.md');
-const specification = readFileSync(specificationPath, 'utf8');
 const adminNavigation = readFileSync(
   join(root, 'apps', 'web', 'app', 'admin-navigation.tsx'),
   'utf8',
@@ -186,7 +182,7 @@ const certificationGaps = [
 const specificationGaps = [...implementationGaps, ...certificationGaps];
 
 const result = {
-  specificationNumberedSections: [...specification.matchAll(/^##\s+\d+\./gmu)].length,
+  catalogRequirementCount: (catalog.match(/^\s+- id:/gmu) ?? []).length,
   catalogScopeStatus: /^scopeStatus:\s*(\S+)/mu.exec(catalog)?.[1] ?? 'unspecified',
   openapiPaths: Object.keys(openapi.paths ?? {}).length,
   catalogStatusCounts: {
