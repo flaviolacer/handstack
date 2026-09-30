@@ -63,6 +63,16 @@ export class AccessController {
     });
   }
 
+  @Get('grants')
+  @ApiOperation({ summary: 'List active and revoked access grants' })
+  async grants(
+    @Param('organizationId') organizationId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    await this.authorize(organizationId, request, 'access.read');
+    return { items: await this.runtime.access.listGrants(organizationId) };
+  }
+
   @Post(':requestId/approve')
   @ApiOperation({ summary: 'Approve an access request' })
   async approve(
@@ -82,11 +92,12 @@ export class AccessController {
   @ApiOperation({ summary: 'Revoke an access grant' })
   async revoke(
     @Param('organizationId') organizationId: string,
+    @Param('requestId') requestId: string,
     @Param('grantId') grantId: string,
     @Req() request: AuthenticatedRequest,
   ) {
     await this.authorize(organizationId, request, 'access.approve');
-    return await this.runtime.access.revoke(organizationId, grantId);
+    return await this.runtime.access.revoke(organizationId, grantId, requestId);
   }
 
   private async authorize(

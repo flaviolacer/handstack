@@ -41,12 +41,14 @@ describe('notifications', () => {
   });
   it('routes SMTP and webhook providers through narrow transports', async () => {
     let email = '';
+    let emailOrganization = '';
     let webhook = '';
     const dispatcher = new NotificationDispatcher([
       new SmtpNotificationProvider(
         {
-          send: ({ to }) => {
+          send: ({ organizationId, to }) => {
             email = to;
+            emailOrganization = organizationId ?? '';
             return Promise.resolve();
           },
         },
@@ -65,6 +67,7 @@ describe('notifications', () => {
     await dispatcher.send({ ...notification, id: 'email', channel: 'EMAIL' });
     await dispatcher.send({ ...notification, id: 'hook', channel: 'WEBHOOK' });
     expect(email).toBe('user@example.test');
+    expect(emailOrganization).toBe('org-a');
     expect(webhook).toContain('"organizationId":"org-a"');
   });
   it('resolves webhook endpoint once per delivery', async () => {

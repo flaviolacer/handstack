@@ -19,6 +19,8 @@
   "dependencies": {
     "@handstack/audit": "file:../audit",
     "@handstack/config": "file:../config",
-    "@handstack/database": "file:../database"
+    "@handstack/database": "file:../database",
+    "yaml": "^2.8.1",
+    "tsx": "^4.20.5"
   }
 }

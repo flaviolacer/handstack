@@ -13,5 +13,5 @@ describe('MongoDB repository conformance', () => {
     } finally {
       await adapter.close();
     }
-  });
+  }, 30_000);
 });

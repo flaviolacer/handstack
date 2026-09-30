@@ -2,13 +2,12 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import { once } from 'node:events';
 import { createInterface } from 'node:readline';
 import type { DatabaseCommandRuntime } from './database-command.js';
+import { requiredPortableSigningKey } from './runtime-config.js';
 
 export function createFileRuntime(environment: NodeJS.ProcessEnv): DatabaseCommandRuntime {
   return {
     signingKey() {
-      const key = environment.HANDSTACK_PORTABLE_SIGNING_KEY;
-      if (key === undefined) throw new Error('HANDSTACK_PORTABLE_SIGNING_KEY is required');
-      return key;
+      return requiredPortableSigningKey(environment);
     },
     async *read(path) {
       const input = createReadStream(path, { encoding: 'utf8' });

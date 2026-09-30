@@ -23,6 +23,7 @@ import {
   type IdentityMapping,
   type IdentityMappingGrant,
   type Organization,
+  type OrganizationSettings,
   type OrganizationLoginPolicy,
   type OrganizationMembership,
   type OrganizationOwnedEntity,
@@ -53,6 +54,7 @@ const names = {
   sessions: repositoryName('auth-sessions'),
   apiKeys: repositoryName('auth-api-keys'),
   oidcTransactions: repositoryName('auth-oidc-transactions'),
+  organizationSettings: repositoryName('identity-organization-settings'),
 } as const;
 
 /**
@@ -131,6 +133,7 @@ export interface OrganizationStores {
   readonly sessions: ScopedRepository<Session>;
   readonly apiKeys: ScopedRepository<ApiKey>;
   readonly oidcTransactions: ScopedRepository<OidcAuthorizationTransaction>;
+  readonly organizationSettings: ScopedRepository<OrganizationSettings>;
 }
 
 function scoped<T extends OrganizationOwnedEntity>(
@@ -167,14 +170,24 @@ function organizationStores(
     sessions: scoped(context, organizationId, names.sessions),
     apiKeys: scoped(context, organizationId, names.apiKeys),
     oidcTransactions: scoped(context, organizationId, names.oidcTransactions),
+    organizationSettings: scoped(context, organizationId, names.organizationSettings),
   };
 }
 
 export class IdentityStorage {
-  readonly organizations: Repository<Organization>;
+  constructor(private readonly adapter: DatabaseAdapter) {}
 
-  constructor(private readonly adapter: DatabaseAdapter) {
-    this.organizations = adapter.repository<Organization>(names.organizations);
+  /**
+   * Resolve repositories lazily so adapters that connect asynchronously (MongoDB)
+   * are not accessed while Nest is still constructing providers.
+   */
+  get organizations(): Repository<Organization> {
+    return this.adapter.repository<Organization>(names.organizations);
+  }
+
+  async listOrganizations(): Promise<readonly Organization[]> {
+    const result = await this.adapter.listAll?.<Organization>(names.organizations, { limit: 200 });
+    return result?.items ?? [];
   }
 
   forOrganization(organizationId: string): OrganizationStores {

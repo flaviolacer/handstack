@@ -65,3 +65,12 @@ uma vaga de concorrência volta a ficar disponível após `release`.
   verificação deve carregar um id de organização não vazio.
 - No perfil distribuído, substitua o store em memória por um store compartilhado para que as
   réplicas coordenem os mesmos contadores em vez de impor limites independentes.
+
+## Limite de chat da plataforma
+
+`rateLimits.chat`, configurado no arquivo/env (`HANDSTACK_RATE_LIMITS_JSON`), limita o início de
+execuções de chat por organização, por minuto. Por exemplo, `{"chat":120}` permite até 120
+execuções em cada janela UTC de um minuto; a próxima recebe HTTP `429`. Sem a chave `chat`, o
+endpoint não aplica esse limite. O perfil compacto mantém contadores no processo; o perfil
+distribuído coordena as réplicas pelo Redis configurado em `queue.redisUrl` e falha fechado se o
+Redis não puder aplicar a contagem.

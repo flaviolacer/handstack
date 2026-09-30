@@ -30,7 +30,7 @@ describe('canonical documentation', () => {
     const result = validateGovernance();
     expect(result.errors).toEqual([]);
     expect(result.requirementCount).toBeGreaterThanOrEqual(47);
-    expect(result.contextualHelpTargetCount).toBeGreaterThanOrEqual(4);
+    expect(result.contextualHelpTargetCount).toBe(33);
   });
 
   it('builds a local search index and finds localized content deterministically', () => {

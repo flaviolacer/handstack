@@ -44,6 +44,16 @@ Run `node scripts/validate_container_contract.mjs` and `node scripts/validate_he
 
 Secrets are injected externally. Distributed replicas remain stateless and continue using the normal authorization, budget, audit and telemetry pipeline.
 
+For Sentinel deployments, configure `HANDSTACK_REDIS_NAT_MAP` as JSON. It is validated by the typed
+configuration layer and shared by API Operations and workers; `handstack config validate` reports
+only whether a map is configured.
+
+Internal worker authentication is resolved through the typed `security.internalServiceToken` and
+`security.internalApiKey`
+configuration and shared by the protected API endpoints. Plugin deployments use the typed `HANDSTACK_PLUGIN_CACHE_DIR`, isolation flag and publisher trust
+store. The CLI reports only cache presence, isolation mode and publisher count; public keys are not
+printed in validation output.
+
 ## Rollback
 
 Roll back the Compose image or Helm release to the last known-good immutable revision; never delete database, audit or object-storage state.

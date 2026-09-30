@@ -1,18 +1,14 @@
 import Link from 'next/link';
 import { IdentityProvidersClient } from './identity-providers-client';
+import { AdminNavigation } from '../../admin-navigation';
 
 export default function IdentityProvidersPage() {
   return (
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">HandStack</div>
-        <nav className="nav" aria-label="Primary navigation">
-          <Link href="/">Dashboard</Link>
-          <Link href="/settings/identity-providers" aria-current="page">
-            Identity Providers
-          </Link>
-          <Link href="/help">Help Center</Link>
-        </nav>
+        <AdminNavigation current="/settings" />
+        <Link href="/settings/identity-providers">Identity Providers</Link>
       </aside>
       <main className="main settings-main">
         <header className="settings-header">

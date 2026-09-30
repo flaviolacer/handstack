@@ -4,12 +4,15 @@ import type { EvaluationGateInput } from '@handstack/models';
 import { describe, expect, it } from 'vitest';
 import {
   CoreEvaluationProvider,
+  RedTeamCampaignService,
+  minimumRedTeamVectors,
   minimumRagGateMetrics,
   scoreRagEvaluation,
   validateRagEvaluationCriteria,
   type EvaluationCaseRunner,
   type EvaluationDataset,
   type EvaluationSuite,
+  type RedTeamCampaign,
 } from '../src/index.js';
 
 const organizationId = 'evaluation-organization';
@@ -145,6 +148,12 @@ describe('core evaluation provider', () => {
         scores: { task_success: 0.9, latency_ms: 350 },
       });
       await expect(provider.run(input)).resolves.toEqual(result);
+      await expect(provider.listResults(organizationId, result.runId)).resolves.toMatchObject({
+        items: [
+          { runId: result.runId, caseId: 'case-a' },
+          { runId: result.runId, caseId: 'case-b' },
+        ],
+      });
       const gate: EvaluationGateInput = { ...input, result };
       await expect(provider.validateGate(gate)).resolves.toEqual({ passed: true, reasons: [] });
       await expect(
@@ -234,6 +243,57 @@ describe('core evaluation provider', () => {
           criteria: [{ metric: 'task_success', direction: 'min', threshold: 0.8 }],
         }),
       ).rejects.toThrow(/product minimum metrics/);
+    } finally {
+      await adapter.close();
+    }
+  });
+
+  it('persists a complete red-team campaign, executes every required vector, and fails closed on findings', async () => {
+    const adapter = createDatabaseAdapter(
+      defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),
+    );
+    await adapter.initialize();
+    try {
+      const campaign: RedTeamCampaign = {
+        ...base('red-team-campaign'),
+        organizationId,
+        targetKind: 'MODEL',
+        targetId: 'model',
+        campaignVersion: 'campaign-v1',
+        scenarios: minimumRedTeamVectors.map((vector) => ({
+          id: `scenario-${vector}`,
+          vector,
+          input: { prompt: `attack-${vector}` },
+        })),
+        status: 'DRAFT',
+        findings: [],
+      };
+      const service = new RedTeamCampaignService(
+        adapter,
+        {
+          runScenario: ({ scenario }) =>
+            Promise.resolve({
+              passed: scenario.vector !== 'unsafe_tool_use',
+              severity: scenario.vector === 'unsafe_tool_use' ? 'HIGH' : 'NONE',
+              evidence: { scenarioId: scenario.id, secret: 'must-not-be-stored-raw' },
+            }),
+        },
+        () => now,
+      );
+      await service.register(campaign);
+      const executed = await service.execute(organizationId, campaign.id);
+      expect(executed.status).toBe('FAILED');
+      expect(executed.findings).toHaveLength(minimumRedTeamVectors.length);
+      expect(executed.findings.find(({ vector }) => vector === 'unsafe_tool_use')).toMatchObject({
+        passed: false,
+        severity: 'HIGH',
+      });
+      await expect(
+        service.assertPublicationAllowed(organizationId, 'MODEL', 'model'),
+      ).rejects.toThrow(/red-team campaign/);
+      expect(JSON.stringify((await service.list(organizationId)).items)).not.toContain(
+        'must-not-be-stored-raw',
+      );
     } finally {
       await adapter.close();
     }

@@ -30,6 +30,17 @@ timeouts, idempotency and dead-letter retention.
 3. Retry transient failures with exponential backoff; inspect and retain terminal DLQ jobs.
 4. Gracefully stop workers only after completing or returning the active job.
 
+The default timeout follows the queue: agents (`HANDSTACK_AGENT_TIMEOUT_MS`), embeddings/indexing
+(`HANDSTACK_PROVIDER_TIMEOUT_MS`), documents/webhooks (`HANDSTACK_HTTP_TIMEOUT_MS`), plugins
+(`HANDSTACK_TOOL_TIMEOUT_MS`), and audit/billing/cleanup/workflows
+(`HANDSTACK_WORKFLOW_TIMEOUT_MS`). `HANDSTACK_WORKER_TIMEOUT_MS` overrides the default for one
+worker/queue. On expiry, the worker aborts the `AbortSignal`, fails the job, and follows its retry/DLQ
+policy; handlers should observe the signal to stop I/O and avoid unnecessary work.
+
+Worker concurrency, heartbeat interval, maximum attempts, retry jitter and metrics port are
+validated by the typed configuration layer. Run `handstack config validate` before deployment to
+check the effective non-sensitive values.
+
 ## Verify
 
 Test duplicate enqueue, capacity backpressure, retry/DLQ transitions, timeout and cancellation.
@@ -40,6 +51,14 @@ The worker exposes Prometheus text format at `GET /metrics` on
 `HANDSTACK_WORKER_METRICS_PORT` (default `9091`). The endpoint contains aggregate active,
 completed, failed and heartbeat metrics only; job payloads are never included. Put the metrics
 port behind the platform network policy and configure Prometheus to scrape each worker instance.
+
+Chat attachment storage path and size limit are validated by the typed configuration layer through
+`HANDSTACK_ATTACHMENT_STORAGE_PATH` and `HANDSTACK_ATTACHMENT_MAX_BYTES`. The signing key remains
+an environment/secret-manager value and is never included in `handstack config validate` output.
+
+Webhook destination host restrictions use the typed `HANDSTACK_WEBHOOK_ALLOWED_HOSTS` allow-list,
+shared by API and workers. Keep it explicit in production and verify the reported host count with
+`handstack config validate`.
 
 ## Troubleshooting
 

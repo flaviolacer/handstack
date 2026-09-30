@@ -11,9 +11,15 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
+    "@handstack/audit": "file:../../packages/audit",
+    "@handstack/budgets": "file:../../packages/budgets",
     "@handstack/config": "file:../../packages/config",
+    "@handstack/core": "file:../../packages/core",
+    "@handstack/database": "file:../../packages/database",
     "@handstack/jobs": "file:../../packages/jobs",
     "@handstack/telemetry": "file:../../packages/telemetry",
-    "bullmq": "^5.81.4"
+    "@handstack/webhooks": "file:../../packages/webhooks",
+    "bullmq": "^5.81.4",
+    "ioredis": "5.11.1"
   }
 }

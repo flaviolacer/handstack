@@ -24,6 +24,127 @@ const version: AgentVersion = {
 };
 
 describe('AgentHarness', () => {
+  it('applies input and output guardrail stages around the model', async () => {
+    const stages: string[] = [];
+    const pipeline = new GuardrailPipeline([
+      (value, stage) => {
+        stages.push(stage);
+        return Promise.resolve(typeof value === 'string' ? value.trim() : value);
+      },
+    ]);
+    const model: AgentModel = {
+      complete: ({ messages }) =>
+        Promise.resolve({ kind: 'final', content: `${messages[1]?.content ?? ''} done` }),
+    };
+    await expect(
+      new AgentHarness(
+        model,
+        new CapabilityExecutionEngine(new InMemoryCapabilityRegistry(), {
+          authorize: () => Promise.resolve(),
+        }),
+      ).run({
+        organizationId: 'org',
+        principalId: 'user',
+        prompt: ' hello ',
+        agentVersion: { ...version, tools: [] },
+        guardrails: pipeline,
+      }),
+    ).resolves.toMatchObject({ content: 'hello done' });
+    expect(stages).toEqual(['INPUT', 'OUTPUT']);
+  });
+
+  it('routes declared MCP tools through the injected MCP executor', async () => {
+    let receivedPrincipal = '';
+    const model: AgentModel = {
+      complete: ({ messages }) =>
+        Promise.resolve(
+          messages.length === 2
+            ? { kind: 'tool_call', call: { name: 'echo', arguments: { value: 'x' } } }
+            : { kind: 'final', content: 'done' },
+        ),
+    };
+    const mcpExecutor = {
+      execute: (_name: string, _argumentsValue: unknown, context: { principalId: string }) => {
+        receivedPrincipal = context.principalId;
+        return Promise.resolve({ ok: true });
+      },
+    };
+    await expect(
+      new AgentHarness(
+        model,
+        new CapabilityExecutionEngine(new InMemoryCapabilityRegistry(), {
+          authorize: () => Promise.resolve(),
+        }),
+      ).run({
+        organizationId: 'org',
+        principalId: 'user',
+        prompt: 'hello',
+        agentVersion: { ...version, configuration: { mcpServers: ['server'] } },
+        mcpExecutor,
+      }),
+    ).resolves.toMatchObject({ content: 'done' });
+    expect(receivedPrincipal).toBe('user');
+  });
+
+  it('loads and persists user memory when memory is enabled', async () => {
+    const stored: {
+      organizationId: string;
+      scope: 'USER';
+      ownerId: string;
+      content: string;
+      id: string;
+      createdAt: Date;
+    }[] = [
+      {
+        id: 'old',
+        organizationId: 'org',
+        scope: 'USER',
+        ownerId: 'user',
+        content: 'Known preference',
+        createdAt: new Date(),
+      },
+    ];
+    const memoryStore = {
+      list: (organizationId: string, scope: string, ownerId: string) =>
+        Promise.resolve(
+          stored.filter(
+            (entry) =>
+              entry.organizationId === organizationId &&
+              entry.scope === scope &&
+              entry.ownerId === ownerId,
+          ),
+        ),
+      put: (entry: (typeof stored)[number]) => {
+        stored.push(entry);
+        return Promise.resolve();
+      },
+      delete: () => Promise.resolve(),
+    };
+    const model: AgentModel = {
+      complete: ({ messages }) =>
+        Promise.resolve({
+          kind: 'final',
+          content: messages[0]?.content.includes('Known preference') ? 'remembered' : 'missing',
+        }),
+    };
+    await expect(
+      new AgentHarness(
+        model,
+        new CapabilityExecutionEngine(new InMemoryCapabilityRegistry(), {
+          authorize: () => Promise.resolve(),
+        }),
+      ).run({
+        organizationId: 'org',
+        principalId: 'user',
+        prompt: 'hello',
+        agentVersion: { ...version, tools: [], configuration: { memoryEnabled: true } },
+        memoryStore,
+      }),
+    ).resolves.toMatchObject({ content: 'remembered' });
+    expect(stored).toHaveLength(2);
+    expect(stored[1]?.content).toContain('remembered');
+  });
+
   it('calls a capability tool and then returns the model response', async () => {
     const registry = new InMemoryCapabilityRegistry();
     await registry.register({
@@ -100,6 +221,49 @@ describe('AgentHarness', () => {
     ).rejects.toThrow(/undeclared/);
     expect(observations).toEqual(['agent.started', 'agent.failed']);
   });
+
+  it('restricts execution permissions to the published version configuration', async () => {
+    const registry = new InMemoryCapabilityRegistry();
+    let received: readonly string[] | undefined;
+    await registry.register({
+      organizationId: 'org',
+      slug: 'echo',
+      name: 'Echo',
+      description: 'Echo',
+      type: 'CUSTOM',
+      inputSchema: {},
+      outputSchema: {},
+      requiredPermissions: ['safe.read'],
+      allowedChannels: ['AGENT'],
+      timeoutMs: 1000,
+      visibility: 'ORGANIZATION',
+      ownerId: 'owner',
+      metadata: {},
+      handler: (_input, context) => {
+        received = context.permissions;
+        return Promise.resolve({ ok: true });
+      },
+    });
+    const model: AgentModel = {
+      complete: ({ messages }) =>
+        Promise.resolve(
+          messages.length === 2
+            ? { kind: 'tool_call', call: { name: 'echo', arguments: {} } }
+            : { kind: 'final', content: 'done' },
+        ),
+    };
+    await new AgentHarness(
+      model,
+      new CapabilityExecutionEngine(registry, { authorize: () => Promise.resolve() }),
+    ).run({
+      organizationId: 'org',
+      principalId: 'user',
+      prompt: 'hello',
+      agentVersion: { ...version, configuration: { permissions: ['safe.read'] } },
+      permissions: ['safe.read', 'admin.write'],
+    });
+    expect(received).toEqual(['safe.read']);
+  });
 });
 
 describe('Agent orchestration and governance contracts', () => {
@@ -160,5 +324,29 @@ describe('Agent orchestration and governance contracts', () => {
     await pipeline.tool('x');
     await pipeline.output('x');
     expect(stages).toEqual(['INPUT', 'TOOL', 'OUTPUT']);
+  });
+
+  it('rejects execution on a channel that the published version did not authorize', async () => {
+    const model: AgentModel = {
+      complete: () => Promise.resolve({ kind: 'final', content: 'done' }),
+    };
+    const restrictedVersion = {
+      ...version,
+      configuration: { publishChannels: ['WEB' as const] },
+    };
+    await expect(
+      new AgentHarness(
+        model,
+        new CapabilityExecutionEngine(new InMemoryCapabilityRegistry(), {
+          authorize: () => Promise.resolve(),
+        }),
+      ).run({
+        organizationId: 'org',
+        principalId: 'user',
+        prompt: 'hello',
+        channel: 'REST_API',
+        agentVersion: restrictedVersion,
+      }),
+    ).rejects.toThrow('not published to this channel');
   });
 });

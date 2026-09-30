@@ -5,6 +5,8 @@ import {
   WorkerMetrics,
   workerQueueName,
   startWorkerMetricsServer,
+  selectWorkerHandler,
+  loadWorkerHandlers,
 } from '../src/main.js';
 
 describe('worker runtime configuration', () => {
@@ -33,10 +35,56 @@ describe('worker runtime configuration', () => {
       organizationId: 'org-test',
       queue: 'agents',
       concurrency: 1,
-      timeoutMs: 30_000,
+      timeoutMs: 120_000,
       heartbeatIntervalMs: 10_000,
       maxAttempts: 3,
     });
+  });
+
+  it('maps each worker queue to the corresponding configured timeout', () => {
+    const base = {
+      HANDSTACK_REDIS_URL: 'redis://localhost:6379/2',
+      HANDSTACK_WORKER_ORGANIZATION_ID: 'org-test',
+      HANDSTACK_HTTP_TIMEOUT_MS: '41000',
+      HANDSTACK_PROVIDER_TIMEOUT_MS: '42000',
+      HANDSTACK_TOOL_TIMEOUT_MS: '43000',
+      HANDSTACK_AGENT_TIMEOUT_MS: '44000',
+      HANDSTACK_WORKFLOW_TIMEOUT_MS: '45000',
+    };
+    const timeout = (queue: string): number =>
+      parseWorkerOptions({ ...base, HANDSTACK_WORKER_QUEUE: queue }).timeoutMs;
+
+    expect(timeout('agents')).toBe(44_000);
+    expect(timeout('embeddings')).toBe(42_000);
+    expect(timeout('indexing')).toBe(45_000);
+    expect(timeout('documents')).toBe(41_000);
+    expect(timeout('webhooks')).toBe(41_000);
+    expect(timeout('plugins')).toBe(43_000);
+    expect(timeout('workflow-executions')).toBe(45_000);
+  });
+
+  it('lets an explicit worker timeout override the queue-specific setting', () => {
+    expect(
+      parseWorkerOptions({
+        HANDSTACK_REDIS_URL: 'redis://localhost:6379/2',
+        HANDSTACK_WORKER_ORGANIZATION_ID: 'org-test',
+        HANDSTACK_WORKER_QUEUE: 'agents',
+        HANDSTACK_AGENT_TIMEOUT_MS: '44000',
+        HANDSTACK_WORKER_TIMEOUT_MS: '50000',
+      }).timeoutMs,
+    ).toBe(50_000);
+  });
+
+  it('accepts the Helm worker class as a queue argument when env is omitted', () => {
+    expect(
+      parseWorkerOptions(
+        {
+          HANDSTACK_REDIS_URL: 'redis://localhost:6379/2',
+          HANDSTACK_WORKER_ORGANIZATION_ID: 'org-test',
+        },
+        'agents',
+      ),
+    ).toMatchObject({ queue: 'agents' });
   });
 
   it('rejects invalid worker limits and builds a tenant queue name', () => {
@@ -54,7 +102,7 @@ describe('worker runtime configuration', () => {
         organizationId: 'org-test',
         queue: 'agents',
       }),
-    ).toBe('handstack:queues:org-test:agents');
+    ).toBe('handstack_queues__org-test__agents');
   });
 
   it('parses TLS Redis connection details without connecting', () => {
@@ -65,6 +113,29 @@ describe('worker runtime configuration', () => {
       password: 'secret',
       db: 2,
       tls: {},
+    });
+  });
+
+  it('maps Sentinel topology to BullMQ sentinel connection options', () => {
+    expect(
+      redisConnection(
+        'redis+sentinel://redis-sentinel.example:26379/2?master=handstack',
+        'sentinel',
+      ),
+    ).toMatchObject({
+      sentinels: [{ host: 'redis-sentinel.example', port: 26379 }],
+      name: 'handstack',
+      db: 2,
+    });
+  });
+
+  it('applies the typed Redis NAT map to Sentinel connections', () => {
+    expect(
+      redisConnection('redis+sentinel://redis-sentinel.example:26379/0', 'sentinel', {
+        'redis-sentinel.example:26379': { host: 'redis.internal', port: 26379 },
+      }),
+    ).toMatchObject({
+      natMap: { 'redis-sentinel.example:26379': { host: 'redis.internal', port: 26379 } },
     });
   });
 
@@ -106,5 +177,12 @@ describe('worker runtime configuration', () => {
     expect(body).toContain('handstack_worker_last_heartbeat_timestamp_seconds 2');
     expect(body).not.toContain('payload');
     await runtime.close();
+  });
+
+  it('requires explicit domain handlers and selects only the configured queue handler', async () => {
+    await expect(loadWorkerHandlers('')).rejects.toThrow('HANDSTACK_WORKER_HANDLER_MODULE');
+    const handler = (): Promise<void> => Promise.resolve();
+    expect(selectWorkerHandler('agents', { agents: handler })).toBe(handler);
+    expect(() => selectWorkerHandler('agents', {})).toThrow('not configured');
   });
 });

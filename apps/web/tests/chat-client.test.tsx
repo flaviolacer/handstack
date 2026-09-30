@@ -42,7 +42,8 @@ describe('ChatClient', () => {
             },
           ],
         }),
-      );
+      )
+      .mockResolvedValueOnce(json({ items: [] }));
     vi.stubGlobal('fetch', fetch);
     const storageWrite = vi.spyOn(Storage.prototype, 'setItem');
     const user = userEvent.setup();

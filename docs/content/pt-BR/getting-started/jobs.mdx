@@ -30,6 +30,17 @@ e retenção de dead-letter.
 3. Faça retry exponencial de falhas transitórias e inspecione jobs terminais na DLQ.
 4. Encerre workers graciosamente concluindo ou devolvendo o job ativo.
 
+O timeout padrão acompanha a fila: Agent (`HANDSTACK_AGENT_TIMEOUT_MS`), embeddings/indexing
+(`HANDSTACK_PROVIDER_TIMEOUT_MS`), documents/webhooks (`HANDSTACK_HTTP_TIMEOUT_MS`), plugins
+(`HANDSTACK_TOOL_TIMEOUT_MS`) e audit/billing/cleanup/workflow (`HANDSTACK_WORKFLOW_TIMEOUT_MS`).
+`HANDSTACK_WORKER_TIMEOUT_MS` substitui o padrão para uma instância/fila específica. Ao expirar, o
+worker aborta o `AbortSignal`, falha o job e segue a política configurada de retry/DLQ; handlers
+devem observar o sinal para interromper I/O e evitar trabalho inútil.
+
+Concorrência, intervalo de heartbeat, número máximo de tentativas, jitter de retry e porta de
+métricas do worker são validados pelo layer tipado de configuração. Execute `handstack config
+validate` antes do deployment para conferir os valores efetivos não sensíveis.
+
 ## Verify
 
 Teste enqueue duplicado, backpressure, transições retry/DLQ, timeout e cancelamento.
@@ -40,6 +51,14 @@ O worker expõe o formato de texto do Prometheus em `GET /metrics`, na porta
 `HANDSTACK_WORKER_METRICS_PORT` (padrão `9091`). O endpoint contém somente métricas agregadas de
 jobs ativos, concluídos, falhos e heartbeat; payloads nunca são incluídos. Proteja a porta com a
 política de rede da plataforma e configure o Prometheus para coletar cada instância do worker.
+
+O caminho e o limite de tamanho dos anexos do Chat são validados pelo layer tipado por meio de
+`HANDSTACK_ATTACHMENT_STORAGE_PATH` e `HANDSTACK_ATTACHMENT_MAX_BYTES`. A chave de assinatura
+permanece no ambiente/secret manager e nunca aparece na saída de `handstack config validate`.
+
+As restrições de host de destino dos Webhooks usam a allow-list tipada
+`HANDSTACK_WEBHOOK_ALLOWED_HOSTS`, compartilhada pela API e pelos workers. Mantenha-a explícita em
+produção e confira a contagem de hosts com `handstack config validate`.
 
 ## Troubleshooting
 

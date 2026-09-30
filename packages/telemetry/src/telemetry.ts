@@ -8,6 +8,8 @@ import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic
 
 export interface TelemetryOptions {
   readonly enabled: boolean;
+  /** Consent/privacy gate; export is disabled when explicitly false. */
+  readonly privacyAllowed?: boolean;
   readonly serviceName: string;
   readonly serviceVersion: string;
   /** Base OTLP/HTTP endpoint, for example http://otel-collector:4318. */
@@ -20,7 +22,8 @@ export interface TelemetryRuntime {
 }
 
 export function initializeTelemetry(options: TelemetryOptions): TelemetryRuntime {
-  if (!options.enabled) return { enabled: false, shutdown: () => Promise.resolve() };
+  if (!options.enabled || options.privacyAllowed === false)
+    return { enabled: false, shutdown: () => Promise.resolve() };
   const endpoint = options.otlpEndpoint ?? process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   const exporters: {
     readonly traceExporter?: OTLPTraceExporter;

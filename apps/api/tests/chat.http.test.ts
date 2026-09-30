@@ -4,8 +4,11 @@ import { setTimeout as delay } from 'node:timers/promises';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AuthRuntimeService } from '../src/auth/auth-runtime.service.js';
+import { AgentRuntimeService } from '../src/agents/agent-runtime.service.js';
 import { ChatRuntimeService } from '../src/chat/chat-runtime.service.js';
+import { DatabaseService } from '../src/database/database.service.js';
 import { createApplication } from '../src/main.js';
+import { vi } from 'vitest';
 
 const organizationId = 'chat-http-organization';
 const password = 'chat http password long enough';
@@ -94,6 +97,7 @@ describe('chat HTTP contract', () => {
       '/api/v1/organizations/{organizationId}/conversations/{conversationId}/attachments',
     );
     expect(paths).toHaveProperty('/api/v1/organizations/{organizationId}/chat/models');
+    expect(paths).toHaveProperty('/api/v1/organizations/{organizationId}/chat/agents');
   });
 
   it('requires authentication, chat.use and exact organization scope', async () => {
@@ -119,6 +123,84 @@ describe('chat HTTP contract', () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ items: [] });
+  });
+
+  it('exposes the published WEB agent catalog to the chat workspace', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${organizationId}/chat/agents`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ items: [] });
+  });
+
+  it('executes a selected agent through the chat stream and persists its response', async () => {
+    const headers = { authorization: `Bearer ${token}` };
+    const created = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${organizationId}/conversations`,
+      headers,
+      payload: { title: 'Agent chat' },
+    });
+    const conversation = created.json<{ id: string; activeBranchId: string }>();
+    const user = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${organizationId}/conversations/${conversation.id}/branches/${conversation.activeBranchId}/messages`,
+      headers,
+      payload: { role: 'user', parts: [{ id: 'agent-question', type: 'text', text: 'Use agent' }] },
+    });
+    const userMessage = user.json<{ id: string }>();
+    const models = runtime.models.execution;
+    const route = vi.spyOn(models, 'resolveRoute').mockResolvedValue({
+      modelDefinitionId: 'agent-model',
+      providerId: 'agent-provider',
+      pricing: { inputPerMillion: 1, outputPerMillion: 1, currency: 'USD' },
+    });
+    const agent = vi.spyOn(app.get(AgentRuntimeService), 'runPublished').mockResolvedValue({
+      runId: 'agent-chat-run',
+      content: 'Agent response',
+      iterations: 1,
+      usage: { inputTokens: 2, outputTokens: 3 },
+    });
+    try {
+      const started = await app.inject({
+        method: 'POST',
+        url: `/api/v1/organizations/${organizationId}/conversations/${conversation.id}/branches/${conversation.activeBranchId}/executions`,
+        headers: { ...headers, 'idempotency-key': 'agent-chat-execution' },
+        payload: {
+          model: 'smart',
+          agentId: 'published-agent',
+          dataClassification: 'INTERNAL',
+          parentMessageId: userMessage.id,
+        },
+      });
+      expect(started.statusCode, started.body).toBe(202);
+      const assistant = started.json<{ id: string }>();
+      const deadline = Date.now() + 5_000;
+      let completed = false;
+      while (Date.now() < deadline) {
+        const current = await runtime.chat.getMessage(organizationId, assistant.id);
+        if (current.status === 'COMPLETED') {
+          completed = true;
+          expect(current.parts.map((part) => part.text ?? '').join('')).toContain('Agent response');
+          break;
+        }
+        await delay(25);
+      }
+      expect(completed).toBe(true);
+      expect(agent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agentId: 'published-agent',
+          prompt: 'Use agent',
+          permissions: ['chat.use'],
+          channel: 'WEB',
+        }),
+      );
+    } finally {
+      route.mockRestore();
+      agent.mockRestore();
+    }
   });
 
   it('creates, lists and reads ordered messages, then replays committed SSE events', async () => {
@@ -154,7 +236,7 @@ describe('chat HTTP contract', () => {
       url: `/api/v1/organizations/${organizationId}/conversations`,
       headers,
     });
-    expect(list.json<{ items: unknown[] }>().items).toHaveLength(1);
+    expect(list.json<{ items: unknown[] }>().items).toHaveLength(2);
 
     const assistant = await runtime.chat.startStream({
       organizationId,
@@ -208,6 +290,77 @@ describe('chat HTTP contract', () => {
       payload: { model: 'smart', dataClassification: 'PUBLIC' },
     });
     expect(missing.statusCode).toBe(400);
+  });
+
+  it('applies live privacy configuration when persisting chat prompts and responses', async () => {
+    const database = app.get(DatabaseService);
+    const originalConfig = database.config;
+    database.config = {
+      ...originalConfig,
+      privacy: {
+        ...originalConfig.privacy,
+        storePrompts: false,
+        storeResponses: false,
+        storeToolPayloads: false,
+      },
+    };
+    try {
+      const conversation = await runtime.chat.createConversation({
+        organizationId,
+        title: 'Privacy configuration',
+        createdBy: 'chat-user',
+      });
+      const prompt = await runtime.chat.appendMessage({
+        organizationId,
+        conversationId: conversation.id,
+        branchId: conversation.activeBranchId,
+        role: 'user',
+        createdBy: 'chat-user',
+        parts: [{ id: 'private-prompt', type: 'text', text: 'private user prompt' }],
+      });
+      expect(prompt.parts).toEqual([{ id: 'private-prompt', type: 'text' }]);
+      const message = await runtime.chat.startStream({
+        organizationId,
+        conversationId: conversation.id,
+        branchId: conversation.activeBranchId,
+        createdBy: 'chat-user',
+        modelDefinitionId: 'model',
+        providerId: 'provider',
+        idempotencyKey: 'privacy-tool-start',
+      });
+      await runtime.chat.appendStreamEvent({
+        organizationId,
+        messageId: message.id,
+        type: 'DELTA',
+        idempotencyKey: 'privacy-tool-delta',
+        part: {
+          id: 'tool-call',
+          type: 'tool_call',
+          text: 'private tool text',
+          data: { secret: 'private tool payload' },
+        },
+      });
+      await runtime.chat.appendStreamEvent({
+        organizationId,
+        messageId: message.id,
+        type: 'DELTA',
+        idempotencyKey: 'privacy-response-delta',
+        part: { id: 'private-response', type: 'text', text: 'private assistant response' },
+      });
+
+      const persisted = await runtime.chat.getMessage(organizationId, message.id);
+      expect(JSON.stringify(persisted)).not.toContain('private tool text');
+      expect(JSON.stringify(persisted)).not.toContain('private tool payload');
+      expect(JSON.stringify(persisted)).not.toContain('private assistant response');
+      expect(
+        JSON.stringify(
+          await runtime.chat.history(organizationId, conversation.id, conversation.activeBranchId),
+        ),
+      ).not.toContain('private user prompt');
+      expect(persisted.parts).toContainEqual({ id: 'tool-call', type: 'tool_call' });
+    } finally {
+      database.config = originalConfig;
+    }
   });
 
   it('archives, restores and deletes only owner-scoped conversations', async () => {

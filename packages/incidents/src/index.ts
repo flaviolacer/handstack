@@ -74,6 +74,10 @@ export interface IncidentStore {
   list(organizationId: string): Promise<readonly Incident[]>;
   update(incident: Incident, expectedVersion?: number): Promise<Incident>;
 }
+export interface IncidentEscalationPolicyStore {
+  get(organizationId: string, capability: string): Promise<IncidentEscalationPolicy | undefined>;
+  save(policy: IncidentEscalationPolicy): Promise<IncidentEscalationPolicy>;
+}
 export interface IncidentManagementProvider {
   create(
     input: Omit<Incident, 'timeline'> & { timeline?: readonly IncidentTimelineEntry[] },
@@ -154,8 +158,17 @@ export class RepositoryIncidentStore implements IncidentStore {
     return entity === undefined ? undefined : clone(entity.incident);
   }
   async list(organizationId: string): Promise<readonly Incident[]> {
-    const page = await this.repository.list(organizationId, { limit: 200 });
-    return page.items.map((item) => clone(item.incident));
+    const values: Incident[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await this.repository.list(organizationId, {
+        limit: 200,
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+      values.push(...page.items.map((item) => clone(item.incident)));
+      cursor = page.nextCursor;
+    } while (cursor !== undefined);
+    return values;
   }
   async update(incident: Incident, expectedVersion?: number): Promise<Incident> {
     const entity = await this.repository.findById(incident.organizationId, incident.id);
@@ -165,6 +178,48 @@ export class RepositoryIncidentStore implements IncidentStore {
       expectedVersion ?? entity.version,
     );
     return clone(incident);
+  }
+}
+
+interface IncidentEscalationPolicyEntity extends TenantEntity {
+  readonly capability: string;
+  readonly levels: readonly { readonly afterMinutes: number; readonly owner: string }[];
+}
+
+export class RepositoryIncidentEscalationPolicyStore implements IncidentEscalationPolicyStore {
+  private readonly repository: Repository<IncidentEscalationPolicyEntity>;
+  constructor(factory: <T extends TenantEntity>(name: RepositoryName) => Repository<T>) {
+    this.repository = factory<IncidentEscalationPolicyEntity>(
+      repositoryName('incident-escalation-policies'),
+    );
+  }
+  async get(
+    organizationId: string,
+    capability: string,
+  ): Promise<IncidentEscalationPolicy | undefined> {
+    const entity = await this.repository.findById(organizationId, capability);
+    return entity === undefined
+      ? undefined
+      : {
+          organizationId,
+          capability: entity.capability,
+          levels: entity.levels.map((level) => ({ ...level })),
+        };
+  }
+  async save(policy: IncidentEscalationPolicy): Promise<IncidentEscalationPolicy> {
+    const existing = await this.repository.findById(policy.organizationId, policy.capability);
+    const entity: IncidentEscalationPolicyEntity = {
+      id: policy.capability,
+      tenantId: policy.organizationId,
+      capability: policy.capability,
+      levels: policy.levels.map((level) => ({ ...level })),
+      version: existing === undefined ? 1 : existing.version + 1,
+      createdAt: existing?.createdAt ?? new Date(),
+      updatedAt: new Date(),
+    };
+    if (existing === undefined) await this.repository.insert(entity);
+    else await this.repository.update(entity, existing.version);
+    return { ...policy, levels: policy.levels.map((level) => ({ ...level })) };
   }
 }
 export class InMemoryIncidentStore implements IncidentStore {
@@ -202,6 +257,7 @@ export class DefaultIncidentManagementProvider implements IncidentManagementProv
     private readonly store: IncidentStore,
     private readonly statusPage?: StatusPageProvider,
     private readonly notifications?: IncidentNotificationDispatcher,
+    private readonly escalationPolicies?: IncidentEscalationPolicyStore,
   ) {}
   async create(
     input: Omit<Incident, 'timeline'> & { timeline?: readonly IncidentTimelineEntry[] },
@@ -325,7 +381,7 @@ export class DefaultIncidentManagementProvider implements IncidentManagementProv
     );
     return saved;
   }
-  setEscalationPolicy(policy: IncidentEscalationPolicy): Promise<IncidentEscalationPolicy> {
+  async setEscalationPolicy(policy: IncidentEscalationPolicy): Promise<IncidentEscalationPolicy> {
     if (
       policy.organizationId.trim() === '' ||
       policy.capability.trim() === '' ||
@@ -335,19 +391,22 @@ export class DefaultIncidentManagementProvider implements IncidentManagementProv
     if (policy.levels.some((level) => level.afterMinutes < 0 || level.owner.trim() === ''))
       throw new ValidationError('Escalation policy levels are invalid');
     const saved = { ...policy, levels: policy.levels.map((level) => ({ ...level })) };
-    this.policies.set(`${policy.organizationId}:${policy.capability}`, saved);
-    return Promise.resolve(saved);
+    if (this.escalationPolicies === undefined)
+      this.policies.set(`${policy.organizationId}:${policy.capability}`, saved);
+    else await this.escalationPolicies.save(saved);
+    return saved;
   }
-  getEscalationPolicy(
+  async getEscalationPolicy(
     organizationId: string,
     capability: string,
   ): Promise<IncidentEscalationPolicy | undefined> {
-    const policy = this.policies.get(`${organizationId}:${capability}`);
-    return Promise.resolve(
-      policy === undefined
-        ? undefined
-        : { ...policy, levels: policy.levels.map((level) => ({ ...level })) },
-    );
+    const policy =
+      this.escalationPolicies === undefined
+        ? this.policies.get(`${organizationId}:${capability}`)
+        : await this.escalationPolicies.get(organizationId, capability);
+    return policy === undefined
+      ? undefined
+      : { ...policy, levels: policy.levels.map((level) => ({ ...level })) };
   }
   async export(organizationId: string, id: string): Promise<Incident> {
     return this.require(organizationId, id);

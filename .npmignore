@@ -1,0 +1,12 @@
+.pnpm-store
+.pnpm-store-incomplete
+.dependency-backup-*
+node_modules
+dist
+.next
+.turbo
+coverage
+test-results
+playwright-report
+*.db
+*.log

@@ -4,3 +4,8 @@ export * from './file-runtime.js';
 export * from './operational-command.js';
 export * from './backup-command.js';
 export * from './audit-command.js';
+export * from './apply-command.js';
+export * from './admin-command.js';
+export * from './init-command.js';
+export * from './export-command.js';
+export * from './sync-command.js';

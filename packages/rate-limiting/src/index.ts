@@ -243,6 +243,7 @@ export function raiseRateLimitError(decision: RateLimitDecision): never {
   const metric = decision.exceededMetric ?? 'requests_per_minute';
   throw new RateLimitError(
     `Rate limit exceeded for ${scope} (${metric}); retry after ${String(decision.retryAfterSeconds)}s`,
+    decision.retryAfterSeconds,
   );
 }
 

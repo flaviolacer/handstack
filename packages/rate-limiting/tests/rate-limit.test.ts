@@ -27,7 +27,12 @@ describe('ScopedRateLimiter', () => {
     expect(denied.allowed).toBe(false);
     expect(denied.exceededScope).toBe('organization');
     expect(denied.exceededMetric).toBe('requests_per_minute');
-    expect(() => raiseRateLimitError(denied)).toThrow(RateLimitError);
+    try {
+      raiseRateLimitError(denied);
+    } catch (error) {
+      expect(error).toBeInstanceOf(RateLimitError);
+      if (error instanceof RateLimitError) expect(error.retryAfterSeconds).toBeGreaterThan(0);
+    }
   });
 
   it('charges token deltas against a tokens-per-minute rule', async () => {

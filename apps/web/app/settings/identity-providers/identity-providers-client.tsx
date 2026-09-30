@@ -366,9 +366,13 @@ function ProviderForm({ onSubmit }: { readonly onSubmit: (event: FormSubmitEvent
         <input
           name="clientSecretReference"
           type="password"
-          placeholder="env://HANDSTACK_SECRET_…"
+          placeholder="secret://<id> or env://HANDSTACK_SECRET_NAME"
           required
         />
+        <small className="muted">
+          Enter a stored secret ID or an allowlisted HANDSTACK_SECRET_* environment reference; never
+          enter the secret value here.
+        </small>
       </label>
       <label className="span-two">
         Redirect URI

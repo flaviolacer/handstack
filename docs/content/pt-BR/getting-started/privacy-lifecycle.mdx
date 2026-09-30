@@ -7,7 +7,7 @@ permissions: [privacy.manage, privacy.request]
 features: [privacy, retention, residency]
 deploymentProfiles: [compact, distributed]
 introducedIn: 0.17.0
-lastReviewedAt: 2026-09-09
+lastReviewedAt: 2026-09-28
 owner: security-platform-team
 tags: [privacy, retention, compliance]
 ---
@@ -30,10 +30,34 @@ titulares e residência. Providers devem manter a organização em toda operaç�
 3. Processe acesso/exportação/exclusão com evidência durável.
 4. Autorize residência antes de gravar em banco, vetores, objetos ou filas.
 
+Para uma capability que envia dados pessoais a um provider, crie uma finalidade de tratamento e o
+consentimento do principal, depois defina `metadata.consentPurposeId` no descritor da capability. O
+engine governado verifica o consentimento mais recente no tenant antes da execução e nega a chamada
+após a retirada.
+
+Na tela administrativa `/privacy`, um administrador com `privacy.manage` pode configurar retenção,
+criar/liberar legal holds e executar a retenção de conversas de uma organização por
+`POST /api/v1/organizations/{organizationId}/privacy/retention/run`. A política da organização
+para `conversations` prevalece sobre o valor global `retention.conversation`. A operação respeita
+holds da conversa ou de qualquer registro filho, usa a exclusão em cascata do Chat para remover
+registros relacionados e blobs locais de anexos e registra evidência por conversa. O agendamento é
+opt-in: defina `HANDSTACK_PRIVACY_RETENTION_ENABLED=true` e configure
+`HANDSTACK_PRIVACY_RETENTION_INTERVAL_MS` (padrão de 24 horas, mínimo de 60 segundos). Organizações
+ativas são descobertas no storage de identidade, salvo quando
+`HANDSTACK_PRIVACY_RETENTION_ORGANIZATIONS` define a lista. Instâncias da API coordenam cada tenant
+por meio de lease persistido no banco. Ao habilitar o scheduler, uma varredura ocorre no startup e
+depois em cada intervalo; os eventos de exclusão identificam o administrador nas execuções manuais
+e o serviço scheduler nas execuções agendadas. Cada execução concluída aparece em deletion jobs com
+seu total de evidências; o ID retornado consulta a evidência por conversa.
+Esses valores do scheduler fazem parte do layer tipado de configuração; execute
+`handstack config validate` para verificar o preflight efetivo sem imprimir IDs de organizações ou
+referências de segredos.
+
 ## Verify
 
-Teste mismatch de tenant, bloqueio por hold, pedido não aprovado e região proibida. Configurações
-de privacidade devem controlar separadamente prompts, respostas, payloads de tools e telemetria.
+Teste mismatch de tenant, bloqueio por hold, pedido não aprovado e região proibida. Execute também
+uma capability vinculada a consentimento com status `GRANTED` e depois da retirada. Configurações de
+privacidade devem controlar separadamente prompts, respostas, payloads de tools e telemetria.
 
 ## Troubleshooting
 

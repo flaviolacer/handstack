@@ -4,6 +4,7 @@ import {
   InMemoryIncidentStore,
   InMemoryStatusPageProvider,
   InMemoryIncidentNotificationDispatcher,
+  RepositoryIncidentEscalationPolicyStore,
 } from '../src/index.js';
 
 const input = {
@@ -113,5 +114,47 @@ describe('incident management', () => {
       'INCIDENT_CREATED',
       'INCIDENT_ACTION_UPDATED',
     ]);
+  });
+
+  it('persists escalation policies with tenant-scoped identity', async () => {
+    interface PolicyEntity {
+      readonly id: string;
+      readonly tenantId: string;
+      readonly version: number;
+      readonly createdAt: Date;
+      readonly updatedAt: Date;
+      readonly capability: string;
+      readonly levels: readonly { readonly afterMinutes: number; readonly owner: string }[];
+    }
+    const values = new Map<string, PolicyEntity>();
+    const repository = {
+      findById: (tenantId: string, id: string) => Promise.resolve(values.get(`${tenantId}:${id}`)),
+      insert: (entity: PolicyEntity) => {
+        values.set(`${entity.tenantId}:${entity.id}`, entity);
+        return Promise.resolve(entity);
+      },
+      update: (entity: PolicyEntity) => {
+        values.set(`${entity.tenantId}:${entity.id}`, entity);
+        return Promise.resolve(entity);
+      },
+    };
+    const policies = new RepositoryIncidentEscalationPolicyStore(() => repository as never);
+    const provider = new DefaultIncidentManagementProvider(
+      new InMemoryIncidentStore(),
+      undefined,
+      undefined,
+      policies,
+    );
+    await provider.setEscalationPolicy({
+      organizationId: 'org',
+      capability: 'gateway',
+      levels: [{ afterMinutes: 5, owner: 'on-call' }],
+    });
+    await expect(provider.getEscalationPolicy('org', 'gateway')).resolves.toMatchObject({
+      organizationId: 'org',
+      capability: 'gateway',
+      levels: [{ afterMinutes: 5, owner: 'on-call' }],
+    });
+    await expect(provider.getEscalationPolicy('other', 'gateway')).resolves.toBeUndefined();
   });
 });

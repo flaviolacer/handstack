@@ -23,10 +23,61 @@
       "type": "object",
       "properties": {
         "redisUrl": { "type": "string" },
-        "topology": { "enum": ["sentinel", "cluster", "managed"] }
+        "topology": { "enum": ["sentinel", "cluster", "managed"] },
+        "pendingClaimIdleMs": { "type": "integer", "minimum": 0, "maximum": 86400000 }
       },
       "required": ["redisUrl", "topology"]
     },
+    "privacyRetention": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "intervalMs": { "type": "integer", "minimum": 60000 }
+      },
+      "required": ["enabled", "intervalMs"]
+    },
+    "auditIntegrity": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "intervalMs": { "type": "integer", "minimum": 60000 },
+        "organizations": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      },
+      "required": ["enabled", "intervalMs", "organizations"]
+    },
+    "knowledgeSync": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "intervalMs": { "type": "integer", "minimum": 1 },
+        "organizations": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      },
+      "required": ["enabled", "intervalMs", "organizations"]
+    },
+    "webhooks": {
+      "type": "object",
+      "properties": { "masterKey": { "type": "string", "minLength": 0 } },
+      "required": ["masterKey"]
+    },
+    "encryption": {
+      "type": "object",
+      "properties": { "masterKey": { "type": "string", "minLength": 0 } },
+      "required": ["masterKey"]
+    },
+    "internalService": {
+      "type": "object",
+      "properties": { "token": { "type": "string", "minLength": 0 } },
+      "required": ["token"]
+    },
+    "pluginRegistry": {
+      "type": "object",
+      "properties": {
+        "trustedPublishers": { "type": "object", "additionalProperties": { "type": "string" } }
+      },
+      "required": ["trustedPublishers"]
+    },
+    "workerOrganizationId": { "type": "string" },
+    "workerHandlerModule": { "type": "string" },
     "externalSecrets": {
       "type": "object",
       "properties": {
@@ -37,5 +88,15 @@
       "required": ["enabled", "createSecret", "secretName"]
     }
   },
-  "required": ["deploymentProfile", "database", "objectStorage", "queue", "externalSecrets"]
+  "required": [
+    "deploymentProfile",
+    "database",
+    "objectStorage",
+    "queue",
+    "webhooks",
+    "encryption",
+    "internalService",
+    "pluginRegistry",
+    "externalSecrets"
+  ]
 }

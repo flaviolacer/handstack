@@ -26,8 +26,11 @@ Hold the `notifications.manage` permission and configure the target channel tran
 
 1. Build a notification with recipient, channel, subject and body.
 2. Dispatch through the matching provider.
-3. For email, provide an SMTP transport and a recipient resolver.
-4. For webhooks, provide an endpoint fetcher with bounded request and response sizes.
+3. For email, configure `HANDSTACK_SMTP_*`; `HANDSTACK_SMTP_PASSWORD_REF` is resolved on demand
+   through the tenant-scoped Secrets broker (`secret://` or allow-listed `env://` reference). Never
+   put the password in notification content or a queue payload.
+4. For webhooks, provide an endpoint fetcher with bounded request and response sizes; its abort
+   deadline uses the configured `timeouts.http` value.
 
 ## Verify
 

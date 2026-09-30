@@ -15,7 +15,19 @@ function render(...args) {
   return execFileSync(helm, ['template', 'handstack', chart, ...args], { encoding: 'utf8' });
 }
 
-const baseline = render('--set', 'images.api.tag=0.1.0', '--set', 'images.web.tag=0.1.0');
+const requiredWorkerValues = [
+  '--set',
+  'workerOrganizationId=release-validation',
+  '--set',
+  'workerHandlerModule=./domain-handlers.mjs',
+];
+const baseline = render(
+  '--set',
+  'images.api.tag=0.1.0',
+  '--set',
+  'images.web.tag=0.1.0',
+  ...requiredWorkerValues,
+);
 const candidate = render(
   '--set',
   'images.api.tag=0.2.0',
@@ -23,6 +35,7 @@ const candidate = render(
   'images.web.tag=0.2.0',
   '--set',
   'images.worker.tag=0.2.0',
+  ...requiredWorkerValues,
 );
 
 for (const [name, output] of [

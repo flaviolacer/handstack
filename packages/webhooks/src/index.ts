@@ -1,12 +1,6 @@
-import {
-  createCipheriv,
-  createDecipheriv,
-  createHash,
-  createHmac,
-  randomBytes,
-  randomUUID,
-  timingSafeEqual,
-} from 'node:crypto';
+import { createDecipheriv, createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { openSecret, sealSecret, secretAad } from '@handstack/core';
+import type { DomainEventContext, MasterKey } from '@handstack/core';
 import {
   repositoryName,
   type Repository,
@@ -93,6 +87,7 @@ export interface WebhookAuditSink {
     readonly event: WebhookEvent;
     readonly attempt: number;
     readonly error?: string;
+    readonly context?: DomainEventContext;
   }): Promise<void>;
 }
 
@@ -113,6 +108,13 @@ export interface WebhookSecretSet {
   readonly keyId: string;
   readonly previous?: { readonly secret: string; readonly keyId: string; readonly expiresAt: Date };
 }
+
+export interface WebhookSecretAccess {
+  readonly organizationId: string;
+  readonly keyId: string;
+}
+
+export type WebhookSecretAccessObserver = (access: WebhookSecretAccess) => Promise<void>;
 
 /** Secret-provider boundary; implementations may delegate to Vault/KMS/cloud secret stores. */
 export interface WebhookSecretProvider {
@@ -222,36 +224,102 @@ export class RepositoryWebhookEndpointStore implements WebhookEndpointStore {
 export class RepositoryWebhookSecretProvider implements WebhookSecretProvider {
   private readonly repository: Repository<WebhookSecretEntity>;
   private readonly encryptionKey: Buffer;
+  private readonly legacyEncryptionKey: Buffer | undefined;
+  private readonly observeAccess: WebhookSecretAccessObserver | undefined;
   constructor(
     repository: <T extends TenantEntity>(name: RepositoryName) => Repository<T>,
-    masterKey: string,
+    masterKey: MasterKey,
+    legacyMasterKey?: string,
+    observeAccess?: WebhookSecretAccessObserver,
   ) {
-    if (masterKey.length < 16) throw new Error('Webhook master key is too short');
+    if (legacyMasterKey !== undefined && legacyMasterKey.length < 16)
+      throw new Error('Legacy webhook master key is too short');
     this.repository = repository<WebhookSecretEntity>(repositoryName('webhook-secrets'));
-    this.encryptionKey = createHash('sha256').update(masterKey).digest();
+    this.encryptionKey = masterKey.derive('webhook-secrets');
+    this.legacyEncryptionKey =
+      legacyMasterKey === undefined
+        ? undefined
+        : createHash('sha256').update(legacyMasterKey).digest();
+    this.observeAccess = observeAccess;
   }
   async get(organizationId: string): Promise<WebhookSecretSet | undefined> {
     const page = await this.repository.list(organizationId, { limit: 1 });
     const entity = page.items[0];
     if (entity === undefined) return undefined;
     const previousExpiresAt = entity.previousExpiresAt;
-    const previousValid =
+    const previousRecord =
       entity.previousCiphertext !== undefined &&
       entity.previousKeyId !== undefined &&
       previousExpiresAt !== undefined &&
-      new Date(previousExpiresAt).getTime() > Date.now();
-    const result: WebhookSecretSet = {
-      current: decryptSecret(entity.currentCiphertext, this.encryptionKey),
-      keyId: entity.currentKeyId,
-      ...(previousValid
+      new Date(previousExpiresAt).getTime() > Date.now()
         ? {
-            previous: {
-              secret: decryptSecret(entity.previousCiphertext, this.encryptionKey),
-              keyId: entity.previousKeyId,
-              expiresAt: new Date(previousExpiresAt),
-            },
+            ciphertext: entity.previousCiphertext,
+            keyId: entity.previousKeyId,
+            expiresAt: previousExpiresAt,
           }
-        : {}),
+        : undefined;
+    const current = this.decrypt(entity.currentCiphertext, organizationId);
+    const previous =
+      previousRecord === undefined
+        ? undefined
+        : {
+            ...previousRecord,
+            secret: this.decrypt(previousRecord.ciphertext, organizationId),
+          };
+    const currentCiphertext = this.isLegacy(entity.currentCiphertext)
+      ? this.encrypt(current, organizationId)
+      : entity.currentCiphertext;
+    const previousCiphertext =
+      previous === undefined
+        ? undefined
+        : this.isLegacy(previous.ciphertext)
+          ? this.encrypt(previous.secret, organizationId)
+          : previous.ciphertext;
+    const clearExpiredPrevious =
+      previous === undefined &&
+      (entity.previousCiphertext !== undefined ||
+        entity.previousKeyId !== undefined ||
+        entity.previousExpiresAt !== undefined);
+    if (
+      currentCiphertext !== entity.currentCiphertext ||
+      previousCiphertext !== entity.previousCiphertext ||
+      clearExpiredPrevious
+    ) {
+      const migrated = {
+        ...entity,
+        currentCiphertext,
+        version: entity.version + 1,
+        updatedAt: new Date(),
+        ...(previousCiphertext === undefined || previous === undefined
+          ? {}
+          : {
+              previousCiphertext,
+              previousKeyId: previous.keyId,
+              previousExpiresAt: previous.expiresAt,
+            }),
+      };
+      if (previous === undefined) {
+        delete migrated.previousCiphertext;
+        delete migrated.previousKeyId;
+        delete migrated.previousExpiresAt;
+      }
+      await this.repository.update(migrated, entity.version);
+    }
+    await this.observeAccess?.({ organizationId, keyId: entity.currentKeyId });
+    if (previous !== undefined)
+      await this.observeAccess?.({ organizationId, keyId: previous.keyId });
+    const result: WebhookSecretSet = {
+      current,
+      keyId: entity.currentKeyId,
+      ...(previous === undefined
+        ? {}
+        : {
+            previous: {
+              secret: previous.secret,
+              keyId: previous.keyId,
+              expiresAt: new Date(previous.expiresAt),
+            },
+          }),
     };
     return result;
   }
@@ -263,38 +331,58 @@ export class RepositoryWebhookSecretProvider implements WebhookSecretProvider {
   ): Promise<WebhookSecretSet> {
     if (secret.length < 16) throw new Error('Webhook secret must contain at least 16 characters');
     const existing = await this.repository.findById(organizationId, organizationId);
-    const next: WebhookSecretEntity = {
+    const nextBase: WebhookSecretEntity = {
       id: organizationId,
       tenantId: organizationId,
-      currentCiphertext: encryptSecret(secret, this.encryptionKey),
+      currentCiphertext: this.encrypt(secret, organizationId),
       currentKeyId: keyId,
       version: existing === undefined ? 1 : existing.version + 1,
       createdAt: existing?.createdAt ?? new Date(),
       updatedAt: new Date(),
-      ...(existing === undefined
-        ? {}
-        : {
-            previousCiphertext: existing.currentCiphertext,
-            previousKeyId: existing.currentKeyId,
-            previousExpiresAt: new Date(Date.now() + overlapMs),
-          }),
     };
-    if (existing === undefined) await this.repository.insert(next);
-    else await this.repository.update(next, existing.version);
+    if (existing === undefined) {
+      await this.repository.insert(nextBase);
+      return { current: secret, keyId };
+    }
+    const existingCurrent = this.decrypt(existing.currentCiphertext, organizationId);
+    await this.observeAccess?.({ organizationId, keyId: existing.currentKeyId });
+    const next: WebhookSecretEntity = {
+      ...nextBase,
+      previousCiphertext: this.encrypt(existingCurrent, organizationId),
+      previousKeyId: existing.currentKeyId,
+      previousExpiresAt: new Date(Date.now() + overlapMs),
+    };
+    await this.repository.update(next, existing.version);
     return {
       current: secret,
       keyId,
-      ...(existing === undefined
-        ? {}
-        : {
-            previous: {
-              secret: decryptSecret(existing.currentCiphertext, this.encryptionKey),
-              keyId: existing.currentKeyId,
-              expiresAt: new Date(Date.now() + overlapMs),
-            },
-          }),
+      previous: {
+        secret: existingCurrent,
+        keyId: existing.currentKeyId,
+        expiresAt: new Date(Date.now() + overlapMs),
+      },
     };
   }
+
+  private encrypt(secret: string, organizationId: string): string {
+    return sealSecret(secret, this.encryptionKey, webhookSecretAad(organizationId));
+  }
+
+  private decrypt(envelope: string, organizationId: string): string {
+    if (!this.isLegacy(envelope))
+      return openSecret(envelope, this.encryptionKey, webhookSecretAad(organizationId));
+    if (this.legacyEncryptionKey === undefined)
+      throw new Error('Legacy webhook secret requires HANDSTACK_WEBHOOK_MASTER_KEY for migration');
+    return decryptSecret(envelope, this.legacyEncryptionKey);
+  }
+
+  private isLegacy(envelope: string): boolean {
+    return !envelope.startsWith('hs-aes256gcm-v1.');
+  }
+}
+
+function webhookSecretAad(organizationId: string): string {
+  return secretAad({ organizationId, pluginId: 'webhook-signing' });
 }
 
 /** Durable boundary for delivery idempotency and terminal state. */
@@ -504,6 +592,7 @@ export class WebhookDispatcher {
     readonly source?: string;
     readonly timestamp?: string;
     readonly keyId?: string;
+    readonly context?: DomainEventContext;
   }): Promise<WebhookDelivery> {
     return await this.dispatchInternal(input, false);
   }
@@ -519,6 +608,7 @@ export class WebhookDispatcher {
     readonly source?: string;
     readonly timestamp?: string;
     readonly keyId?: string;
+    readonly context?: DomainEventContext;
   }): Promise<WebhookDelivery> {
     return await this.dispatchInternal(input, true);
   }
@@ -534,6 +624,7 @@ export class WebhookDispatcher {
       readonly source?: string;
       readonly timestamp?: string;
       readonly keyId?: string;
+      readonly context?: DomainEventContext;
     },
     force: boolean,
   ): Promise<WebhookDelivery> {
@@ -582,6 +673,7 @@ export class WebhookDispatcher {
         deliveryId: input.id,
         event: input.event,
         attempt,
+        ...(input.context === undefined ? {} : { context: input.context }),
       });
       const attemptLog: WebhookAttempt = { attempt, startedAt, status: 'PENDING' };
       attempts = [...attempts, attemptLog];
@@ -614,6 +706,7 @@ export class WebhookDispatcher {
           deliveryId: input.id,
           event: input.event,
           attempt,
+          ...(input.context === undefined ? {} : { context: input.context }),
         });
         await this.store.save(delivered);
         return delivered;
@@ -632,6 +725,7 @@ export class WebhookDispatcher {
           deliveryId: input.id,
           event: input.event,
           attempt,
+          ...(input.context === undefined ? {} : { context: input.context }),
           error: lastError,
         });
         attempts = [
@@ -668,6 +762,7 @@ export class WebhookDispatcher {
       deliveryId: input.id,
       event: input.event,
       attempt: this.maxAttempts,
+      ...(input.context === undefined ? {} : { context: input.context }),
       ...(lastError === undefined ? {} : { error: lastError }),
     });
     await this.store.save(dead);
@@ -815,14 +910,6 @@ function redactPayload(value: unknown): unknown {
 
 function redactError(message: string, secret: string): string {
   return message.replaceAll(secret, '[REDACTED]').slice(0, 500);
-}
-
-function encryptSecret(secret: string, key: Buffer): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
-  const ciphertext = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return [iv, tag, ciphertext].map((part) => part.toString('base64url')).join('.');
 }
 
 function decryptSecret(encoded: string, key: Buffer): string {

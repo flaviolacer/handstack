@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+title: HandStack
+message: If HandStack contributes to your research or software, please cite this repository.
+type: software
+authors:
+  - name: HandStack contributors
+repository-code: https://github.com/handstack/handstack
+url: https://github.com/handstack/handstack
+license: Apache-2.0
+abstract: >-
+  An open-source AI workspace, agent runtime, gateway, and capability platform with governed
+  execution across Web, REST, MCP, and Agent channels.
+keywords:
+  - artificial intelligence
+  - agents
+  - capabilities
+  - governance
+  - MCP
+  - TypeScript

@@ -26,6 +26,17 @@ jobs:
       - run: npm run format:check
       - run: npm run release:validate
       - run: npm run integration:validate
+      - run: npm run dr:validate
+      - run: npm run container:validate
+      - run: npm run security:validate
+      - run: npm run scope:audit
+      - run: npm run openapi:validate
+      - run: npm run helm:validate
+      - run: npm run kubernetes:validate
+      - run: npm run helm:release:validate
+      - run: npm run resilience:validate
+      - run: npm run observability:validate
+      - run: npm run frontend:validate
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run docs:validate
@@ -113,6 +124,47 @@ jobs:
         env:
           HANDSTACK_TEST_MONGODB_URL: mongodb://127.0.0.1:27017/?replicaSet=rs0
         run: npm --workspace @handstack/identity-storage run test:mongodb
+      - name: API MongoDB-only startup and settings
+        env:
+          HANDSTACK_TEST_MONGODB_URL: mongodb://127.0.0.1:27017/handstack_api_smoke?replicaSet=rs0
+          HANDSTACK_LOG_LEVEL: error
+        run: npm --workspace @handstack/api exec -- vitest run tests/mongodb.startup.integration.test.ts --reporter=dot
+      - name: Cleanup database containers
+        if: always()
+        run: docker rm --force handstack-postgres handstack-mongodb 2>/dev/null || true
+
+  redis-conformance:
+    name: Redis Streams conformance
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Start Redis
+        run: |
+          docker run --detach --name handstack-redis --publish 6379:6379 redis:7.4
+          until docker exec handstack-redis redis-cli ping | grep PONG; do sleep 2; done
+      - name: Redis Streams integration
+        env:
+          HANDSTACK_TEST_REDIS_URL: redis://127.0.0.1:6379
+        run: npm --workspace @handstack/core run test:redis
+      - name: Distributed worker and BullMQ integration
+        env:
+          HANDSTACK_TEST_REDIS_URL: redis://127.0.0.1:6379
+        run: npm --workspace @handstack/worker exec -- vitest run --config vitest.config.ts tests/redis.integration.test.ts
+      - name: API runtime to Redis to worker integration
+        env:
+          HANDSTACK_TEST_REDIS_URL: redis://127.0.0.1:6379
+          HANDSTACK_LOG_LEVEL: error
+        run: npm --workspace @handstack/api exec -- vitest run tests/distributed.queue.integration.test.ts --reporter=dot
+      - name: Cleanup Redis container
+        if: always()
+        run: docker rm --force handstack-redis 2>/dev/null || true
 
   official-sql-conformance:
     name: MySQL, MariaDB, and SQL Server conformance
@@ -169,6 +221,9 @@ jobs:
           HANDSTACK_TEST_SQL_TRUST_CERT: 'true'
           HANDSTACK_TEST_SQL_URL: mssql://sa:HandStack%21Passw0rd@localhost:1433/handstack_test
         run: npm --workspace @handstack/database-typeorm run test:official-sql
+      - name: Cleanup official SQL containers
+        if: always()
+        run: docker rm --force handstack-mysql handstack-mariadb handstack-sqlserver 2>/dev/null || true
 
   graph:
     name: Structural knowledge graph

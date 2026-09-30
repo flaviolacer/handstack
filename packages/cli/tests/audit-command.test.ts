@@ -21,6 +21,10 @@ function runtime() {
     sink,
     provider: new TamperEvidentAuditSink(sink),
     signingKey: () => 'audit-test-key',
+    async *read(path: string) {
+      await Promise.resolve();
+      yield files.get(path) ?? '';
+    },
     async write(path: string, content: AsyncIterable<string>) {
       let value = '';
       for await (const chunk of content) value += chunk;
@@ -51,5 +55,41 @@ describe('audit CLI commands', () => {
     await executeAuditCommand(['export', '--tenant', 'org-a', '--output', 'audit.ndjson'], current);
     expect(current.files.get('audit.ndjson')).toContain('event-1');
     expect(current.files.get('audit.ndjson')).not.toContain('event-2');
+    expect(JSON.parse(current.files.get('audit.ndjson.manifest.json') ?? '{}')).toMatchObject({
+      organizationId: 'org-a',
+      eventCount: 1,
+      firstEventId: 'event-1',
+      lastEventId: 'event-1',
+      format: 'ndjson',
+    });
+    await executeAuditCommand(
+      [
+        'verify-export',
+        '--tenant',
+        'org-a',
+        '--input',
+        'audit.ndjson',
+        '--manifest',
+        'audit.ndjson.manifest.json',
+      ],
+      current,
+    );
+    expect(current.outputValues.at(-1)).toContain('"valid":true');
+    const exported = current.files.get('audit.ndjson') ?? '';
+    current.files.set('audit.ndjson', `${exported}tampered`);
+    await expect(
+      executeAuditCommand(
+        [
+          'verify-export',
+          '--tenant',
+          'org-a',
+          '--input',
+          'audit.ndjson',
+          '--manifest',
+          'audit.ndjson.manifest.json',
+        ],
+        current,
+      ),
+    ).rejects.toThrow('Audit export verification failed');
   });
 });

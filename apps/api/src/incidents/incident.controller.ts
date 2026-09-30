@@ -8,6 +8,7 @@ import { AccessTokenGuard } from '../auth/access-token.guard.js';
 import { AuthRuntimeService } from '../auth/auth-runtime.service.js';
 import {
   requireAuthentication,
+  requestTraceContext,
   type AuthenticatedRequest,
 } from '../auth/authentication-context.js';
 import { IncidentRuntimeService } from './incident-runtime.service.js';
@@ -53,6 +54,17 @@ const policySchema = z.object({
     .max(20),
 });
 
+function eventContext(request: AuthenticatedRequest) {
+  const auth = requireAuthentication(request);
+  const trace = requestTraceContext(request);
+  return {
+    requestId: trace.requestId,
+    traceId: trace.traceId,
+    principalId: auth.subject,
+    source: 'API' as const,
+  };
+}
+
 @ApiTags('Incidents')
 @ApiBearerAuth()
 @Controller('api/v1/organizations/:organizationId/incidents')
@@ -93,20 +105,24 @@ export class IncidentController {
     @Body() value: unknown,
   ) {
     await this.authorize(organizationId, request, 'incidents.manage');
+    const context = eventContext(request);
     const parsed = createSchema.safeParse(value);
     if (!parsed.success)
       throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid incident');
     const { id, rootCause, ...body } = parsed.data;
-    return this.runtime.create({
-      id: id ?? randomUUID(),
-      organizationId,
-      status: 'DETECTED',
-      startedAt: new Date(),
-      detectedAt: new Date(),
-      correctiveActions: [],
-      ...body,
-      ...(rootCause === undefined ? {} : { rootCause }),
-    });
+    return this.runtime.create(
+      {
+        id: id ?? randomUUID(),
+        organizationId,
+        status: 'DETECTED',
+        startedAt: new Date(),
+        detectedAt: new Date(),
+        correctiveActions: [],
+        ...body,
+        ...(rootCause === undefined ? {} : { rootCause }),
+      },
+      context,
+    );
   }
   @Patch(':id/status')
   async transition(
@@ -118,13 +134,16 @@ export class IncidentController {
     const auth = await this.authorize(organizationId, request, 'incidents.manage');
     const parsed = transitionSchema.safeParse(value);
     if (!parsed.success) throw new ValidationError('Invalid incident transition');
-    return this.runtime.transition({
-      organizationId,
-      id,
-      status: parsed.data.status,
-      actor: auth.subject,
-      ...(parsed.data.message === undefined ? {} : { message: parsed.data.message }),
-    });
+    return this.runtime.transition(
+      {
+        organizationId,
+        id,
+        status: parsed.data.status,
+        actor: auth.subject,
+        ...(parsed.data.message === undefined ? {} : { message: parsed.data.message }),
+      },
+      eventContext(request),
+    );
   }
   @Post(':id/timeline')
   async timeline(
@@ -136,7 +155,10 @@ export class IncidentController {
     const auth = await this.authorize(organizationId, request, 'incidents.manage');
     const parsed = timelineSchema.safeParse(value);
     if (!parsed.success) throw new ValidationError('Invalid timeline entry');
-    return this.runtime.addTimeline({ organizationId, id, actor: auth.subject, ...parsed.data });
+    return this.runtime.addTimeline(
+      { organizationId, id, actor: auth.subject, ...parsed.data },
+      eventContext(request),
+    );
   }
   @Patch(':id/actions/:actionId')
   async action(
@@ -150,15 +172,18 @@ export class IncidentController {
     const parsed = actionSchema.safeParse(value);
     if (!parsed.success) throw new ValidationError('Invalid corrective action');
     const { description, owner, dueAt, completed } = parsed.data;
-    return this.runtime.updateAction({
-      organizationId,
-      id,
-      actionId,
-      ...(description === undefined ? {} : { description }),
-      ...(owner === undefined ? {} : { owner }),
-      ...(dueAt === undefined ? {} : { dueAt }),
-      ...(completed === undefined ? {} : { completed }),
-    });
+    return this.runtime.updateAction(
+      {
+        organizationId,
+        id,
+        actionId,
+        ...(description === undefined ? {} : { description }),
+        ...(owner === undefined ? {} : { owner }),
+        ...(dueAt === undefined ? {} : { dueAt }),
+        ...(completed === undefined ? {} : { completed }),
+      },
+      eventContext(request),
+    );
   }
   @Get('escalation-policies/:capability')
   async policy(

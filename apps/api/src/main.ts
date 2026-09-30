@@ -8,11 +8,18 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import 'reflect-metadata';
 import { AppModule } from './app.module.js';
 import { ProblemDetailsFilter } from './http/problem-details.filter.js';
+import { configLayerFromEnvironment, resolveConfigLayers } from '@handstack/config';
+import { loadConfigFile } from './database/config-file.js';
+
+function runtimeConfig() {
+  return resolveConfigLayers(configLayerFromEnvironment(process.env), loadConfigFile());
+}
 
 export async function createApplication(): Promise<NestFastifyApplication> {
+  const config = runtimeConfig();
   const structuredLogger = createLogger({
     name: 'handstack-api',
-    level: process.env.HANDSTACK_LOG_LEVEL ?? 'info',
+    level: config.logging.level,
   });
   const adapter = new FastifyAdapter({ bodyLimit: 1024 * 1024, trustProxy: true });
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, {
@@ -43,16 +50,18 @@ export async function createApplication(): Promise<NestFastifyApplication> {
 }
 
 async function bootstrap(): Promise<void> {
+  const config = runtimeConfig();
   const telemetry = initializeTelemetry({
-    enabled: process.env.HANDSTACK_TELEMETRY_ENABLED === 'true',
+    enabled: config.telemetry.enabled,
+    privacyAllowed: config.privacy.sendTelemetry,
     serviceName: 'handstack-api',
     serviceVersion: '0.0.0',
-    ...(process.env.HANDSTACK_OTLP_ENDPOINT === undefined
+    ...(config.telemetry.otlpEndpoint === undefined
       ? {}
-      : { otlpEndpoint: process.env.HANDSTACK_OTLP_ENDPOINT }),
+      : { otlpEndpoint: config.telemetry.otlpEndpoint }),
   });
   const app = await createApplication();
-  const port = Number.parseInt(process.env.HANDSTACK_API_PORT ?? '3001', 10);
+  const port = config.server.apiPort;
   await app.listen(port, '0.0.0.0');
   const shutdown = async (): Promise<void> => {
     await app.close();

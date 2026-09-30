@@ -50,6 +50,7 @@ export interface UsageRecord extends TenantEntity {
   readonly inputTokens: number;
   readonly outputTokens: number;
   readonly costUsd: number;
+  readonly traceId?: string;
 }
 
 export interface CostRecord extends TenantEntity {
@@ -58,6 +59,7 @@ export interface CostRecord extends TenantEntity {
   readonly amountUsd: number;
   readonly currency: 'USD';
   readonly source: 'MODEL' | 'TOOL' | 'CAPABILITY';
+  readonly traceId?: string;
 }
 
 export interface ProviderPricing extends TenantEntity {
@@ -278,6 +280,7 @@ export class BudgetEngine {
       keyof TenantEntity | 'organizationId' | 'reservationId' | 'principalId' | 'costUsd'
     > & { scopeType: BudgetScopeType; scopeKey: string };
     source?: CostRecord['source'];
+    traceId?: string;
   }): Promise<{ reservation: BudgetReservation; cost: CostRecord }> {
     assertMoney(input.actualUsd, 'actualUsd');
     const timestamp = this.now();
@@ -323,6 +326,7 @@ export class BudgetEngine {
           amountUsd: input.actualUsd,
           currency: 'USD',
           source: input.source ?? 'MODEL',
+          ...(input.traceId === undefined ? {} : { traceId: input.traceId }),
         };
         await context.repository<UsageRecord>(repositories.usage).insert({
           id: uuidV7(timestamp.getTime() + 1),
@@ -335,6 +339,7 @@ export class BudgetEngine {
           ...input.usage,
           principalId: reservation.principalId,
           costUsd: input.actualUsd,
+          ...(input.traceId === undefined ? {} : { traceId: input.traceId }),
         });
         await context.repository<CostRecord>(repositories.costs).insert(cost);
         return { reservation: settled, cost };
@@ -346,6 +351,12 @@ export class BudgetEngine {
 
 export class PricingCatalog {
   constructor(private readonly adapter: DatabaseAdapter) {}
+
+  listModelPricing(organizationId: string) {
+    return this.adapter
+      .repository<ModelPricing>(repositories.modelPricing)
+      .list(organizationId, { limit: 100 });
+  }
 
   async setModelPricing(input: Omit<ModelPricing, keyof TenantEntity>): Promise<ModelPricing> {
     assertMoney(input.inputUsdPerMillionTokens, 'inputUsdPerMillionTokens');

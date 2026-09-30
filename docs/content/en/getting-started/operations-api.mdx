@@ -7,7 +7,7 @@ permissions: [feature-flags.manage, audit.read, jobs.manage]
 features: [operations-api, feature-flags, audit, jobs]
 deploymentProfiles: [compact, distributed]
 introducedIn: 0.21.0
-lastReviewedAt: 2026-09-09
+lastReviewedAt: 2026-09-28
 owner: platform-team
 tags: [api, operations, governance]
 ---
@@ -27,12 +27,15 @@ permission decision.
 
 1. `GET/PUT /feature-flags/:key` to resolve or set organization/user overrides.
 2. `GET /audit` to query append-only evidence for the current organization.
-3. `POST /jobs/:queue` with an idempotency key to enqueue bounded work.
+3. `GET /audit/verify` to verify the tenant's tamper-evident hash chain. The operation records an
+   `AUDIT_VERIFIED` event with the checked count and validity, without exposing audit secrets.
+4. `POST /jobs/:queue` with an idempotency key to enqueue bounded work.
 
 ## Verify
 
 Cross-organization requests, missing bearer tokens and denied permissions must fail. Queue capacity
 returns typed backpressure with retry guidance; audit responses never include another tenant.
+Verification also requires `audit.read` and returns `valid`, `checked` and bounded `errors` fields.
 
 ## Troubleshooting
 

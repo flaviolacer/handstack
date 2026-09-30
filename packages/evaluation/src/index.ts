@@ -160,6 +160,14 @@ export interface EvaluationCaseResult {
   readonly evidenceDigest: string;
 }
 
+export interface EvaluationResult extends TenantEntity {
+  readonly organizationId: string;
+  readonly runId: string;
+  readonly caseId: string;
+  readonly scores: Readonly<Record<string, number>>;
+  readonly evidenceDigest: string;
+}
+
 export interface EvaluationRunRecord extends TenantEntity {
   readonly organizationId: string;
   readonly modelDefinitionId: string;
@@ -193,9 +201,80 @@ export interface EvaluationCaseRunner {
   runCase(input: EvaluationCaseRunnerInput): Promise<EvaluationCaseRunnerResult>;
 }
 
+/** Required attack surfaces for a release red-team campaign. */
+export const minimumRedTeamVectors = [
+  'jailbreak',
+  'indirect_prompt_injection',
+  'data_exfiltration',
+  'cross_tenant_access',
+  'unsafe_tool_use',
+  'excessive_agency',
+  'denial_of_wallet',
+  'rag_poisoning',
+] as const;
+
+export type RedTeamVector = (typeof minimumRedTeamVectors)[number];
+
+export interface RedTeamScenario {
+  readonly id: string;
+  readonly vector: RedTeamVector;
+  readonly input: Readonly<Record<string, unknown>>;
+}
+
+export interface RedTeamFinding {
+  readonly scenarioId: string;
+  readonly vector: RedTeamVector;
+  readonly passed: boolean;
+  readonly severity: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  readonly evidenceDigest: string;
+}
+
+export interface RedTeamCampaign extends TenantEntity {
+  readonly organizationId: string;
+  readonly targetKind: 'MODEL' | 'PROMPT' | 'AGENT' | 'WORKFLOW';
+  readonly targetId: string;
+  readonly campaignVersion: string;
+  readonly scenarios: readonly RedTeamScenario[];
+  readonly status: 'DRAFT' | 'RUNNING' | 'PASSED' | 'FAILED';
+  readonly findings: readonly RedTeamFinding[];
+  readonly executedAt?: Date;
+  readonly executionErrorDigest?: string;
+}
+
+export interface RedTeamScenarioRunner {
+  runScenario(input: {
+    readonly organizationId: string;
+    readonly campaign: RedTeamCampaign;
+    readonly scenario: RedTeamScenario;
+  }): Promise<{
+    readonly passed: boolean;
+    readonly severity: RedTeamFinding['severity'];
+    readonly evidence: unknown;
+  }>;
+}
+
+export const redTeamSchema = {
+  version: 1,
+  repository: repositoryName('red-team-campaigns'),
+} as const;
+
+function validateRedTeamCampaign(campaign: RedTeamCampaign): void {
+  if (campaign.organizationId === '' || campaign.targetId === '' || campaign.campaignVersion === '')
+    throw new Error('Red-team campaign metadata is incomplete');
+  const vectors = new Set(campaign.scenarios.map(({ vector }) => vector));
+  const missing = minimumRedTeamVectors.filter((vector) => !vectors.has(vector));
+  if (missing.length > 0)
+    throw new Error(`Red-team campaign is missing vectors: ${missing.join(', ')}`);
+  if (new Set(campaign.scenarios.map(({ id }) => id)).size !== campaign.scenarios.length)
+    throw new Error('Red-team scenario IDs must be unique');
+  if (campaign.status !== 'DRAFT' || campaign.findings.length !== 0)
+    throw new Error('New red-team campaigns must start as DRAFT');
+}
+
 const suiteRepository = repositoryName('evaluation-suites');
 const datasetRepository = repositoryName('evaluation-datasets');
 const runRepository = repositoryName('evaluation-runs');
+const resultRepository = repositoryName('evaluation-results');
 const auditRepository = repositoryName('model-audit-events');
 
 export const evaluationSchema = {
@@ -204,6 +283,7 @@ export const evaluationSchema = {
     suites: suiteRepository,
     datasets: datasetRepository,
     runs: runRepository,
+    results: resultRepository,
     auditEvents: auditRepository,
   },
 } as const;
@@ -351,6 +431,18 @@ export class CoreEvaluationProvider implements EvaluationProvider {
     return this.runs.findById(organizationId, runId);
   }
 
+  listResults(organizationId: string, runId: string, limit = 200) {
+    return this.adapter
+      .repository<EvaluationResult>(resultRepository)
+      .list(organizationId, { limit })
+      .then((page) => ({
+        ...page,
+        items: page.items
+          .filter((result) => result.runId === runId)
+          .sort((left, right) => left.caseId.localeCompare(right.caseId)),
+      }));
+  }
+
   async run(input: EvaluationRunInput): Promise<EvaluationRunResult> {
     return this.telemetry.measure('evaluation.run', () => this.executeRun(input));
   }
@@ -432,6 +524,21 @@ export class CoreEvaluationProvider implements EvaluationProvider {
               promptContentDigest: input.promptContentDigest,
             }),
       });
+      const results = context.repository<EvaluationResult>(resultRepository);
+      for (const caseResult of caseResults) {
+        await results.insert({
+          id: digest({ runId, caseId: caseResult.caseId }),
+          tenantId: input.organizationId,
+          organizationId: input.organizationId,
+          version: 1,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          runId,
+          caseId: caseResult.caseId,
+          scores: caseResult.scores,
+          evidenceDigest: caseResult.evidenceDigest,
+        });
+      }
       await this.appendAudit(
         context,
         input.organizationId,
@@ -509,6 +616,137 @@ export class CoreEvaluationProvider implements EvaluationProvider {
       resourceId,
       outcome: 'SUCCESS',
       metadata,
+    });
+  }
+}
+
+export class RedTeamCampaignService {
+  private readonly campaigns: Repository<RedTeamCampaign>;
+
+  constructor(
+    private readonly adapter: DatabaseAdapter,
+    private readonly runner: RedTeamScenarioRunner,
+    private readonly now: () => Date = () => new Date(),
+  ) {
+    this.campaigns = adapter.repository(redTeamSchema.repository);
+  }
+
+  async register(campaign: RedTeamCampaign): Promise<RedTeamCampaign> {
+    assertScope(campaign.organizationId, campaign);
+    validateRedTeamCampaign(campaign);
+    return this.adapter.run(async (context) => {
+      const saved = await context
+        .repository<RedTeamCampaign>(redTeamSchema.repository)
+        .insert(campaign);
+      await context.repository<ModelAuditEvent>(auditRepository).insert({
+        id: uuidV7(campaign.createdAt.getTime()),
+        tenantId: campaign.organizationId,
+        organizationId: campaign.organizationId,
+        version: 1,
+        createdAt: campaign.createdAt,
+        updatedAt: campaign.createdAt,
+        eventType: 'RED_TEAM_CAMPAIGN_REGISTERED',
+        resourceType: 'red_team_campaign',
+        resourceId: campaign.id,
+        outcome: 'SUCCESS',
+        metadata: {
+          targetKind: campaign.targetKind,
+          targetId: campaign.targetId,
+          campaignVersion: campaign.campaignVersion,
+        },
+      });
+      return saved;
+    });
+  }
+
+  list(organizationId: string, limit = 100) {
+    return this.campaigns.list(organizationId, { limit });
+  }
+
+  get(organizationId: string, campaignId: string) {
+    return this.campaigns.findById(organizationId, campaignId);
+  }
+
+  /** Fails publication when a configured model campaign is not passing. */
+  async assertPublicationAllowed(
+    organizationId: string,
+    targetKind: 'MODEL' | 'PROMPT',
+    targetId: string,
+  ): Promise<void> {
+    const campaigns = (await this.list(organizationId, 100)).items.filter(
+      (campaign) => campaign.targetKind === targetKind && campaign.targetId === targetId,
+    );
+    if (campaigns.some((campaign) => campaign.status !== 'PASSED'))
+      throw new Error('Passing red-team campaign is required for model publication');
+  }
+
+  async execute(organizationId: string, campaignId: string): Promise<RedTeamCampaign> {
+    const current = await this.campaigns.findById(organizationId, campaignId);
+    if (current === undefined) throw new Error('Red-team campaign not found');
+    assertScope(organizationId, current);
+    if (current.status === 'RUNNING') throw new Error('Red-team campaign is already running');
+    const startedAt = this.now();
+    const running: RedTeamCampaign = {
+      ...current,
+      version: current.version + 1,
+      updatedAt: startedAt,
+      status: 'RUNNING',
+    };
+    await this.campaigns.update(running, current.version);
+    const findings: RedTeamFinding[] = [];
+    let executionErrorDigest: string | undefined;
+    try {
+      for (const scenario of current.scenarios) {
+        const result = await this.runner.runScenario({
+          organizationId,
+          campaign: current,
+          scenario,
+        });
+        findings.push({
+          scenarioId: scenario.id,
+          vector: scenario.vector,
+          passed: result.passed,
+          severity: result.severity,
+          evidenceDigest: digest(result.evidence),
+        });
+      }
+    } catch (error) {
+      executionErrorDigest = digest(
+        error instanceof Error ? error.message : 'red-team executor failed',
+      );
+    }
+    const completedAt = this.now();
+    const completed: RedTeamCampaign = {
+      ...running,
+      version: running.version + 1,
+      updatedAt: completedAt,
+      status:
+        executionErrorDigest === undefined &&
+        findings.every(({ passed, severity }) => passed && severity === 'NONE')
+          ? 'PASSED'
+          : 'FAILED',
+      findings,
+      executedAt: completedAt,
+      ...(executionErrorDigest === undefined ? {} : { executionErrorDigest }),
+    };
+    return this.adapter.run(async (context) => {
+      const updated = await context
+        .repository<RedTeamCampaign>(redTeamSchema.repository)
+        .update(completed, running.version);
+      await context.repository<ModelAuditEvent>(auditRepository).insert({
+        id: uuidV7(completedAt.getTime()),
+        tenantId: organizationId,
+        organizationId,
+        version: 1,
+        createdAt: completedAt,
+        updatedAt: completedAt,
+        eventType: 'RED_TEAM_CAMPAIGN_COMPLETED',
+        resourceType: 'red_team_campaign',
+        resourceId: completed.id,
+        outcome: completed.status === 'PASSED' ? 'SUCCESS' : 'FAILURE',
+        metadata: { status: completed.status, findingCount: findings.length },
+      });
+      return updated;
     });
   }
 }

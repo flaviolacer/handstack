@@ -9,6 +9,29 @@
   --hs-text: #f7f7fb;
   --hs-muted: #a5a8b8;
   --hs-border: #2b2e3b;
+  --hs-font: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+:root[data-hs-theme='light'] {
+  --hs-surface: #ffffff;
+  --hs-text: #111827;
+  --hs-muted: #4b5563;
+  --hs-border: #d1d5db;
+}
+
+:root[data-hs-theme='system'] {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-hs-theme='system'] {
+    --hs-background: #f8fafc;
+    --hs-surface: #ffffff;
+    --hs-text: #111827;
+    --hs-muted: #4b5563;
+    --hs-border: #d1d5db;
+    color-scheme: light;
+  }
 }
 
 * {
@@ -22,7 +45,7 @@ body {
   overflow-x: hidden;
   background: var(--hs-background);
   color: var(--hs-text);
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--hs-font);
 }
 a {
   color: inherit;

@@ -45,6 +45,7 @@ import {
   type AuthenticatedRequest,
 } from '../auth/authentication-context.js';
 import { ChatRuntimeService } from './chat-runtime.service.js';
+import { ChatRateLimitService } from './chat-rate-limit.service.js';
 import {
   appendMessageSchema,
   attachmentUploadQuerySchema,
@@ -91,6 +92,7 @@ export class ChatController {
   constructor(
     @Inject(AuthRuntimeService) auth: AuthRuntimeService,
     @Inject(ChatRuntimeService) private readonly runtime: ChatRuntimeService,
+    @Inject(ChatRateLimitService) private readonly rateLimit: ChatRateLimitService,
   ) {
     this.administration = new IdentityAdministrationService(auth.storage);
   }
@@ -104,6 +106,17 @@ export class ChatController {
   ) {
     await this.authorize(organizationId, request);
     return this.runtime.listPublishedModels(organizationId);
+  }
+
+  @Get('chat/agents')
+  @ApiOperation({ summary: 'List published agents available to the chat workspace' })
+  @ApiOkResponse({ description: 'Published WEB agents without implementation details' })
+  async agents(
+    @Param('organizationId') organizationId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    await this.authorize(organizationId, request);
+    return this.runtime.listPublishedAgents(organizationId);
   }
 
   @Get('conversations')
@@ -326,16 +339,19 @@ export class ChatController {
     if (idempotencyKey === undefined || idempotencyKey.trim() === '')
       throw new ValidationError('Idempotency-Key is required');
     const input = parse(executeChatSchema, value);
+    await this.rateLimit.consume(organizationId);
     return this.runtime.startExecution({
       organizationId,
       conversationId,
       branchId,
       createdBy: subject,
       model: input.model,
+      ...(input.agentId === undefined ? {} : { agentId: input.agentId }),
       dataClassification: input.dataClassification,
       idempotencyKey,
       ...(input.parentMessageId === undefined ? {} : { parentMessageId: input.parentMessageId }),
       ...(input.traceId === undefined ? {} : { traceId: input.traceId }),
+      ...(input.knowledgeBaseId === undefined ? {} : { knowledgeBaseId: input.knowledgeBaseId }),
     });
   }
 

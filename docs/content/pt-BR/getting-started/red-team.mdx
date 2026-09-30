@@ -1,0 +1,42 @@
+---
+id: getting-started/red-team
+title: Executar campanhas de red team governadas
+description: Crie campanhas adversariais versionadas e revise findings antes do release.
+audience: [platform-operator, security-engineer]
+permissions: [red-team.manage]
+features: [red-team, evaluations, governance]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.5.0
+lastReviewedAt: 2026-09-15
+owner: security-team
+tags: [red-team, security, evaluation]
+---
+
+# Executar campanhas de red team governadas
+
+## Purpose and expected outcome
+
+Use uma campanha versionada para exercitar agents, modelos, capabilities ou workflows com casos
+adversariais. Findings são redigidos, auditáveis e permanecem associados à versão exata do alvo.
+
+## Prerequisites
+
+- Um principal com `red-team.manage` na organização.
+- Um alvo publicado e um dataset de avaliação aprovado ou conjunto de vetores da campanha.
+
+## Steps
+
+1. Crie uma campanha e identifique tipo do alvo, versão, owner e classificação de dados.
+2. Adicione vetores de prompt injection, bypass de autorização, vazamento e comportamento inseguro de tools.
+3. Execute a campanha e revise findings persistidos e o evento de auditoria.
+4. Resolva ou aceite cada finding com decisão explícita antes de publicar o alvo afetado.
+
+## Verify
+
+Confirme que findings não contêm prompts, secrets ou respostas sensíveis brutas e que uma campanha
+de outra organização não pode ser lida nem executada.
+
+## Troubleshooting
+
+- Uma campanha não pode executar contra alvo não publicado ou versão alterada.
+- A ausência de `red-team.manage` é negada antes da execução por design.

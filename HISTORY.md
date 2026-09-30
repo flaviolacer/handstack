@@ -1,5 +1,245 @@
 # HandStack — Ledger de implementação
 
+### M442 — laboratório local de certificação (2026-09-29)
+
+- `LOCAL-CERTIFICATION-LAB.md` documenta os serviços Docker ativos, reprodução, portas e limites
+  deliberados do laboratório local.
+- O pacote de release recebeu `local-lab-summary.md`, mantendo separados os 19 gates locais verdes
+  e os seis gates externos que ainda exigem ambiente autorizado.
+
+### M441 — runbooks externos e E2E local SDK/CLI (2026-09-29)
+
+- `CERTIFICATION-RUNBOOKS.md` consolida pré-condições, owners, comandos, evidências e critérios
+  para os seis gates externos sem armazenar credenciais.
+- SDK passou 22/22 testes e CLI passou 2/2 jornadas de processo; os logs e o resumo foram anexados
+  ao pacote de release candidate.
+
+### M440 — E2E HTTP de governança de access grants (2026-09-29)
+
+- A nova jornada autenticada cobre submissão, aprovação, rejeição de revogação com `requestId`
+  incorreto e revogação correta do grant pela API.
+- O teste `apps/api/tests/access-governance.http.test.ts` passou 1/1, reforçando a evidência de
+  runtime do contrato OpenAPI e da proteção contra vínculo cruzado.
+
+### M439 — contrato OpenAPI e vínculo de grants (2026-09-29)
+
+- O validador OpenAPI passou a verificar todas as 205 rotas e 267 operações, com `operationId`
+  único, respostas declaradas e parâmetros de caminho obrigatórios.
+- A rota de revogação de access grant passou a declarar e validar `requestId`, impedindo revogar um
+  grant por uma requisição diferente; testes focais, build e lint dos pacotes passaram.
+
+### M438 — correção do estado de readiness (2026-09-29)
+
+- `CERTIFICATION-READINESS.md` foi alinhado ao ambiente real: Docker/Redis e os drills locais já
+  estão disponíveis e aprovados; a próxima dependência é staging/produção autorizado com owner,
+  janela de mudança e revisão independente para os seis gates externos.
+
+### M437 — backup/restore portátil SQL local (2026-09-29)
+
+- O drill portátil assinado passou 1/1 em PostgreSQL, MySQL, MariaDB e SQL Server, cobrindo escopo
+  tenant, verificação HMAC, importação transacional e leitura do registro restaurado.
+- Os quatro logs foram anexados ao pacote de release candidate. O cenário local usa origem e destino
+  lógicos no mesmo banco; restauração independente, imutabilidade, HA e DR continuam pendentes.
+
+### M436 — doctor local em todos os adapters (2026-09-29)
+
+- O CLI `doctor` passou com `healthy=true` para MongoDB, PostgreSQL, MySQL, MariaDB e SQL Server,
+  cobrindo conexão, versão, transações, schema, índices e migrações; SQLite já tinha evidência na
+  jornada E2E.
+- Os logs foram anexados ao pacote de release candidate. Backup/restore SQL, backup imutável,
+  HA/failover e DR permanecem corretamente separados como evidência pendente.
+
+### M426 — pacote de evidência Redis para release candidate (2026-09-29)
+
+- O pacote `artifacts/certification/release-candidate-2026-09-29` agora inclui
+  `redis-drill-summary.md`, com links para os cinco logs de conformance local e a delimitação
+  explícita do que ainda não é certificação externa.
+- `CERTIFICATION-READINESS.md` passou a apontar para esse resumo, mantendo os seis gates externos
+  como `PENDENTE` até haver ambiente autorizado, owners e evidência operacional correspondente.
+
+### M427 — conformance MongoDB em replica set local (2026-09-29)
+
+- O serviço MongoDB do Compose foi iniciado e inicializado como `rs0`; a conformance canônica do
+  adapter passou 1/1 teste com os 6 checks esperados.
+- O teste de failover não foi executado como certificação porque o Compose local tem somente um
+  membro; uma réplica única não fornece evidência válida de failover multi-réplica.
+
+### M428 — conformance vetorial local (2026-09-29)
+
+- Qdrant `1.13.6`, Chroma `1.0.0` e Weaviate `1.28.4` passaram seus testes reais de isolamento,
+  busca, filtros e deleção tenant-scoped, cada um com 1/1 teste.
+- O cold start inicial do Chroma excedeu o timeout padrão, mas a execução repetida após o serviço
+  aquecer passou; a ressalva e os logs estão em `vector-drill-summary.md` no pacote de release.
+- Pinecone gerenciado, Atlas Vector Search gerenciado e certificação operacional de produção
+  continuam explicitamente pendentes.
+
+### M430 — preflight final da release candidate (2026-09-29)
+
+- O `certification:preflight -- --include-contracts` foi reexecutado após anexar as evidências de
+  MongoDB e adapters vetoriais.
+- O manifesto atualizado registra 19/19 gates locais aprovados, sem falhas; os artefatos de
+  conformance permanecem no mesmo pacote e os gates externos continuam não certificados.
+
+### M431 — conformance S3 local (2026-09-29)
+
+- O conector S3 do Knowledge passou 1/1 teste contra MinIO real, cobrindo bucket/object lifecycle,
+  resolução de credencial tenant-scoped, bytes e versão do provider.
+- O resultado foi anexado em `storage-drill-summary.md`; permanece limitado a S3-compatible local e
+  não promove storage de produção, HA ou DR.
+
+### M432 — backup/restore portátil MongoDB (2026-09-29)
+
+- O cenário oficial `test:mongodb-portable` passou 1/1 contra MongoDB real em replica set, cobrindo
+  exportação assinada, staging durável, restauração em banco separado e leitura tenant-scoped.
+- O log foi anexado ao pacote de release; failover multi-réplica, backup imutável externo e os
+  demais adapters continuam pendentes.
+
+### M433 — conformance PostgreSQL TypeORM (2026-09-29)
+
+- O adapter PostgreSQL/TypeORM passou 1/1 teste com os 6 checks canônicos contra PostgreSQL 16 real
+  em container isolado.
+- MySQL, MariaDB e SQL Server permanecem pendentes por ausência de ambientes locais nesta rodada.
+
+### M434 — conformance MySQL e MariaDB (2026-09-29)
+
+- MySQL 8.4 e MariaDB 11 passaram 1/1 teste cada contra os adapters TypeORM, com 6 checks
+  canônicos por engine.
+- Os logs foram anexados ao pacote de release; SQL Server segue pendente por ausência de ambiente
+  local específico.
+
+### M435 — conformance SQL Server TypeORM (2026-09-29)
+
+- SQL Server 2022 Developer passou 1/1 teste contra o adapter TypeORM, com 6 checks canônicos e
+  certificado TLS confiável apenas no ambiente local efêmero.
+- O log foi anexado ao pacote de release; os adapters SQL oficiais agora têm conformance local
+  real, sem promover HA, DR ou certificação de produção.
+
+### M429 — conformance pgvector local (2026-09-29)
+
+- O adapter pgvector passou 1/1 teste contra `pgvector/pgvector:pg16`, cobrindo isolamento de
+  tenants, busca vetorial, filtros e deleção.
+- A primeira tentativa foi interrompida pelo bootstrap do PostgreSQL; a repetição após
+  `pg_isready` passar foi verde e o log final foi anexado ao pacote de release.
+
+### M425 — retomada Redis e preflight de release (2026-09-29)
+
+- Após o Docker Desktop Linux Engine ficar disponível, o Redis oficial do Compose foi iniciado e
+  os drills Redis isolados passaram: worker 6/6, core Streams 1/1, API Event Bus 3/3, workflow
+  distribuído 1/1 e Knowledge reindex distribuído 1/1.
+- Corrigido o parser do harness de conformance Redis do core, que lia um nível incorreto do retorno
+  de `XPENDING` e reportava `deliveries: 0` apesar de Redis retornar 2.
+- O preflight foi reexecutado em
+  `artifacts/certification/release-candidate-2026-09-29`, com 19/19 gates locais aprovados e
+  snapshot sanitizado de Docker/Redis. Nenhum dos seis gates externos foi promovido: ainda faltam
+  ambiente autorizado, providers reais e revisão independente.
+
+### M417 — contrato tipado de execução Chat Workspace (2026-09-29)
+
+- O SDK passou a expor `ChatWorkspaceExecutionRequest`, alinhado ao schema da API, incluindo
+  `agentId`, `knowledgeBaseId`, `parentMessageId` e `traceId`.
+- O tipo é reexportado pelo entrypoint público; a regressão verifica o import e que os campos
+  Chat→Agent/Knowledge chegam no corpo JSON, preservando a rota e o header de idempotência.
+
+### M418 — validação antecipada do export no CLI (2026-09-29)
+
+- `handstack export` agora valida o caminho `-o` antes de fazer qualquer consulta à API, evitando
+  chamadas externas quando os argumentos estão incompletos.
+- O teste focal confirma falha imediata e zero requisições nesse caso.
+
+### M419 — nome obrigatório nos manifests Configuration as Code (2026-09-29)
+
+- `handstack apply` agora exige `metadata.name` não vazio para cada recurso `handstack.io/v1`,
+  evitando o fallback ambíguo para o nome do tipo.
+- Testes de apply e sync cobrem a validação antes de qualquer chamada à API.
+
+### M420 — duplicatas rejeitadas no apply (2026-09-29)
+
+- `handstack apply` agora rejeita recursos repetidos pelo par `kind` + `metadata.name` antes de
+  contactar a API, evitando aplicações parcialmente ambíguas.
+- A regressão confirma que uma lista duplicada não produz nenhuma requisição.
+
+### M421 — precisão dos rótulos da auditoria de escopo (2026-09-29)
+
+- Os gaps programáticos de Chat/Agents, Configuration e SDK/CLI agora distinguem runtime/contrato
+  local já implementado da evidência de deployment/provider ainda ausente.
+- A contagem e o estado `PARTIAL` não mudaram; nenhum gap foi ocultado ou promovido.
+
+### M422 — snapshot sanitizado do ambiente de preflight (2026-09-29)
+
+- O coletor agora registra disponibilidade/versão do daemon Docker e apenas a presença da URL de
+  teste Redis no `manifest.json` e no README, sem expor endpoint, credencial ou segredo.
+- O snapshot é informativo e não altera o status `NOT_CERTIFIED` dos seis gates externos.
+
+### M423 — auditoria de dependências no preflight (2026-09-29)
+
+- `security:validate` passou a integrar os gates de contrato do preflight; `npm audit --omit=dev
+--audit-level=high` reportou zero vulnerabilidades.
+- O pacote local agora registra 19 gates aprovados, mantendo os seis gates externos como
+  `NOT_CERTIFIED`.
+- A sequência manual de preparação em `CERTIFICATION-READINESS.md` também foi alinhada para
+  executar `security:validate`.
+
+### M424 — plano explícito de desbloqueio externo (2026-09-29)
+
+- `CERTIFICATION-READINESS.md` agora oferece duas rotas de retomada — Docker/Redis local ou staging
+  autorizado — e uma ordem única para coletar os seis exercícios externos sem repetir sondagens.
+- O plano define owner, janela, artefatos mínimos e a decisão necessária para sair de `NOT_CERTIFIED`;
+  não promove nenhum gate por evidência local.
+
+### M416 — alinhamento da evidência de certificação local (2026-09-29)
+
+- STATUS, `CERTIFICATION-READINESS.md` e `SCOPE-AUDIT.md` agora apontam para a auditoria e o
+  pacote reproduzível de evidências gerados em 2026-09-29.
+- A atualização é documental: os 18 gates locais continuam aprovados e os seis gates externos
+  permanecem `NOT_CERTIFIED` até a execução em ambiente autorizado.
+
+### M402 — reconexão MCP no CLI (2026-09-28)
+
+- Adicionado `handstack mcp reconnect --server <server-id>`, usando a rota de gestão autenticada
+  e mantendo a reconexão lazy implementada no registry/API/SDK.
+- Teste focal do comando passou 4/4; typecheck, lint e `docs:validate` também passaram.
+
+### M403 — enforcement de consentimento em capabilities (2026-09-28)
+
+- Capabilities podem declarar `metadata.consentPurposeId`; a autorização consulta o consentimento
+  mais recente do principal no tenant e bloqueia execução quando ele não está concedido ou foi
+  retirado.
+- O teste HTTP cobre execução consentida e falha fechada após retirada.
+
+### M404 — falha fechada na propagação de deleção (2026-09-28)
+
+- O `DataDeletionPropagator` agora registra `adapter-error:<destination>` como resultado não
+  excluído quando um destino externo falha, preservando o estado parcial e permitindo retry sem
+  expor mensagens de provider nos artefatos de privacidade.
+- Adicionado teste focal do comportamento retryable e sem vazamento de erro.
+
+### M405 — adapter Redis de cache por titular (2026-09-28)
+
+- Adicionado `RedisSubjectCache`, que mantém índice de chaves por organização/titular e remove
+  somente os valores pertencentes ao titular solicitado.
+- O teste focal confirma purge, retenção de outros titulares e isolamento entre organizações;
+  wiring com Redis implantado e adapter externo de backup permanecem pendentes.
+
+### M406 — wiring distribuído do cache de privacidade (2026-09-28)
+
+- O Event Bus expõe uma superfície Redis compartilhada e a API registra o `RedisSubjectCache` no
+  perfil distribuído, compondo-o com a limpeza de cache MCP quando aplicável.
+- O teste de integração da API cobre o caminho contra Redis real, mas ficou `skipped` sem
+  `HANDSTACK_TEST_REDIS_URL`; typecheck e lint da API passaram.
+
+### M407 — tombstone para backup externo (2026-09-28)
+
+- Adicionado `ExternalBackupTombstoneAdapter`, que grava apenas um tombstone tenant-scoped em uma
+  `BackupTombstoneStore` injetada, sem persistir conteúdo do titular.
+- Teste focal confirma chave, payload mínimo e ausência de material sensível; wiring com backend de
+  backup e drill de restauração permanecem pendentes.
+
+### M408 — ownership seguro de chaves Redis (2026-09-28)
+
+- `RedisSubjectCache` agora mantém o titular proprietário da chave e remove o índice anterior ao
+  reutilizar uma chave, evitando que a deleção do titular antigo apague dados do novo titular.
+- Adicionada regressão de reuso de chave; privacy passou 8/8, com lint e typecheck aprovados.
+
 ### M271 — verificacao runtime de pacotes built-in (M18)
 
 - Implementado `HS-CORE-022` com resolvedor injetavel para confirmar a disponibilidade dos
@@ -7247,3 +7487,919 @@ packages/jobs/tests/jobs.test.ts`, mas o pnpm ficou bloqueado na verificação d
 
 - O arquivo `.handstack-codex/autopilot-v2.lock` é criado pelo supervisor durante cada execução e não representa
   bloqueio do projeto. Relatos que pedem sua liberação são stale e devem ser ignorados pelo agente.
+
+### M297 — retomada do plano e incremento inicial do SDK (2026-09-28)
+
+- A auditoria viva foi executada novamente: status `PARTIAL`, 160 seções normativas, 105 requisitos
+  catalogados verificados, 15 lacunas funcionais/cobertura e 6 certificações externas pendentes.
+  O relatório atual encontrou 202 caminhos OpenAPI. O Docker não estava disponível e não foi tratado
+  como bloqueio permanente.
+- O SDK passou a expor operações tenant-scoped já existentes na API para Knowledge (`bases`,
+  `documents`, `search`, `reindex`) e Privacy (`retention`, `runRetention`, `legalHolds`,
+  `subjectRequests`).
+- Evidência focal: SDK com 9 testes, typecheck, lint e build aprovados; CLI com 20 testes aprovados.
+- Nenhuma configuração de teste global, lockfile, arquivo do supervisor ou dependência foi alterada.
+
+### M298 — cobertura SDK de domínios administrativos (2026-09-28)
+
+- O SDK passou a expor namespaces tenant-scoped de Knowledge, Privacy, MCP, Plugins, Secrets e
+  Workflows, usando apenas rotas existentes nos controllers da API.
+- Evidência focal: 10 testes do SDK, typecheck, lint e build passaram.
+- A lacuna de SDK/CLI foi reduzida, mas ainda requer E2E funcional de todos os domínios e não altera
+  as seis certificações externas.
+
+### M299 — cobertura completa dos métodos SDK disponíveis (2026-09-28)
+
+- Foram adicionados ao SDK os métodos restantes dos endpoints implementados de Knowledge (ingestão,
+  sync e jobs), Privacy (políticas, retenção de usage/anexos e legal holds), MCP (tools/resources/
+  prompts), Plugins (quarantine/upgrade/uninstall), Secrets (remoção) e Workflows (eventos,
+  schedules e inspeção de execuções).
+- A regressão inicial do teste de método HTTP foi corrigida para refletir o `GET` explícito padrão
+  do cliente.
+- Evidência focal: 11 testes do SDK, typecheck, lint e build passaram.
+
+### M300 — gates globais e correções de qualidade (2026-09-28)
+
+- Corrigidos três erros de lint no API: uma asserção redundante na retenção de usage e dois acessos
+  inseguros a tokens de anexos no teste de settings, substituídos por narrowing explícito.
+- Formatação aplicada somente aos 35 arquivos apontados pelo `format:check`; o gate passou depois da
+  correção. `docs:validate` passou com 122 artigos, 105 requisitos e 33 alvos contextuais.
+- Gates globais passaram: typecheck 108/108, lint 108/108, test 105/105 tarefas (140 testes API
+  aprovados; 7 integrações opcionais ignoradas) e build 63/63 tarefas. OpenAPI validado com 202 paths.
+- A auditoria de escopo continua `PARTIAL` com as mesmas 15 lacunas funcionais e 6 certificações
+  externas. A API de Docker permanece indisponível nesta máquina, sem containers/volumes atribuídos
+  a esta rodada.
+
+### M301 — alinhamento do exemplo oficial de Agents SDK (2026-09-28)
+
+- A API pública de Agents agora aceita `prompt` ou `repository`; quando recebe `repository`, cria
+  o contexto `Review repository: ...` antes de executar o runtime governado. A forma anterior com
+  `prompt` permanece compatível.
+- `AgentRunRequest` do SDK agora tipa as duas formas. Testes cobrem o exemplo oficial, preservação
+  de autorização efetiva e o payload enviado.
+- Evidência: SDK 11/11, teste HTTP de Agents 2/2, typecheck e lint do API passaram; OpenAPI foi
+  regenerado e validado com 202 paths.
+
+### M302 — reconciliação da auditoria viva (2026-09-28)
+
+- `SCOPE-AUDIT.md` foi atualizado para refletir a cobertura atual do SDK e o exemplo `repository`
+  de Agents, sem promover a área: ainda faltam E2E completo de todos os domínios e as integrações
+  externas/deployment descritas nas lacunas.
+- Após a atualização, `format:check` e `docs:validate` passaram novamente.
+
+### M303 — propagação de contexto nos workflows (2026-09-28)
+
+- O runtime de workflows passou a aceitar metadados de proveniência (`requestId`, `traceId` e
+  `source`) no início da execução e entregá-los ao executor de cada nó e de compensação.
+- O worker assíncrono agora repassa o contexto já validado do job para a execução efetiva, evitando
+  perda de rastreabilidade entre API, fila e execução distribuída.
+- Evidência focal: `packages/workflows` passou com 32 testes, typecheck, lint e build; API passou
+  typecheck e lint.
+
+### M304 — cobertura adicional do SDK (2026-09-28)
+
+- Adicionados `NotificationsNamespace` e `IncidentsNamespace` ao SDK, cobrindo listagem/envio de
+  notificações e criação, transição, timeline, ações e políticas de escalação de incidentes.
+- Evidência focal: 12 testes do SDK, typecheck, lint e build passaram. A auditoria continua parcial
+  porque ainda faltam cobertura de todos os domínios e E2E completo contra API implantada.
+
+### M305 — cobertura administrativa adicional do SDK (2026-09-28)
+
+- Adicionados namespaces de Operations, Settings e Gateway API Keys, incluindo operações assíncronas,
+  configurações tenant-scoped e ciclo de vida de chaves virtuais.
+- Evidência focal: 13 testes do SDK, typecheck, lint e build passaram. A cobertura total de domínios
+  e o E2E contra API implantada continuam pendentes.
+
+### M306 — cobertura de Webhooks no SDK (2026-09-28)
+
+- Adicionado `WebhooksNamespace` com configuração, dispatch, rotação, listagem de entregas/DLQ e
+  replay, incluindo query string e escape de identificadores.
+- Evidência focal: 14 testes do SDK, typecheck, lint e build passaram; E2E com endpoint real e
+  providers externos continuam pendentes.
+
+### M307 — cobertura do Chat Workspace no SDK (2026-09-28)
+
+- Adicionado `ChatWorkspaceNamespace` para catálogo de modelos/agentes, conversas, histórico,
+  mensagens, execução idempotente, edição/regeneração/retry, cancelamento e replay SSE.
+- Evidência focal: 15 testes do SDK, typecheck, lint e build passaram. Upload multipart e E2E com
+  provider compatível continuam pendentes.
+
+### M308 — anexos do Chat Workspace no SDK (2026-09-28)
+
+- O transporte do SDK passou a aceitar corpo bruto para multipart sem sobrescrever o
+  `content-type` gerenciado pelo runtime; Chat Workspace agora suporta upload, URL assinada e
+  remoção de anexos.
+- Evidência focal: 16 testes do SDK, typecheck, lint e build passaram. O E2E com provider real
+  continua pendente.
+
+### M309 — matriz de readiness de certificações (2026-09-28)
+
+- Criado `CERTIFICATION-READINESS.md` como plano operacional para os seis gates externos:
+  banco/backup, DR, capacidade, upgrade/rollback, providers E2E e threat model/pentest.
+- O documento define pré-requisitos, evidências mínimas, critérios de aprovação, pacote por release
+  e bloqueios atuais sem promover nenhum gate sem ambiente ou prova externa.
+
+### M310 — revalidação transversal após expansão do SDK (2026-09-28)
+
+- Reexecutados os gates globais após as alterações de Chat Workspace e anexos: `format:check`,
+  `docs:validate`, `lint`, `typecheck`, `test`, `build` e `openapi:validate` passaram.
+- Evidência: 108/108 tarefas de typecheck, 108/108 de lint, 105/105 de testes (141 aprovados e 7
+  opcionais ignorados), 63/63 de build e OpenAPI válido com 202 caminhos.
+- O escopo permanece `PARTIAL`: as lacunas de E2E externo, implantação, capacidade, DR, upgrade/
+  rollback e threat model/pentest continuam dependentes de ambiente e autorização externos.
+
+### M311 — governança e diretório no SDK (2026-09-28)
+
+- O SDK passou a expor os contratos tenant-scoped existentes de Access Governance, Directory/RBAC,
+  Budgets e Policies, incluindo solicitações/concessões, usuários, grupos, roles, permissões,
+  memberships, preços, uso e avaliação de políticas.
+- Evidência focal: 17 testes do SDK, typecheck, lint e build passaram. A lacuna de E2E completo do
+  SDK/CLI permanece aberta; nenhum requisito de certificação externa foi promovido.
+
+### M312 — administração operacional no SDK (2026-09-28)
+
+- O SDK também passou a expor Service Accounts, Routing Policies e as configurações administrativas
+  globais do database, cobrindo emissão/rotação/revogação, políticas de roteamento e leitura/edição
+  da camada persistida sem permitir alterar o adapter primário em runtime.
+- A implementação foi validada com a suíte focal de 17 testes, typecheck, lint e build; a jornada
+  E2E do CLI/SDK contra API implantada continua pendente.
+
+### M313 — gate global após cobertura administrativa do SDK (2026-09-28)
+
+- A revalidação transversal após Service Accounts, Routing e database settings passou integralmente:
+  typecheck 108/108, lint 108/108, testes 105/105, build 63/63 e OpenAPI válido com 202 caminhos.
+- `format:check` e `docs:validate` também passaram. O auditor segue em `PARTIAL`, com Docker
+  indisponível e as certificações de produção, E2E externo e segurança ainda sem evidência válida.
+
+### M314 — jornada E2E local do CLI (2026-09-28)
+
+- Adicionado teste de processo real que executa `handstack init`, `apply`, `export` e `config sync`
+  em diretório temporário, com API HTTP autenticada simulada, fixture Git e verificação de que
+  segredos não são exportados.
+- A suíte do CLI passou com 21 testes; typecheck, lint e build também passaram. Isso fecha a
+  jornada local de Configuration as Code, mas não substitui E2E de todos os domínios nem API
+  implantada com providers externos.
+
+### M315 — ciclo completo de Privacy no SDK (2026-09-28)
+
+- O SDK passou a cobrir todos os endpoints do `PrivacyController`: subject requests (criação,
+  atualização, execução e exportação), inventário, finalidades, consentimentos, processors,
+  incidentes, deletion jobs/evidências e residência, além de retenção e legal holds já existentes.
+- Evidência focal: 18 testes, typecheck, lint e build do SDK passaram. A cobertura de contrato não
+  promove a lacuna de enforcement em caches/backups externos, residência por destino ou E2E real.
+
+### M316 — gates globais após Privacy SDK (2026-09-28)
+
+- A revalidação transversal do estado atual passou: typecheck 108/108, lint 108/108, testes
+  105/105, build 63/63 e OpenAPI válido com 202 caminhos.
+- `format:check` e `docs:validate` permanecem verdes; a auditoria continua `PARTIAL` porque as
+  integrações externas, deployment e certificações operacionais ainda não foram executados.
+
+### M317 — ciclo administrativo de Models no SDK (2026-09-28)
+
+- O SDK passou a cobrir providers e modelos, prompts e versões, datasets e suites de avaliação,
+  runs e gates, campanhas Red-Team, aprovação/publicação e overrides de Models e Prompt Versions.
+- Evidência focal: 19 testes do SDK, typecheck, lint e build passaram. O rollback operacional,
+  execução contra providers externos e certificação Red-Team continuam pendentes.
+
+### M318 — gates globais após Models SDK (2026-09-28)
+
+- Revalidação global concluída com typecheck 108/108, lint 108/108, testes 105/105, build 63/63 e
+  OpenAPI válido com 202 caminhos.
+- O contrato administrativo está mais completo, mas a execução de providers externos, rollback
+  operacional e certificação de segurança permanecem pendentes por dependerem de ambiente autorizado.
+
+### M319 — jornada E2E de persistência do CLI (2026-09-28)
+
+- A jornada de processo do CLI foi ampliada para executar `migrate`, `doctor`, backup portátil
+  assinado e restore em um segundo banco SQLite, verificando formato e assinatura do backup.
+- A suíte do CLI passou com 22 testes, incluindo as duas jornadas E2E; typecheck e lint também
+  passaram. A evidência cobre SQLite local, não substitui conformance operacional nos demais adapters.
+
+### M320 — suíte global após E2E de persistência (2026-09-28)
+
+- `npm test` passou com 105/105 tarefas, incluindo as duas jornadas E2E do CLI e 19 testes do SDK.
+- A evidência permanece local: os adapters externos, HA/backup/restore de produção e os drills de
+  certificação ainda dependem dos serviços e da infraestrutura autorizados.
+
+### M321 — wiring de domínio no Event Bus (2026-09-28)
+
+- Notifications, Webhooks, Incidents e Audit passaram a publicar eventos de domínio sanitizados
+  após operações bem-sucedidas, usando o mesmo Event Bus local ou Redis Streams selecionado pelo
+  perfil de deployment da API.
+- O teste focal de Notifications confirmou entrega do evento e que corpo/metadados sensíveis não
+  vazam no payload. Typecheck, lint e os testes focais de Notifications/Webhooks passaram; o cenário
+  distribuído real e a propagação completa de contexto ainda dependem de infraestrutura externa.
+
+### M322 — gates globais após wiring do Event Bus (2026-09-28)
+
+- `format:check`, `docs:validate`, `typecheck` (108/108), `lint` (108/108), `test` (105/105),
+  `build` (63/63) e `openapi:validate` (202 caminhos) passaram após a integração.
+- A suíte API fechou 142 testes e 7 opcionais ignorados; os testes de Redis, MongoDB, S3 e filas
+  distribuídas continuam condicionados à infraestrutura externa não disponível nesta máquina.
+
+### M323 — cobertura SDK de identidade e SCIM (2026-09-28)
+
+- O SDK passou a expor administração de providers de identidade, usuários, grupos, roles, mappings,
+  login policy, break-glass e deprovisionamento, além de endpoint, emissão e revogação de credencial
+  SCIM.
+- A suíte focal passou de 19 para 20 testes; typecheck e lint do SDK passaram. Continua pendente o
+  E2E contra uma API implantada e a certificação de provisionamento/RBAC/SCIM em produção.
+
+### M324 — contexto de execução nos eventos HTTP (2026-09-28)
+
+- Notifications, Incidents e Webhooks agora recebem o contexto autenticado da requisição e o
+  publicam com `requestId`, `traceId`, `principalId` e `source: API`, sem incluir corpo ou segredos
+  nos payloads de domínio.
+- Typecheck e lint da API passaram; os 9 testes focais de Notifications/Webhooks passaram, incluindo
+  asserções de contexto. O cenário Redis distribuído e os workers internos continuam pendentes.
+
+### M325 — proveniência no contrato de jobs duráveis (2026-09-28)
+
+- O contrato de jobs passou a transportar contexto opcional (`requestId`, `traceId`, `principalId`,
+  `source`) no job persistido e no `JobContext`, cobrindo filas em memória, transporte BullMQ e o
+  worker real.
+- Operations, Knowledge reindex e Workflows agora passam a proveniência ao enfileirar; 27 testes do
+  pacote Jobs, typecheck/lint do Jobs e Worker e os testes HTTP focais de Operations (3) e Knowledge
+  reindex (2) passaram.
+
+### M326 — certificação local dos gates globais (2026-09-28)
+
+- Após o fechamento da proveniência nos jobs, `format:check`, `docs:validate`, `openapi:validate`,
+  `typecheck` (108/108), `lint` (108/108), `test` (105/105) e `build` (63/63) passaram novamente.
+- A suíte global registrou 142 testes aprovados e 7 opcionais ignorados; documentação validou 122
+  artigos localizados, 105 requisitos e 33 destinos de ajuda, e OpenAPI validou 202 caminhos.
+- Permanecem fora do alcance local os testes que exigem Docker/Redis/Mongo/S3 ou provedores externos,
+  além dos seis gates de certificação de produção descritos em `CERTIFICATION-READINESS.md`.
+
+### M327 — correlação nas chamadas internas dos workers (2026-09-28)
+
+- Os handlers de Agent, Embedding, Document, Workflow, Plugin e Knowledge reindex agora repassam
+  `requestId` e `traceId` do `JobContext` em headers de diagnóstico nas chamadas HTTP à API.
+- A mudança mantém o token interno como única credencial e não trata headers de correlação como
+  autoridade de identidade. O teste focal dos handlers verifica os seis caminhos e preserva os
+  contratos de payload existentes.
+- A suíte completa do Worker passou: 20 testes aprovados e 4 integrações Redis/Sentinel opcionais
+  ignoradas; typecheck, build, `format:check` e `docs:validate` também passaram.
+
+### M328 — sweep agendado de retenção de privacidade (2026-09-28)
+
+- O scheduler opt-in agora executa retenção de conversas, usage e anexos para cada organização sob
+  a mesma lease durável e com o ator `system:privacy-retention-scheduler`.
+- A suíte focal do scheduler passou com a nova regressão de ordem; a lease continua impedindo
+  execução concorrente entre instâncias. O drill distribuído e a saturação seguem externos.
+
+### M329 — restauração de contexto no payload de workflow (2026-09-28)
+
+- O handler de Workflow agora reconstrói `requestId`, `traceId`, `principalId` e `source` a partir
+  do `JobContext` quando o payload não duplica a proveniência do envelope persistido.
+- A regressão confirma que a chamada à API interna mantém o contexto completo mesmo nesse formato;
+  headers de correlação e token interno continuam separados.
+
+### M330 — cobertura adicional do SDK de Operations (2026-09-28)
+
+- O SDK passou a expor auditoria, feature flags, enqueue de jobs e inspeção, retry e descarte de
+  dead-letters no domínio Operations, com encoding seguro de organização, fila e idempotency key.
+- O teste de contrato verifica seis rotas, métodos HTTP e URLs tenant-scoped; o E2E contra API
+  implantada permanece pendente.
+
+### M331 — superfície OAuth do MCP no SDK (2026-09-28)
+
+- O SDK passou a expor armazenamento de credencial por usuário e os endpoints `oauth/start` e
+  `oauth/callback` do MCP, com encoding de organização/servidor e corpos de contrato preservados.
+- O contrato local foi ampliado; credenciais reais, consentimento em provedor externo e reconexão
+  operacional continuam pendentes para a certificação MCP.
+
+### M333 — proveniência no Event Bus de auditoria (2026-09-28)
+
+- `AuditRuntimeService` agora preserva `requestId`, `traceId`, `principalId` e `source` no evento
+  `audit.recorded`; o `traceId` também fica no registro de auditoria para consulta posterior.
+- Retry e descarte de dead-letter passam o contexto HTTP para a auditoria. O teste focal confirma
+  persistência e publicação no Event Bus sem incluir material sensível.
+
+### M334 — gate global após incrementos de contexto e SDK (2026-09-28)
+
+- `npm test` concluiu com 105/105 tarefas bem-sucedidas; a API passou 144 testes e deixou 7 testes
+  opcionais ignorados. Os incrementos de auditoria, contexto distribuído, privacidade e SDK estão
+  cobertos pelo gate global, sem promover os cenários externos ainda indisponíveis a certificação.
+
+### M335 — proveniência do job de auditoria no worker (2026-09-28)
+
+- O handler da fila `audit` agora usa o contexto durável do job como fonte de verdade para
+  `traceId` e para os metadados limitados de `requestId`, `principalId` e `source`, preservando
+  metadados seguros do evento e rejeitando implicitamente qualquer extensão de autoridade.
+- O teste focal cobre o enriquecimento e a ausência de material de permissões; a validação contra
+  deployment distribuído continua pendente.
+
+### M336 — execução tenant-scoped de retenção de traces (2026-09-28)
+
+- `retention.trace` agora remove somente `traceId` expirado de mensagens, preserva o conteúdo,
+  respeita legal holds, grava `DeletionEvidence`/`DeletionJob` e expõe execução autenticada na API
+  e na tela de Privacy.
+- O scheduler executa conversation, usage, attachments e traces sob a mesma lease; o teste HTTP
+  cobre CAS, isolamento do conteúdo e retenção por hold. Audit append-only e destinos externos
+  continuam fora deste executor.
+- O OpenAPI foi regenerado e validado com 203 caminhos; `format:check` e `docs:validate` também
+  passaram após o incremento.
+- A namespace Privacy do SDK passou a expor a execução de retenção de traces, com contrato
+  tenant-scoped coberto no teste de cliente.
+
+### M337 — gate global após retenção de traces e SDK (2026-09-28)
+
+- `npm test` concluiu com 105/105 tarefas bem-sucedidas: API com 145 testes aprovados e 7
+  opcionais ignorados, worker com 22 aprovados e 4 opcionais ignorados, e Web com 27 aprovados.
+- A evidência confirma o novo endpoint de traces, o scheduler sob lease, a preservação de conteúdo
+  durante a retenção e a proveniência do handler de auditoria; cenários externos permanecem não
+  certificados.
+
+### M338 — certificação local final da rodada (2026-09-28)
+
+- `npm run scope:audit` revalidou `PARTIAL`, 160 seções normativas, 105 requisitos verificados,
+  203 caminhos OpenAPI, 15 lacunas funcionais/cobertura e 6 certificações externas pendentes.
+- `npm run typecheck`, `npm run lint` e `npm run build` passaram integralmente: 108/108 tarefas de
+  typecheck, 108/108 de lint e 63/63 de build. O `npm test` permanece em 105/105 tarefas, com
+  145 testes de API aprovados e 7 opcionais ignorados.
+- A auditoria confirmou `missingHandlers`, rotas administrativas, rotas administrativas Web e
+  ajuda contextual vazios, além de contexto de execução unificado e os dez handlers oficiais.
+  Docker continua indisponível para os drills implantados.
+
+### M339 — proveniência de billing no worker (2026-09-28)
+
+- `BudgetEngine.settle` passou a aceitar `traceId` opcional e persistí-lo nos registros de uso e
+  custo; `processBillingJob` fornece o valor vindo do `JobContext` durável.
+- A regressão de budgets passou 3/3 testes e a suíte de worker passou 22 testes, com 4 testes de
+  integração Redis opcionais ignorados; typecheck e lint dos dois workspaces passaram.
+
+### M340 — gates globais após billing (2026-09-28)
+
+- Após a alteração de billing, `npm test`, `npm run typecheck`, `npm run lint` e `npm run build`
+  passaram: respectivamente 105/105, 108/108, 108/108 e 63/63 tarefas.
+- `format:check` e `docs:validate` também passaram; a documentação permanece em 122 artigos
+  localizados, 105 requisitos e 33 destinos de ajuda contextual.
+
+### M341 — crosswalk das seções normativas (2026-09-28)
+
+- `docs/requirements/traceability.md` agora contém o crosswalk das 160 seções em 17 famílias
+  contíguas, relacionando requisitos canônicos, código, contratos, testes focais e documentação.
+- O catálogo `docs/requirements/catalog.yaml` continua sendo a única fonte normativa de requisitos;
+  o incremento adiciona navegação e evidência sem criar catálogo concorrente. `docs:validate` passou.
+
+### M342 — revalidação do pacote de contratos externos (2026-09-28)
+
+- Passaram `resilience:validate`, `dr:validate`, `container:validate`, `observability:validate`,
+  `integration:validate`, `helm:validate`, `kubernetes:validate`, `helm:release:validate`,
+  `release:validate`, `frontend:validate` e `openapi:validate` (203 caminhos).
+- Esses resultados confirmam preparação local de resiliência, deployment, release e observabilidade;
+  não substituem os seis exercícios externos registrados em `CERTIFICATION-READINESS.md`.
+
+### M343 — wiring dos namespaces Redis configuráveis (2026-09-28)
+
+- `queue.namespaces.rateLimit` agora controla as chaves distribuídas do limite de Chat; o namespace
+  padrão anterior permanece preservado por configuração default.
+- `queue.namespaces.cache` agora é injetado no `McpClientRegistry` e prefixa discovery de tools,
+  resources e prompts, com purge tenant-scoped. Testes MCP client (9), rate limit (2), MCP HTTP (3)
+  e configuração (12) passaram; typecheck, lint e builds dos consumidores também passaram.
+
+### M344 — gate global após configuração Redis (2026-09-28)
+
+- Após o wiring dos namespaces, `npm test`, `npm run typecheck`, `npm run lint` e `npm run build`
+  passaram integralmente: 105/105, 108/108, 108/108 e 63/63 tarefas, respectivamente.
+- A API permaneceu em 145 testes aprovados e 7 opcionais ignorados; o pacote MCP client passou
+  9 testes e a validação HTTP de MCP passou 3 testes.
+
+### M345 — auditoria de escopo após wiring Redis (2026-09-28)
+
+- `npm run scope:audit` confirmou 160 seções, 105 requisitos verificados, 203 caminhos OpenAPI,
+  `missingHandlers`/rotas administrativas/ajuda vazios, contexto unificado e dez handlers oficiais.
+- O resultado permanece `PARTIAL`, com 15 lacunas funcionais/cobertura e 6 certificações externas;
+  a sondagem registrou novamente a ausência do Docker daemon e não promoveu drills externos.
+
+### M346 — validação das rotas de ajuda contextual (2026-09-28)
+
+- `validateGovernance` passou a resolver cada rota do `docs/contextual-help.yaml` contra páginas
+  reais do App Router Web, incluindo segmentos dinâmicos; erros agora identificam rotas inexistentes.
+- O teste do docs-engine fixa os 33 destinos atuais. O item de validação de artigos e links contextuais
+  foi concluído no plano, sem alterar o catálogo canônico de requisitos.
+
+### M347 — verificação parcial da cadeia de auditoria (2026-09-28)
+
+- `TamperEvidentAuditSink.verify` agora preserva a âncora e a sequência da cadeia ao validar intervalos
+  iniciados no meio do histórico, reportando também saltos de sequência.
+- Regressão cobre intervalo parcial íntegro e adulteração do evento predecessor; o pacote passou 7/7
+  testes, typecheck, lint, build e formatação. A retenção append-only e a certificação distribuída
+  continuam pendentes.
+
+### M348 — proveniência de auditoria em entregas Webhook do worker (2026-09-28)
+
+- O contrato de auditoria Webhook aceita contexto limitado de execução; o dispatcher propaga esse
+  contexto apenas para o sink de auditoria, mantendo o payload enviado ao endpoint externo inalterado.
+- O worker injeta `WebhookAuditBridge` no caminho persistente e os testes confirmam `requestId`,
+  `traceId`, `principalId` e `source` nos eventos de tentativa/entrega. Webhooks passou 19/19 testes;
+  worker passou 22/22 testes (4 integrações Redis opcionais ignoradas), typecheck, lint, build e formato.
+
+### M349 — gate global após contexto Webhook (2026-09-28)
+
+- `npm test` passou 105/105 tarefas: API 145 testes aprovados e 7 opcionais ignorados, CLI 22/22,
+  worker 22 aprovados e 4 integrações Redis ignoradas. Os pacotes audit e webhooks também passaram
+  suas suítes completas; nenhuma certificação externa foi promovida.
+
+### M350 — alinhamento do scan de dependências do release (2026-09-28)
+
+- `deploy/release/handstack-release-manifest.json` deixou de prescrever `pnpm audit` e passou a
+  declarar `npm audit`, coerente com o gerenciador oficial e com a matriz de readiness.
+- `npm run release:validate` passou; a mudança não altera o estado dos seis gates externos.
+
+### M351 — manifesto verificável de exportação de auditoria (2026-09-28)
+
+- `handstack audit export` passou a escrever um manifesto sidecar JSON com versão/formato, tenant,
+  contagem, primeiro/último evento, head hash, timestamp e SHA-256 dos bytes NDJSON exatos.
+- O pacote audit passou 8 testes e o CLI 22/22, incluindo E2E de processo; a documentação EN/PT-BR
+  instrui a validar o hash. O audit store permanece append-only e nenhum gate externo foi promovido.
+
+### M352 — verificador de pacote de auditoria (2026-09-28)
+
+- `handstack audit verify-export --tenant ... --input ... --manifest ...` agora valida o manifesto
+  sidecar, SHA-256, contagem, primeiro/último evento e isolamento de organização; conteúdo adulterado
+  falha fechada.
+- Audit passou 8/8 testes; CLI passou typecheck, lint, build e 22/22 testes, incluindo E2Es de
+  processo. Documentação EN/PT-BR foi atualizada com o comando de verificação.
+
+### M353 — auditoria de escopo e persistência local (2026-09-28)
+
+- `npm run scope:audit` foi reexecutado contra o worktree atual: 160 seções, 105 requisitos
+  verificados, 203 caminhos OpenAPI, dez handlers oficiais e nenhuma rota administrativa, UI ou
+  ajuda contextual faltante. O resultado permanece `PARTIAL` por 15 lacunas funcionais/cobertura e
+  seis certificações externas.
+- A suíte focal `@handstack/database` passou 15/15 testes, cobrindo formato portátil, operações
+  de migração/doctor e seleção dos adapters TypeORM sem abrir conexão. O Docker daemon continua
+  ausente, portanto isso não substitui conformance ou backup/restore em bancos externos.
+
+### M354 — preflight de Configuration as Code no CLI (2026-09-28)
+
+- `handstack config validate` agora valida o layer efetivo carregado pelo CLI e produz um resumo
+  JSON sem URLs de banco ou referências de segredo. Argumentos inesperados falham com uso explícito.
+- Dois testes focais cobrem o resumo seguro e a validação de argumentos; a documentação EN/PT-BR
+  inclui o preflight antes de `apply`/`config sync`.
+
+### M355 — E2E administrativo de Agents (2026-09-28)
+
+- O Playwright agora cobre a jornada Web de Agents com mocks tenant-scoped: conexão, criação,
+  versionamento, publicação e verificação de acessibilidade com axe; uma segunda jornada confirma
+  que erro 503 produz mensagem recuperável para o operador.
+- A evidência amplia a cobertura administrativa local, mas não substitui E2E com API implantada,
+  provider real ou certificação operacional.
+
+### M356 — E2E administrativo de Workflows (2026-09-28)
+
+- O Playwright agora cobre draft → publicação de Workflows e o tratamento de indisponibilidade da
+  API, com mock tenant-scoped e verificação axe da tela inicial nos navegadores suportados.
+- A prova permanece limitada à jornada Web/API simulada; scheduler, worker distribuído e execução
+  com runtimes/providers reais continuam sem promoção de status.
+
+### M357 — configuração governada do scheduler de privacidade (2026-09-28)
+
+- Os parâmetros `HANDSTACK_PRIVACY_RETENTION_*` foram incorporados ao schema e ao layer de
+  configuração, com validação do intervalo mínimo, deduplicação da allow-list de organizações e
+  preservação do instance ID sem expor segredos.
+- O scheduler agora consome esse contrato tipado; os testes do pacote de configuração cobrem
+  defaults, parsing e rejeição de intervalo inseguro. Isso fecha o wiring local, sem certificar o
+  failover ou a saturação em deployment distribuído. `docs:validate` continua válido com os dois
+  guias localizados atualizados.
+
+### M358 — coletor reproduzível de evidência local (2026-09-28)
+
+- Criado `npm run certification:preflight`, com opção `--include-contracts`, para executar os gates
+  locais por npm, salvar um log por comando e gerar `manifest.json` com revisão, ambiente, duração e
+  status de cada gate.
+- O manifesto fixa `externalCertification.status = NOT_CERTIFIED`, registra se o worktree está sujo
+  e a documentação reforça que evidência local não substitui HA/DR, capacidade, rollback, providers
+  reais ou pentest.
+
+### M359 — configuração tipada dos schedulers de Knowledge e Workflows (2026-09-28)
+
+- `knowledgeSync` e `workflowScheduler` foram adicionados ao schema e ao parser de ambiente, com
+  validação de intervalos, allow-lists deduplicadas, identidade de instância e principal seguro.
+- Os dois serviços agora consomem o contrato tipado; a CLI expõe somente contagens e flags não
+  sensíveis, e o `.env.example` documenta as variáveis operacionais.
+- Configuração passou 13/13 testes, API passou 6/6 testes focais dos schedulers e CLI passou 2/2;
+  typecheck, lint e build dos três pacotes também passaram.
+
+### M360 — configuração tipada dos limites do worker (2026-09-28)
+
+- Os parâmetros `HANDSTACK_WORKER_CONCURRENCY`, `TIMEOUT`, `HEARTBEAT_INTERVAL`, `MAX_ATTEMPTS`,
+  `RETRY_JITTER` e `METRICS_PORT` foram incorporados ao schema/config layer com limites seguros.
+- O worker agora consome esses valores tipados; o timeout explícito continua tendo precedência sobre
+  o timeout derivado da fila. CLI, `.env.example` e os guias EN/PT-BR foram alinhados.
+- Configuração passou 13/13, worker 11/11 e CLI 2/2; typecheck, lint, build e `docs:validate`
+  passaram nos pacotes afetados.
+
+### M361 — referência tipada de credencial do vector store (2026-09-28)
+
+- `HANDSTACK_VECTOR_STORE_CREDENTIAL_REFERENCE` foi incorporada ao schema e ao parser de ambiente
+  como referência, sem armazenar o valor secreto na configuração ou nos vetores.
+- `ConfiguredVectorStore` agora usa a referência resolvida do config e mantém a resolução pelo
+  broker tenant-scoped; a CLI expõe apenas um booleano de configuração e os guias EN/PT-BR foram
+  atualizados.
+- O teste focal do API confirma a resolução tenant-scoped e o header de autenticação sem recorrer
+  ao ambiente global. Configuração passou 13/13, API passou o teste focal, typecheck/lint/build, CLI passou 2/2 e
+  typecheck/lint/build; `docs:validate` passou com 122 artigos localizados.
+
+### M362 — configuração tipada do armazenamento de anexos (2026-09-28)
+
+- `HANDSTACK_ATTACHMENT_STORAGE_PATH` e `HANDSTACK_ATTACHMENT_MAX_BYTES` foram incorporados ao
+  schema/config layer, com defaults e limites de tamanho; o CLI mostra apenas caminho e limite,
+  nunca a chave de assinatura.
+- `LocalAttachmentStorage` e `ChatRuntimeService` agora consomem `DatabaseService.config`, mantendo
+  a chave de assinatura separada no ambiente/secret manager. `.env.example` e o guia de Jobs foram
+  atualizados.
+- Configuração passou 13/13; Chat e Settings HTTP passaram 18/18; API passou typecheck, lint e
+  build; CLI e `docs:validate` continuaram aprovados.
+
+### M363 — allow-list tipada de destinos Webhook (2026-09-28)
+
+- `HANDSTACK_WEBHOOK_ALLOWED_HOSTS` foi incorporada ao schema como `webhooks.allowedHosts`, com
+  parsing, trimming e deduplicação; API e worker deixaram de manter parsers independentes.
+- A CLI expõe apenas `allowedHostCount`; `.env.example` e o guia de Jobs documentam o contrato
+  compartilhado e o worker mantém a mesma política de segurança da API.
+- Configuração passou 13/13, API 3/3, worker 11/11 e CLI 2/2; typecheck, lint, build e
+  `docs:validate` passaram.
+
+### M364 — allow-list tipada de fontes Knowledge (2026-09-28)
+
+- `HANDSTACK_KNOWLEDGE_ALLOWED_HOSTS` foi incorporada ao schema como `knowledge.allowedHosts`, com
+  parsing deduplicado e resumo seguro da contagem na CLI.
+- O `KnowledgeRuntimeService` agora injeta a allow-list tipada no guard comum de URLs usado pelos
+  conectores públicos e autenticados; as verificações DNS/SSRF permanecem ativas.
+- Configuração passou 13/13, integração Knowledge 3/3 e CLI 2/2; typecheck, lint, build e
+  `docs:validate` passaram nos pacotes afetados.
+
+### M365 — configuração tipada de logging e OTLP (2026-09-28)
+
+- `HANDSTACK_LOG_LEVEL` agora é validado por `logging.level`, e `HANDSTACK_OTLP_ENDPOINT` por
+  `telemetry.otlpEndpoint`; a API usa o config resolvido tanto no logger quanto no bootstrap de
+  telemetria.
+- A CLI informa apenas o nível e se o endpoint está configurado, sem imprimir o endpoint; o guia
+  EN/PT-BR e `.env.example` foram alinhados.
+- Configuração passou 13/13, API 7/7 testes executáveis (1 integração Redis opcional ignorada) e
+  CLI 2/2; typecheck, lint, build e `docs:validate` passaram.
+
+### M366 — Redis NAT map tipado e compartilhado (2026-09-28)
+
+- `HANDSTACK_REDIS_NAT_MAP` agora é parseado e validado como `queue.natMap`, com host/porta
+  estruturados; o resumo da CLI informa apenas se existe configuração.
+- Operations e workers reutilizam o mesmo mapa tipado para conexões Sentinel, removendo parsers
+  divergentes; deployment profiles e `.env.example` documentam o formato.
+- Configuração passou 13/13, worker 12/12, Operations HTTP 3/3 e CLI 2/2; typecheck, lint e
+  build passaram nos consumidores alterados.
+
+### M367 — configuração tipada do runtime de plugins (2026-09-28)
+
+- Cache, exigência de isolamento e trust store de publishers agora fazem parte de `config.plugins`;
+  o runtime não lê mais esses parâmetros operacionais diretamente do ambiente quando recebe o
+  config resolvido.
+- A CLI informa apenas `cacheConfigured`, `isolationRequired` e a quantidade de publishers
+  confiáveis; `.env.example` e os guias EN/PT-BR documentam o contrato sem expor chaves.
+- Runtime administrativo passou 6/6 e registro HTTP 4/4; API passou typecheck, lint e build.
+- O scheduler de Workflows preserva a compatibilidade de allow-list definida após a construção do
+  serviço, sem perder o parser tipado; o teste focal passou 14/14 casos executáveis.
+
+### M368 — autenticação interna tipada e compartilhada (2026-09-28)
+
+- `HANDSTACK_INTERNAL_SERVICE_TOKEN` agora é validado e resolvido como `security.internalServiceToken`;
+  os endpoints internos de Workflows e Knowledge usam um único autenticador com comparação segura.
+- A CLI informa apenas `internalServiceTokenConfigured`; `.env.example` e os guias de deployment
+  mantêm o segredo fora de saídas e documentação operacional.
+- Configuração passou 13/13, CLI 2/2 e os contratos HTTP protegidos 3/3; API e CLI passaram
+  typecheck, lint e build, e `docs:validate` passou.
+
+### M369 — propagação da configuração de autenticação aos handlers do worker (2026-09-28)
+
+- Os cinco handlers distribuídos que chamam endpoints internos agora resolvem o token via
+  `configLayerFromEnvironment`, alinhando o consumidor do worker ao campo `security` tipado.
+- A suíte de handlers passou 11/11, com typecheck e lint do worker aprovados; tokens curtos e
+  ausência de credenciais continuam falhando fechado.
+
+### M370 — chave interna de embeddings tipada (2026-09-28)
+
+- `HANDSTACK_INTERNAL_API_KEY` agora é resolvida como `security.internalApiKey`; o handler de
+  Embeddings deixou de ler essa credencial diretamente do ambiente fora do parser comum.
+- A CLI expõe somente `internalApiKeyConfigured`; `.env.example` e os guias EN/PT-BR documentam
+  o parâmetro sem valor real. Configuração 13/13, worker 11/11 e CLI 2/2 passaram.
+
+### M371 — peppers de Gateway, SCIM e OIDC tipados (2026-09-28)
+
+- `HANDSTACK_GATEWAY_KEY_PEPPER`, `HANDSTACK_SCIM_TOKEN_PEPPER` e `HANDSTACK_OIDC_STATE_PEPPER`
+  agora pertencem a `config.security`; os runtimes deixam de ler esses segredos diretamente do
+  ambiente e continuam exigindo configuração explícita em produção.
+- Configuração passou 13/13; Gateway, SCIM e OIDC passaram 9/9 testes HTTP; API e CLI passaram
+  typecheck, lint e build, e a documentação continuou válida.
+
+### M372 — Secrets de sessão, anexos e Webhooks centralizados (2026-09-28)
+
+- Segredos de sessão (`accessTokenSecret`/`tokenPepper`), assinatura de anexos e chave legada de
+  migração Webhook agora são resolvidos no bloco `config.security`; os consumidores não fazem mais
+  leituras independentes dessas variáveis.
+- A CLI expõe somente flags de presença. Configuração passou 13/13; Auth, Gateway, SCIM, OIDC,
+  Chat, Settings e Webhooks passaram 30/30 testes HTTP; API/CLI passaram typecheck, lint e build.
+
+### M373 — plano operacional dos seis gates externos (2026-09-28)
+
+- `CERTIFICATION-READINESS.md` agora especifica, para cada gate, a ação inicial, owner mínimo e
+  diretório esperado do pacote de evidências, mantendo `PENDENTE` sem ambiente/autorização.
+- A documentação passou `docs:validate` e `format:check`; a sondagem confirmou novamente que o
+  Docker Desktop Linux Engine não está disponível nesta máquina.
+
+### M374 — preflight completo com validadores de contrato (2026-09-28)
+
+- `certification:preflight --include-contracts` passou os 18 gates locais: base, DR, resiliência,
+  containers, observabilidade, integração, Helm, Kubernetes e frontend.
+- O manifesto continua `NOT_CERTIFIED` para os seis gates externos, pois os validadores locais não
+  substituem drills em ambiente implantado, providers autorizados ou revisão independente.
+
+### M375 — último consumidor de segredo legado alinhado (2026-09-28)
+
+- O worker de Webhooks agora resolve `HANDSTACK_WEBHOOK_MASTER_KEY` como
+  `security.webhookLegacyMasterKey` antes de construir o provider de migração; não há material
+  secreto no payload do job.
+- A suíte de handlers passou 11/11, com typecheck e lint do worker aprovados.
+
+### M376 — opções de deployment do worker tipadas (2026-09-28)
+
+- `HANDSTACK_API_URL`, `HANDSTACK_WORKER_ORGANIZATION_ID`, `HANDSTACK_WORKER_QUEUE` e
+  `HANDSTACK_WORKER_HANDLER_MODULE` agora fazem parte de `config.worker`; o bootstrap e os
+  handlers distribuídos deixaram de ler essas opções diretamente do ambiente.
+- O override de fila recebido pela CLI continua tendo precedência. Configuração passou 13/13 e o
+  worker passou 23/23 testes focais, com typecheck e lint aprovados.
+
+### M377 — configuração de cliente do CLI centralizada (2026-09-28)
+
+- URL, organização, token de acesso e chave portátil agora são campos de `config.cli`, resolvidos
+  pelo parser compartilhado; os comandos `apply`, `export`, `admin`, `audit` e `backup/restore`
+  não fazem mais leituras diretas dessas variáveis.
+- `config validate` informa somente presença das quatro configurações. CLI passou 10 testes focais,
+  incluindo E2E de apply/export/sync e backup/restore SQLite, com typecheck e lint aprovados.
+
+### M378 — chave mestra integrada ao layer de segurança (2026-09-28)
+
+- `HANDSTACK_MASTER_KEY` agora é exposta somente como `security.masterKey`; Secrets, Webhooks e o
+  worker de entrega decodificam a chave pelo config resolvido, mantendo a mesma validação criptográfica
+  e o fail-closed de produção.
+- Configuração passou 13/13, API 5/5 e worker 11/11 testes focais; typecheck e lint de API/worker
+  passaram. Não restam chamadas de produção a `MasterKey.fromEnvironment` nesses consumidores.
+
+### M379 — retenção global aplicada aos Webhooks (2026-09-28)
+
+- O `WebhookRuntimeService` agora injeta `config.retention.audit` nos dispatchers quando não há
+  override específico, removendo o default fixo de 30 dias e alinhando a retenção operacional ao
+  layer global.
+- O teste focal de Webhooks passou 3/3, com typecheck e lint da API aprovados.
+
+### M380 — índice reproduzível do pacote de certificação (2026-09-28)
+
+- `certification:preflight` agora gera `README.md` ao lado do `manifest.json` e dos logs, listando
+  cada gate, comando, status, log vinculável e os seis conjuntos de evidência externa ainda exigidos.
+- O README registra a invocação exata, incluindo `--include-contracts`, e mantém `NOT_CERTIFIED`
+  explícito. O pacote local foi regenerado com 18/18 gates aprovados.
+
+### M381 — porta web ligada ao config compartilhado (2026-09-28)
+
+- Os scripts `dev` e `start` do Web agora resolvem `HANDSTACK_WEB_PORT` via
+  `configLayerFromEnvironment`, propagam a porta como `--port` e `PORT`, e preservam 3000 como
+  default para Compose/Kubernetes.
+- A superfície Web passou 8 testes focais, typecheck e lint.
+
+### M382 — retenção de Webhooks ligada ao scheduler tenant-scoped (2026-09-28)
+
+- `PrivacyRetentionSchedulerService` agora aciona `WebhookRuntimeService.prune` sob o mesmo lease
+  persistente por organização; a resolução de configuração usa a janela global `retention.audit`.
+- O fluxo foi coberto junto das retenções de privacidade: API passou 8/8 testes focais combinados,
+  com typecheck e lint aprovados.
+
+### M383 — lockfile e launcher web reproduzíveis (2026-09-28)
+
+- O `apps/web` passou a declarar `@handstack/config` no `package-lock.json`, sincronizado com
+  `npm install --package-lock-only --ignore-scripts --no-audit --no-fund`; a validação confirmou a
+  dependência no pacote correto.
+- A configuração ESLint passou a reconhecer o launcher `.mjs` como script Node sem type-aware lint;
+  o lint do Web voltou a cobrir `app` e `scripts`.
+
+### M384 — lint do launcher web (2026-09-28)
+
+- `apps/web/scripts/next-with-config.mjs` agora é validado pelo lint do workspace, com globals Node e
+  regras tipadas desativadas somente para esse script. Prettier, lint, typecheck e `routes.test.tsx`
+  (8/8) passaram.
+
+### M385 — auditoria tamper-evident no runtime da API (2026-09-28)
+
+- `AuditRuntimeService` passou a envolver o sink em memória ou durável com `TamperEvidentAuditSink`;
+  a ponte de Webhooks grava na mesma cadeia, mantendo isolamento tenant-scoped e append-only.
+- O wrapper expõe consulta para preservar os consumidores existentes. Auditoria 8/8, API runtime,
+  Secrets e Webhooks 6/6, typecheck e lint dos dois workspaces passaram.
+
+### M386 — serialização concorrente da cadeia de auditoria (2026-09-28)
+
+- `TamperEvidentAuditSink` agora serializa append por organização no processo, evitando sequências
+  ou hashes concorrentes quando requisições simultâneas calculam o mesmo head.
+- O teste do pacote passou 9/9 com doze append concorrentes e verificação da cadeia; API foi
+  recompilada e os fluxos de auditoria, Secrets e Webhooks passaram 6/6.
+
+### M387 — operações de verificação no runtime de auditoria (2026-09-28)
+
+- `AuditRuntimeService` agora expõe `verify(organizationId)` e `checkpoint(organizationId, key)`
+  usando o mesmo provider tamper-evident, sem transportar a chave em eventos ou metadata.
+- O teste focal da API confirma verificação válida e checkpoint assinado tenant-scoped; Prettier,
+  typecheck e lint passaram.
+
+### M388 — endpoint e SDK para verificação de auditoria (2026-09-28)
+
+- Operations ganhou `GET /api/v1/organizations/:organizationId/audit/verify`, protegido por
+  `audit.read`, registrando `AUDIT_VERIFIED` com contexto redigido e sem aceitar chave de assinatura.
+- O SDK ganhou `operations.verifyAudit`; o teste HTTP cobre sucesso e isolamento cross-tenant.
+  API passou 4/4 e SDK 21/21, com typecheck e lint aprovados.
+
+### M389 — OpenAPI sincronizado com a verificação de auditoria (2026-09-28)
+
+- `docs/api/openapi.json` foi regenerado pelo comando oficial após a nova rota, incluindo
+  `/api/v1/organizations/{organizationId}/audit/verify`; o contrato agora contém 204 caminhos.
+- O build usado na geração passou, e a validação OpenAPI do preflight continua aprovada.
+
+### M390 — documentação de verificação de auditoria (2026-09-28)
+
+- Os artigos `operations-api.mdx` em EN e PT-BR agora documentam `GET /audit/verify`, a permissão
+  `audit.read`, o evento `AUDIT_VERIFIED` e os campos de resposta sem segredos.
+- Prettier e `docs:validate` passaram: 122 artigos localizados, 105 requisitos e 33 destinos de
+  ajuda contextual.
+
+### M391 — limite de diagnósticos da verificação (2026-09-28)
+
+- `TamperEvidentAuditSink.verify` limita a 50 mensagens de erro, evitando respostas de diagnóstico
+  descontroladas em streams muito corrompidos.
+- O pacote de auditoria passou 10/10 com teste de stream grande; API passou 5/5 nos testes focais
+  combinados, com build, typecheck e lint aprovados.
+
+### M392 — reconciliação do relatório de escopo (2026-09-28)
+
+- A execução programática de `scope:audit` confirmou 204 caminhos OpenAPI, 15 lacunas
+  funcionais/cobertura e 6 certificações externas; `SCOPE-AUDIT.md` foi atualizado para não
+  apresentar a contagem antiga de 203 como estado atual.
+- Prettier e o preflight completo permaneceram verdes: 18/18 gates locais aprovados.
+
+### M393 — cadeia tamper-evident também no worker (2026-09-28)
+
+- Os handlers de auditoria do worker e o caminho padrão de Secrets/Webhooks passaram a envolver o
+  `RepositoryAuditSink` com `TamperEvidentAuditSink`, uniformizando sequência, hash anterior e hash
+  do evento entre API e workers sem transportar material secreto.
+- O teste focal do worker passou 11/11, com typecheck e lint aprovados; o pacote de auditoria passou
+  10/10. A coordenação de append entre réplicas continua explicitamente pendente do drill externo.
+
+### M394 — documentação da cadeia de auditoria do worker (2026-09-28)
+
+- Os guias de auditoria EN/PT-BR foram atualizados para registrar que API, jobs do worker e acesso
+  a secrets de Webhooks usam a mesma cadeia tamper-evident, mantendo explícita a limitação do drill
+  distribuído de produção.
+- Prettier e `docs:validate` passaram: 122 artigos localizados, 105 requisitos e 33 destinos de
+  ajuda contextual.
+
+### M395 — coordenação Redis do append de auditoria (2026-09-28)
+
+- `TamperEvidentAuditSink` agora aceita um coordenador distribuído opcional; o
+  `RedisAuditAppendCoordinator` usa token aleatório, `SET NX PX` e release condicionado ao token,
+  evitando que uma réplica vencida remova o lock de outra.
+- O `EventBusRuntimeService` conecta esse lock ao Redis já usado no perfil distribuído, e os handlers
+  do worker criam a mesma coordenação para auditoria, secrets e Webhooks. O pacote de auditoria passou
+  12/12, incluindo dois sinks concorrentes sobre o mesmo tenant; API e worker passaram typecheck/lint.
+  O drill real de failover/lease continua pendente.
+
+### M396 — teste reproduzível do lock Redis para certificação (2026-09-28)
+
+- `apps/worker/tests/redis.integration.test.ts` agora inclui o exercício com dois coordenadores Redis,
+  oito seções críticas concorrentes e métrica de exclusão mútua; ele usa `HANDSTACK_TEST_REDIS_URL`
+  e permanece `skipped` quando o serviço não está disponível.
+- `CERTIFICATION-READINESS.md` registra o comando PowerShell e a regra de que casos pulados não são
+  evidência de aprovação. No ambiente atual, o arquivo foi descoberto com 4 testes pulados, sem
+  promover nenhum gate externo.
+
+### M397 — renovação da lease do lock Redis (2026-09-28)
+
+- O coordenador Redis renova a lease periodicamente com `PEXPIRE` condicionado ao token, limpa o
+  timer antes do release e falha fechado quando a renovação retorna perda de ownership ou erro.
+- O teste focal de auditoria passou 14/14, incluindo renovação e perda de lease; typecheck e lint do
+  pacote passaram. O teste Redis real continua preparado, mas pulado sem infraestrutura.
+
+### M398 — critérios operacionais do drill Redis (2026-09-28)
+
+- `CERTIFICATION-READINESS.md` agora exige operação longa, observação da renovação, perda/isolamento
+  do owner, exclusão mútua entre réplicas e falha fechada antes de aceitar evidência de append.
+- Prettier passou; a ausência de Redis nesta máquina continua impedindo a execução do exercício real.
+
+### M399 — evidência executável de renovação e perda de lease Redis (2026-09-28)
+
+- `apps/worker/tests/redis.integration.test.ts` agora cobre, contra Redis real, uma operação maior
+  que o intervalo de renovação e verifica TTL positivo enquanto um segundo coordenador é impedido
+  de entrar na seção crítica.
+- O mesmo arquivo simula a perda de ownership por um cliente independente e exige o erro fechado
+  `Audit append lock lease was lost`; o teste focal ficou com 6 cenários preparados, mas todos
+  permanecem `skipped` no ambiente atual sem `HANDSTACK_TEST_REDIS_URL`.
+- Typecheck e lint do worker passaram após o incremento; a certificação externa continua pendente
+  até executar o arquivo sem skips e anexar o log ao diretório autorizado.
+
+### M400 — reconexão explícita do cliente MCP (2026-09-28)
+
+- `McpClientRegistry.reconnect` agora fecha o transporte HTTP/stdio atual sem descartar o servidor
+  registrado nem o cache persistido de descoberta; a próxima operação recria o transporte lazy,
+  evitando retry automático de tool potencialmente não idempotente.
+- O teste focal de MCP passou 10/10 com reinício efetivo de um servidor stdio; typecheck, lint e
+  documentação EN/PT-BR passaram. Reconexão contra servidor externo/deployment continua dependente
+  do ambiente de certificação.
+
+### M401 — reconexão MCP exposta no contrato público (2026-09-28)
+
+- A API agora oferece `POST /mcp/servers/:organizationId/:serverId/reconnect` com a mesma
+  autorização administrativa tenant-scoped; o SDK expõe `mcp.reconnect`.
+- O teste HTTP de MCP passou 3/3, o SDK passou 21/21, e o OpenAPI foi regenerado/validado com
+  205 caminhos. A operação local está coberta; E2E com servidor externo/deployment permanece
+  pendente para certificação.
+
+### M332 — auditoria de escopo após incrementos de SDK e retenção (2026-09-28)
+
+- A auditoria executável continua `PARTIAL`: 160 seções normativas, 105 requisitos verificados,
+  202 caminhos OpenAPI, 15 lacunas funcionais/cobertura e 6 certificações externas pendentes.
+- `missingHandlers`, `missingAdminRoutes`, `missingAdminUiRoutes` e `missingContextualHelpRoutes`
+  permanecem vazios; o relatório confirma `unifiedExecutionContext: true` e todos os dez handlers
+  oficiais de fila presentes.
+- A sondagem novamente confirmou que o Docker daemon não está disponível; nenhum teste externo foi
+  promovido a certificação por causa dessa ausência.
+
+### M409 — fechamento do contrato Redis do cache de privacidade (2026-09-28)
+
+- O adaptador Redis compartilhado pelo `EventBusRuntimeService` passou a implementar `srem`,
+  completando o contrato exigido pelo `RedisSubjectCache` para remover ownership antigo quando
+  uma chave é reutilizada por outro titular.
+- Typecheck, lint, testes focais de privacidade (8/8), formatação e o preflight completo passaram
+  com 18/18 gates locais. A certificação externa permanece `NOT_CERTIFIED` até executar Redis,
+  containers, provedores reais e drills em ambiente autorizado.
+
+### M410 — auditoria de consultas autenticadas (2026-09-28)
+
+- `GET /api/v1/organizations/:organizationId/audit` agora registra `AUDIT_QUERIED` após construir
+  a resposta, sem incluir o próprio evento na consulta corrente; o evento mantém somente contagem e
+  contexto limitado de request/trace/principal.
+- O teste HTTP de Operations passou 5/5, além de typecheck, lint e formatação do API.
+
+### M411 — adapters SIEM formatados (2026-09-28)
+
+- `@handstack/audit` agora expõe `FormattedSiemExporter` e `formatAuditEvents` para JSON Lines,
+  CEF e syslog RFC 5424. O adapter redige chaves sensíveis sem diferenciar maiúsculas/minúsculas,
+  escapa os campos de cada protocolo e deixa entrega/retry/backpressure sob responsabilidade do
+  sender injetado.
+- A suíte focal do pacote passou 17/17, com typecheck, lint e formatação aprovados.
+
+### M412 — tombstone de backup no perfil distribuído (2026-09-29)
+
+- O `PrivacyRuntimeService` agora compõe o tombstone durável do repositório com
+  `ExternalBackupTombstoneAdapter` apoiado pelo Redis compartilhado quando o API roda em perfil
+  distribuído; nenhuma evidência do repositório primário é substituída.
+- O teste HTTP de settings passou 7/7, o pacote de privacy passou 8/8 e typecheck/lint do API
+  passaram. O Redis real e o drill de restauração seguem dependentes de ambiente autorizado.
+
+### M413 — verificação agendada da cadeia de audit (2026-09-29)
+
+- Criado `AuditIntegritySchedulerService`, opt-in por `auditIntegrity`, com descoberta de tenants,
+  lease persistente por organização, falha fechada para hash inválido e evento `AUDIT_VERIFIED`
+  sanitizado após cada verificação válida.
+- A configuração foi propagada para `.env.example`, Compose, Kubernetes, Helm e guias EN/PT-BR.
+  Configuração passou 14/14 e o scheduler passou 2/2; typecheck e lint do API passaram.
+
+### M414 — contrato de arquivo WORM para audit (2026-09-29)
+
+- `@handstack/audit` agora oferece `WormAuditExporter` e `WormAuditStore.putIfAbsent`, gerando
+  arquivos tenant-scoped redigidos com chaves imutáveis e rejeitando exportações cross-tenant.
+- A suíte focal do pacote passou 19/19, com typecheck, lint e formatação aprovados. A implementação
+  de storage WORM externo permanece uma responsabilidade de deployment/certificação.
+
+### M415 — configuração segura do scheduler no CLI (2026-09-29)
+
+- O resumo de `handstack config validate` agora inclui `auditIntegrity.enabled`, intervalo, contagem
+  de organizações e presença do instance ID, sem imprimir valores sensíveis ou identificadores.
+- O teste focal do CLI passou 2/2, com typecheck, lint e formatação aprovados.
+
+### M443 — simulação local encerrada e laboratório limpo (2026-09-29)
+
+- O laboratório Docker local foi executado como preparação para certificação e o preflight registrou
+  19/19 gates locais aprovados; os limites de validade externa permanecem documentados.
+- Após a execução, foram removidos os 11 containers HandStack, 2 volumes, 1 rede, as 11 tags de
+  imagem usadas pelo laboratório e as 3 imagens locais de aplicação (`handstack-api`, `handstack-web`
+  e `handstack-docs`). A verificação final não encontrou containers, volumes, redes ou tags
+  correspondentes; imagens de outros projetos foram preservadas.
+- Os artefatos em `artifacts/certification/release-candidate-2026-09-29` e os runbooks permanecem
+  disponíveis para a próxima janela de staging autorizada.
+
+### M444 — pacote de documentação open source para GitHub (2026-09-29)
+
+- O README foi ampliado com proposta, status pre-1.0, capacidades, quick start, execução local,
+  mapa de documentação, limites de validade e canais de suporte.
+- Foram adicionados `CITATION.cff`, `SUPPORT.md`, `CHANGELOG.md`, roadmap, troubleshooting,
+  arquitetura, versionamento e templates públicos de issue/PR.
+- Dependabot e CodeQL foram configurados no GitHub; `CONTRIBUTING.md` foi ajustado para o fluxo
+  comunitário e deixou de expor instruções internas do supervisor.
+- `npm run docs:validate`, `npm run format:check` e `git diff --check` passaram.

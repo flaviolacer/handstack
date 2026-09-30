@@ -15,14 +15,18 @@ tags: [plugins, sdk, supply-chain]
 # Install governed plugins
 
 `@handstack/plugin-sdk` validates a manifest, records a SHA-256 source checksum and requires an
-administrator to approve every declared permission. Official trusted plugins may run in-process;
-community plugins require an isolated RPC runner.
+administrator to approve every declared permission. External npm/GitHub artifacts are resolved only
+from a pre-provisioned cache, must run in isolated mode, and require an Ed25519 publisher signature.
+Local development artifacts may use the trusted in-process mode; do not use that mode for external
+publisher content.
 
 ## Prerequisites
 
 - A package exposing `definePlugin` with an API-compatible manifest.
 - Administrator approval for requested network, filesystem, secrets, database, identity, MCP or
   model permissions.
+- A provisioned artifact cache and `HANDSTACK_PLUGIN_TRUSTED_PUBLISHERS_JSON`, mapping publisher
+  IDs to PEM-encoded Ed25519 public keys.
 
 ## Steps
 
@@ -31,13 +35,42 @@ community plugins require an isolated RPC runner.
 3. Approve only the requested permissions, then enable in the intended mode.
 4. Disable or uninstall through the host lifecycle when retiring a plugin.
 
+For external sources, sign the UTF-8 bytes of the following compact JSON object (property order is
+significant) with the publisher's Ed25519 private key and encode the 64-byte signature as base64url:
+
+```json
+{
+  "publisher": "publisher-id",
+  "pluginName": "@vendor/plugin",
+  "pluginVersion": "1.2.3",
+  "checksum": "<artifact-sha256>",
+  "sbomDigest": "<sbom-sha256>",
+  "provenanceDigest": "<provenance-sha256>"
+}
+```
+
+The signature binds the publisher, plugin identity/version, source checksum, SBOM digest and
+provenance digest. Keep the private signing key outside HandStack; only public keys belong in the
+trust configuration.
+
+Submit the raw UTF-8 JSON documents as `source.supplyChainDocuments.sbom` and
+`source.supplyChainDocuments.provenance`. HandStack recomputes both SHA-256 digests and checks that
+the SBOM identifies the exact package/version (CycloneDX JSON or SPDX JSON), and that provenance is
+an in-toto Statement v1 with a SLSA provenance predicate whose subject SHA-256 matches the plugin
+artifact. The raw documents are discarded after verification and are not stored with the tenant
+installation.
+
 ## Verify
 
-Check that a checksum is recorded, unapproved permissions cannot be elevated, isolated plugins
-fail closed without an RPC runner, and lifecycle hooks execute in order.
+Check that a checksum and trusted-publisher signature are verified, external plugins cannot load in
+trusted mode, unapproved permissions cannot be elevated, isolated plugins fail closed without an
+RPC runner, and lifecycle hooks execute in order.
 
 ## Troubleshooting
 
 - `isolated plugin runner is unavailable` means the deployment has no worker/RPC boundary.
+- `publisher is not trusted` means the publisher ID is absent from
+  `HANDSTACK_PLUGIN_TRUSTED_PUBLISHERS_JSON`; a signature failure means the signed identity,
+  version, checksum or supply-chain digest does not match.
 - A duplicate name requires uninstalling or versioning the existing installation.
 - Never place secret values in a manifest or plugin audit metadata.

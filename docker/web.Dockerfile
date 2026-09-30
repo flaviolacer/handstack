@@ -7,6 +7,7 @@ RUN npm --workspace @handstack/web run build
 
 FROM node:22.19.0-bookworm-slim AS runtime
 ENV NODE_ENV=production
+ENV HOSTNAME=0.0.0.0
 WORKDIR /app
 COPY --from=build /workspace/apps/web/.next/standalone ./
 COPY --from=build /workspace/apps/web/.next/static ./apps/web/.next/static

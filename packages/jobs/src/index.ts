@@ -17,8 +17,14 @@ export const JOB_QUEUES = [
   'billing',
   'cleanup',
   'indexing',
+  'workflow-executions',
 ] as const;
 export type JobQueueName = (typeof JOB_QUEUES)[number];
+
+/** BullMQ rejects `:` in queue names; encode each namespace segment deterministically. */
+export function bullMqQueueName(namespace: string, organizationId: string, queue: string): string {
+  return [namespace, organizationId, queue].map((part) => part.replaceAll(':', '_')).join('__');
+}
 
 export class BackpressureError extends Error {
   readonly code = 'JOB_BACKPRESSURE';
@@ -52,6 +58,13 @@ export interface Job<T> {
   readonly attempts: number;
   readonly availableAt: number;
   readonly createdAt: Date;
+  readonly context?: JobExecutionContext;
+}
+export interface JobExecutionContext {
+  readonly requestId: string;
+  readonly traceId: string;
+  readonly principalId: string;
+  readonly source: string;
 }
 export interface JobCheckpoint {
   readonly attempt: number;
@@ -61,6 +74,10 @@ export interface JobContext {
   readonly signal: AbortSignal;
   heartbeat(): void;
   checkpoint(value?: unknown): Promise<void>;
+  readonly requestId?: string;
+  readonly traceId?: string;
+  readonly principalId?: string;
+  readonly source?: string;
 }
 export interface DeadLetterJob<T> {
   readonly job: Job<T>;
@@ -101,6 +118,8 @@ export interface DurableJobTransport<T> {
   requeue(queue: JobQueueName, job: Job<T>, delayMs: number): Promise<void>;
   deadLetter(queue: JobQueueName, job: Job<T>, error: unknown): Promise<void>;
   backlog(queue: JobQueueName): Promise<number>;
+  /** Removes pending and dead-lettered payloads belonging to a data subject. */
+  deleteBySubject?(queue: JobQueueName, subjectId: string): Promise<number>;
 }
 
 /** Optional administrative operations for inspecting and operating a DLQ. */
@@ -143,6 +162,7 @@ interface BullMqEnvelope<T> {
   readonly idempotencyKey: string;
   readonly attempts: number;
   readonly createdAt: number;
+  readonly context?: JobExecutionContext;
 }
 
 interface BullMqDeadLetterEnvelope<T> {
@@ -181,6 +201,7 @@ export class BullMqJobTransport<T> implements DurableJobTransport<T>, JobDeadLet
         idempotencyKey: job.idempotencyKey,
         attempts: job.attempts,
         createdAt: job.createdAt.getTime(),
+        ...(job.context === undefined ? {} : { context: job.context }),
       },
       {
         jobId: this.jobId(job),
@@ -205,6 +226,7 @@ export class BullMqJobTransport<T> implements DurableJobTransport<T>, JobDeadLet
       attempts: stored.data.attempts,
       availableAt: stored.timestamp + (stored.opts.delay ?? 0),
       createdAt: new Date(stored.data.createdAt),
+      ...(stored.data.context === undefined ? {} : { context: stored.data.context }),
     };
   }
 
@@ -225,6 +247,23 @@ export class BullMqJobTransport<T> implements DurableJobTransport<T>, JobDeadLet
   async backlog(queue: JobQueueName): Promise<number> {
     const counts = await this.queue(queue).getJobCounts('waiting', 'delayed', 'prioritized');
     return Object.values(counts).reduce((total, count) => total + count, 0);
+  }
+
+  async deleteBySubject(queue: JobQueueName, subjectId: string): Promise<number> {
+    if (subjectId.trim() === '') throw new ValidationError('Job subject is required');
+    let removed = 0;
+    for (const target of [this.queue(queue), this.deadLetterQueue(queue)]) {
+      const jobs = await target.getJobs(['waiting', 'delayed', 'prioritized'], 0, -1, true);
+      for (const stored of jobs) {
+        const data = stored.data as BullMqEnvelope<T> | BullMqDeadLetterEnvelope<T>;
+        const payload = 'payload' in data ? data.payload : data.job.payload;
+        if (containsSubject(payload, subjectId)) {
+          await target.remove(stored.id);
+          removed += 1;
+        }
+      }
+    }
+    return removed;
   }
 
   async listDeadLetters(queue: JobQueueName): Promise<readonly DeadLetterJob<T>[]> {
@@ -292,11 +331,11 @@ export class BullMqJobTransport<T> implements DurableJobTransport<T>, JobDeadLet
   }
 
   private queueName(queue: string): string {
-    return `${this.namespace}:${this.organizationId}:${queue}`;
+    return bullMqQueueName(this.namespace, this.organizationId, queue);
   }
 
   private jobId(job: Job<T>): string {
-    return `${this.organizationId}:${job.idempotencyKey}`;
+    return `${this.organizationId}__${job.idempotencyKey}`.replaceAll(':', '_');
   }
 }
 
@@ -390,6 +429,20 @@ export class RepositoryJobTransport<T> implements DurableJobTransport<T>, JobDea
   async backlog(queue: JobQueueName): Promise<number> {
     const items = await this.listQueue(queue);
     return items.filter((item) => item.state !== 'DEAD').length;
+  }
+
+  deleteBySubject(queue: JobQueueName, subjectId: string): Promise<number> {
+    if (subjectId.trim() === '') throw new ValidationError('Job subject is required');
+    return this.serial(async () => {
+      let removed = 0;
+      for (const item of await this.listQueue(queue)) {
+        if (containsSubject(item.job.payload, subjectId)) {
+          await this.repository.delete(this.organizationId, item.id, item.version);
+          removed += 1;
+        }
+      }
+      return removed;
+    });
   }
 
   async listDeadLetters(queue: JobQueueName): Promise<readonly DeadLetterJob<T>[]> {
@@ -566,6 +619,7 @@ export class DistributedJobQueue<T> {
     idempotencyKey: string;
     priority?: number;
     delayMs?: number;
+    context?: JobExecutionContext;
   }): Promise<Job<T>> {
     if (input.id.trim() === '') throw new ValidationError('Job id is required');
     if (input.idempotencyKey === '') throw new ValidationError('Idempotency key is required');
@@ -590,6 +644,7 @@ export class DistributedJobQueue<T> {
       attempts: 0,
       availableAt: Date.now() + (input.delayMs ?? 0),
       createdAt: new Date(),
+      ...(input.context === undefined ? {} : { context: input.context }),
     };
     await this.observedOperation('enqueue', () => this.transport.enqueue(this.name, job));
     return job;
@@ -635,6 +690,7 @@ export class DistributedJobQueue<T> {
     let checkpoint: JobCheckpoint = { attempt: job.attempts };
     const context: JobContext = {
       signal: controller.signal,
+      ...(job.context ?? {}),
       heartbeat: () => options.onHeartbeat?.(Date.now()),
       checkpoint: (value) => {
         checkpoint = { attempt: job.attempts, value };
@@ -696,6 +752,12 @@ export class DistributedJobQueue<T> {
     return withTransportBoundary('backlog', this.options.retryAfterSeconds, () =>
       this.transport.backlog(this.name),
     );
+  }
+
+  deleteBySubject(subjectId: string): Promise<number> {
+    if (this.transport.deleteBySubject === undefined)
+      throw new ValidationError('Job transport does not support subject deletion');
+    return this.transport.deleteBySubject(this.name, subjectId);
   }
 
   async listDeadLetters(): Promise<readonly DeadLetterJob<T>[]> {
@@ -878,6 +940,7 @@ export class InMemoryJobQueue<T> {
     idempotencyKey: string;
     priority?: number;
     delayMs?: number;
+    context?: JobExecutionContext;
   }): Job<T> {
     if (input.id.trim() === '') throw new ValidationError('Job id is required');
     if (input.idempotencyKey === '') throw new ValidationError('Idempotency key is required');
@@ -903,6 +966,7 @@ export class InMemoryJobQueue<T> {
       attempts: 0,
       availableAt: Date.now() + (input.delayMs ?? 0),
       createdAt: new Date(),
+      ...(input.context === undefined ? {} : { context: input.context }),
     };
     this.pending.push(job);
     this.idempotency.add(job.idempotencyKey);
@@ -928,6 +992,7 @@ export class InMemoryJobQueue<T> {
     let checkpoint: JobCheckpoint = { attempt: job.attempts };
     const context: JobContext = {
       signal: controller.signal,
+      ...(job.context ?? {}),
       heartbeat: () => {
         return;
       },
@@ -971,6 +1036,22 @@ export class InMemoryJobQueue<T> {
   get backlog(): number {
     return this.pending.length;
   }
+  async deleteBySubject(subjectId: string): Promise<number> {
+    if (subjectId.trim() === '') throw new ValidationError('Job subject is required');
+    const before = this.pending.length + this.deadLetter.length;
+    for (let index = this.pending.length - 1; index >= 0; index -= 1) {
+      if (containsSubject(this.pending[index]?.payload, subjectId)) {
+        const removed = this.pending.splice(index, 1)[0];
+        if (removed !== undefined) this.idempotency.delete(removed.idempotencyKey);
+      }
+    }
+    for (let index = this.deadLetter.length - 1; index >= 0; index -= 1) {
+      if (containsSubject(this.deadLetter[index]?.job.payload, subjectId)) {
+        this.deadLetter.splice(index, 1);
+      }
+    }
+    return Promise.resolve(before - this.pending.length - this.deadLetter.length);
+  }
   get deadLetters(): readonly Job<T>[] {
     return this.deadLetter
       .filter((entry) => Date.now() - entry.deadLetteredAt.getTime() <= this.options.retentionMs)
@@ -1004,6 +1085,17 @@ export interface JobResult<T = unknown> {
   readonly job: Job<T>;
   readonly error?: unknown;
   readonly checkpoint?: JobCheckpoint;
+}
+
+function containsSubject(value: unknown, subjectId: string, seen = new Set<object>()): boolean {
+  if (value === subjectId) return true;
+  if (typeof value !== 'object' || value === null) return false;
+  if (seen.has(value)) return false;
+  seen.add(value);
+  if (Array.isArray(value)) return value.some((item) => containsSubject(item, subjectId, seen));
+  return Object.values(value as Record<string, unknown>).some((item) =>
+    containsSubject(item, subjectId, seen),
+  );
 }
 
 export const operationRepository = repositoryName('operations');

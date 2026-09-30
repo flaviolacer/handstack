@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { ExtensionHealth, ExtensionProvider, JsonSchema } from '@handstack/core';
+import { spawn } from 'node:child_process';
 
 export type SandboxNetworkPolicy = 'deny-all' | 'allow-listed';
 
@@ -70,6 +71,8 @@ export interface SandboxExecutionRequest {
   /** Explicit network targets; each must satisfy the profile network allowlist and SSRF policy. */
   readonly networkTargets?: readonly SandboxDestination[];
   readonly signal?: AbortSignal;
+  /** Bidirectional request broker supported only by the process executor. */
+  readonly rpcHandler?: (request: unknown) => Promise<unknown>;
 }
 
 export interface SandboxExecutionResult {
@@ -112,6 +115,7 @@ export interface SandboxExecutorInput {
   readonly profile: SandboxProfile;
   readonly stdin?: string;
   readonly signal?: AbortSignal;
+  readonly rpcHandler?: (request: unknown) => Promise<unknown>;
 }
 
 export interface SandboxExecutorOutput {
@@ -124,6 +128,125 @@ export interface SandboxExecutorOutput {
 
 export interface SandboxExecutor {
   run(input: SandboxExecutorInput): Promise<SandboxExecutorOutput>;
+}
+
+/**
+ * Real child-process executor for the process sandbox. The sandbox provider
+ * remains responsible for authorization; this class only owns process
+ * lifecycle, cancellation, timeout and bounded output collection.
+ */
+export class NodeProcessSandboxExecutor implements SandboxExecutor {
+  run(input: SandboxExecutorInput): Promise<SandboxExecutorOutput> {
+    const [command, ...arguments_] = input.argv;
+    if (command === undefined || command.trim() === '')
+      return Promise.reject(new SandboxError('sandbox_denied', 'sandbox command is required'));
+    const startedAt = Date.now();
+    return new Promise((resolve, reject) => {
+      const child = spawn(command, arguments_, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+      });
+      let stdout = '';
+      let stdoutPending = '';
+      let stderr = '';
+      let timedOut = false;
+      let settled = false;
+      const finish = (callback: () => void): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        input.signal?.removeEventListener('abort', abort);
+        callback();
+      };
+      const abort = (): void => {
+        child.kill();
+      };
+      const timer = setTimeout(() => {
+        timedOut = true;
+        child.kill();
+      }, input.profile.resourceLimits.executionTimeoutMs);
+      input.signal?.addEventListener('abort', abort, { once: true });
+      child.on('error', (error) => {
+        finish(() => {
+          reject(error);
+        });
+      });
+      const handleStdoutLine = (line: string): void => {
+        let message: { type?: unknown; id?: unknown; request?: unknown } | undefined;
+        try {
+          message = JSON.parse(line) as typeof message;
+        } catch {
+          // Non-protocol stdout is preserved for the caller.
+        }
+        if (
+          message?.type === 'handstack_rpc_request' &&
+          typeof message.id === 'string' &&
+          input.rpcHandler !== undefined
+        ) {
+          void input.rpcHandler(message.request).then(
+            (result) => {
+              if (!settled)
+                child.stdin.write(
+                  `${JSON.stringify({ type: 'handstack_rpc_response', id: message.id, result })}\n`,
+                );
+            },
+            () => {
+              if (!settled)
+                child.stdin.write(
+                  `${JSON.stringify({
+                    type: 'handstack_rpc_response',
+                    id: message.id,
+                    error: 'Host capability request failed',
+                  })}\n`,
+                );
+            },
+          );
+          return;
+        }
+        stdout = appendBounded(stdout, `${line}\n`, input.profile.resourceLimits.maxOutputBytes);
+      };
+      child.stdout.on('data', (chunk: Buffer | string) => {
+        stdoutPending = appendBounded(
+          stdoutPending,
+          chunk,
+          input.profile.resourceLimits.maxOutputBytes + 1,
+        );
+        let newline = stdoutPending.indexOf('\n');
+        while (newline >= 0) {
+          handleStdoutLine(stdoutPending.slice(0, newline).replace(/\r$/u, ''));
+          stdoutPending = stdoutPending.slice(newline + 1);
+          newline = stdoutPending.indexOf('\n');
+        }
+      });
+      child.stderr.on('data', (chunk: Buffer | string) => {
+        stderr = appendBounded(stderr, chunk, input.profile.resourceLimits.maxLogBytes);
+      });
+      child.on('close', (exitCode) => {
+        finish(() => {
+          if (stdoutPending.length > 0)
+            stdout = appendBounded(
+              stdout,
+              stdoutPending,
+              input.profile.resourceLimits.maxOutputBytes,
+            );
+          resolve({
+            exitCode: exitCode ?? 1,
+            stdout,
+            stderr,
+            durationMs: Date.now() - startedAt,
+            timedOut,
+          });
+        });
+      });
+      if (input.stdin !== undefined) child.stdin.write(input.stdin);
+      if (input.rpcHandler === undefined) child.stdin.end();
+    });
+  }
+}
+
+function appendBounded(current: string, chunk: Buffer | string, limit: number): string {
+  const next = current + chunk.toString();
+  return next.length <= limit ? next : next.slice(0, limit);
 }
 
 /** Container runtime injected behind the container provider (e.g. a Docker-compatible client). */
@@ -340,6 +463,7 @@ export class ProcessIsolatedSandboxProvider extends TrackedSandboxProvider {
       profile: current.profile,
       ...(request.stdin !== undefined ? { stdin: request.stdin } : {}),
       ...(request.signal !== undefined ? { signal: request.signal } : {}),
+      ...(request.rpcHandler !== undefined ? { rpcHandler: request.rpcHandler } : {}),
     };
     const output = await this.executor.run(input);
     return enforceOutputLimits(output, current.profile);
@@ -361,6 +485,8 @@ export class ContainerSandboxProvider extends TrackedSandboxProvider {
     const current = this.currentHandle(handle.id);
     authorizeRequestedSecrets(request, current.profile, Date.now());
     authorizeNetworkTargets(request, current.profile);
+    if (request.rpcHandler !== undefined)
+      throw new SandboxError('sandbox_unavailable', 'container sandbox does not support host RPC');
     const image = request.image;
     if (image === undefined || image.trim() === '')
       throw new SandboxError('sandbox_denied', 'container sandbox requires an image');

@@ -1,0 +1,42 @@
+---
+id: getting-started/red-team
+title: Run governed red-team campaigns
+description: Create versioned adversarial campaigns and review findings before release.
+audience: [platform-operator, security-engineer]
+permissions: [red-team.manage]
+features: [red-team, evaluations, governance]
+deploymentProfiles: [compact, distributed]
+introducedIn: 0.5.0
+lastReviewedAt: 2026-09-15
+owner: security-team
+tags: [red-team, security, evaluation]
+---
+
+# Run governed red-team campaigns
+
+## Purpose and expected outcome
+
+Use a versioned campaign to exercise agents, models, capabilities or workflows with adversarial
+cases. Findings are redacted, auditable and remain associated with the exact target version.
+
+## Prerequisites
+
+- A principal with `red-team.manage` in the organization.
+- A published target and an approved evaluation dataset or campaign vector set.
+
+## Steps
+
+1. Create a campaign and identify the target type, target version, owner and data classification.
+2. Add vectors covering prompt injection, authorization bypass, leakage and unsafe tool behavior.
+3. Execute the campaign and review the persisted findings and audit event.
+4. Resolve or accept each finding with an explicit decision before publishing the affected target.
+
+## Verify
+
+Confirm findings contain no prompts, secrets or raw sensitive responses, and that a campaign from
+another organization cannot be read or executed.
+
+## Troubleshooting
+
+- A campaign cannot execute against an unpublished or changed target version.
+- Missing `red-team.manage` permission is intentionally denied before execution.

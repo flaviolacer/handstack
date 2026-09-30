@@ -6,6 +6,7 @@ import { AccessTokenGuard } from '../auth/access-token.guard.js';
 import { AuthRuntimeService } from '../auth/auth-runtime.service.js';
 import {
   requireAuthentication,
+  requestTraceContext,
   type AuthenticatedRequest,
 } from '../auth/authentication-context.js';
 import { IdentityAdministrationService } from '@handstack/identity-service';
@@ -85,7 +86,18 @@ export class WebhookController {
       const parsed = dispatchSchema.safeParse(value);
       if (!parsed.success)
         throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid webhook delivery');
-      return await this.runtime.dispatch({ organizationId, ...parsed.data });
+      const auth = requireAuthentication(request);
+      const trace = requestTraceContext(request);
+      return await this.runtime.dispatch({
+        organizationId,
+        ...parsed.data,
+        context: {
+          requestId: trace.requestId,
+          traceId: trace.traceId,
+          principalId: auth.subject,
+          source: 'API',
+        },
+      });
     });
   }
 

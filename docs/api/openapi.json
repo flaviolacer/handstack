@@ -96,6 +96,40 @@
         "tags": ["Chat"]
       }
     },
+    "/api/v1/organizations/{organizationId}/chat/agents": {
+      "get": {
+        "operationId": "ChatController_agents",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "description": "Organization scope",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Published WEB agents without implementation details"
+          },
+          "401": {
+            "description": "Bearer access token is missing or invalid"
+          },
+          "403": {
+            "description": "Organization mismatch or chat.use is missing"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List published agents available to the chat workspace",
+        "tags": ["Chat"]
+      }
+    },
     "/api/v1/organizations/{organizationId}/conversations": {
       "get": {
         "operationId": "ChatController_list",
@@ -692,6 +726,11 @@
                     "minLength": 1,
                     "maxLength": 200
                   },
+                  "agentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
                   "dataClassification": {
                     "type": "string",
                     "enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
@@ -702,6 +741,11 @@
                     "maxLength": 200
                   },
                   "traceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "knowledgeBaseId": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
@@ -1174,6 +1218,126 @@
       },
       "post": {
         "operationId": "IdentityAdminController_createProvider",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["IdentityAdmin"]
+      }
+    },
+    "/organizations/{organizationId}/identity/users": {
+      "get": {
+        "operationId": "IdentityAdminController_listUsers",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["IdentityAdmin"]
+      },
+      "post": {
+        "operationId": "IdentityAdminController_createUser",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["IdentityAdmin"]
+      }
+    },
+    "/organizations/{organizationId}/identity/groups": {
+      "get": {
+        "operationId": "IdentityAdminController_listGroups",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["IdentityAdmin"]
+      },
+      "post": {
+        "operationId": "IdentityAdminController_createGroup",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["IdentityAdmin"]
+      }
+    },
+    "/organizations/{organizationId}/identity/roles": {
+      "get": {
+        "operationId": "IdentityAdminController_listRoles",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["IdentityAdmin"]
+      },
+      "post": {
+        "operationId": "IdentityAdminController_createRole",
         "parameters": [
           {
             "name": "organizationId",
@@ -3408,6 +3572,571 @@
         "tags": ["Providers and models"]
       }
     },
+    "/api/v1/organizations/{organizationId}/red-team-campaigns": {
+      "get": {
+        "operationId": "ModelAdminController_listRedTeamCampaigns",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "description": "Organization scope",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "organizationId": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          },
+                          "targetKind": {
+                            "type": "string",
+                            "enum": ["MODEL", "PROMPT", "AGENT", "WORKFLOW"]
+                          },
+                          "targetId": {
+                            "type": "string"
+                          },
+                          "campaignVersion": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["DRAFT", "RUNNING", "PASSED", "FAILED"]
+                          },
+                          "scenarioCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "findings": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "scenarioId": {
+                                  "type": "string"
+                                },
+                                "vector": {
+                                  "type": "string",
+                                  "enum": [
+                                    "jailbreak",
+                                    "indirect_prompt_injection",
+                                    "data_exfiltration",
+                                    "cross_tenant_access",
+                                    "unsafe_tool_use",
+                                    "excessive_agency",
+                                    "denial_of_wallet",
+                                    "rag_poisoning"
+                                  ]
+                                },
+                                "passed": {
+                                  "type": "boolean"
+                                },
+                                "severity": {
+                                  "type": "string",
+                                  "enum": ["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+                                },
+                                "evidenceDigest": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "scenarioId",
+                                "vector",
+                                "passed",
+                                "severity",
+                                "evidenceDigest"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "executedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          },
+                          "executionErrorDigest": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "organizationId",
+                          "version",
+                          "createdAt",
+                          "updatedAt",
+                          "targetKind",
+                          "targetId",
+                          "campaignVersion",
+                          "status",
+                          "scenarioCount",
+                          "findings"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "string"
+                    },
+                    "previousCursor": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer access token is missing or invalid"
+          },
+          "403": {
+            "description": "Organization mismatch or models.manage is missing"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List versioned red-team campaigns",
+        "tags": ["Providers and models"]
+      },
+      "post": {
+        "operationId": "ModelAdminController_createRedTeamCampaign",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "description": "Organization scope",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                  "targetKind": {
+                    "type": "string",
+                    "enum": ["MODEL", "PROMPT", "AGENT", "WORKFLOW"]
+                  },
+                  "targetId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "campaignVersion": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "scenarios": {
+                    "minItems": 8,
+                    "maxItems": 10000,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "vector": {
+                          "type": "string",
+                          "enum": [
+                            "jailbreak",
+                            "indirect_prompt_injection",
+                            "data_exfiltration",
+                            "cross_tenant_access",
+                            "unsafe_tool_use",
+                            "excessive_agency",
+                            "denial_of_wallet",
+                            "rag_poisoning"
+                          ]
+                        },
+                        "input": {
+                          "type": "object",
+                          "properties": {
+                            "prompt": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 100000
+                            },
+                            "expected": {
+                              "type": "object",
+                              "properties": {
+                                "mustContain": {
+                                  "default": [],
+                                  "maxItems": 100,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 2000
+                                  }
+                                },
+                                "mustNotContain": {
+                                  "default": [],
+                                  "maxItems": 100,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 2000
+                                  }
+                                }
+                              },
+                              "required": ["mustContain", "mustNotContain"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": ["prompt", "expected"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["id", "vector", "input"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["targetKind", "targetId", "campaignVersion", "scenarios"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "organizationId": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "targetKind": {
+                      "type": "string",
+                      "enum": ["MODEL", "PROMPT", "AGENT", "WORKFLOW"]
+                    },
+                    "targetId": {
+                      "type": "string"
+                    },
+                    "campaignVersion": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["DRAFT", "RUNNING", "PASSED", "FAILED"]
+                    },
+                    "scenarioCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "findings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "scenarioId": {
+                            "type": "string"
+                          },
+                          "vector": {
+                            "type": "string",
+                            "enum": [
+                              "jailbreak",
+                              "indirect_prompt_injection",
+                              "data_exfiltration",
+                              "cross_tenant_access",
+                              "unsafe_tool_use",
+                              "excessive_agency",
+                              "denial_of_wallet",
+                              "rag_poisoning"
+                            ]
+                          },
+                          "passed": {
+                            "type": "boolean"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": ["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+                          },
+                          "evidenceDigest": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "scenarioId",
+                          "vector",
+                          "passed",
+                          "severity",
+                          "evidenceDigest"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "executedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "executionErrorDigest": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organizationId",
+                    "version",
+                    "createdAt",
+                    "updatedAt",
+                    "targetKind",
+                    "targetId",
+                    "campaignVersion",
+                    "status",
+                    "scenarioCount",
+                    "findings"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer access token is missing or invalid"
+          },
+          "403": {
+            "description": "Organization mismatch or models.manage is missing"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Register a governed red-team campaign",
+        "tags": ["Providers and models"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/red-team-campaigns/{campaignId}/execute": {
+      "post": {
+        "operationId": "ModelAdminController_executeRedTeamCampaign",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "description": "Organization scope",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "campaignId",
+            "required": true,
+            "in": "path",
+            "description": "Red-team campaign ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "organizationId": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "targetKind": {
+                      "type": "string",
+                      "enum": ["MODEL", "PROMPT", "AGENT", "WORKFLOW"]
+                    },
+                    "targetId": {
+                      "type": "string"
+                    },
+                    "campaignVersion": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["DRAFT", "RUNNING", "PASSED", "FAILED"]
+                    },
+                    "scenarioCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "findings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "scenarioId": {
+                            "type": "string"
+                          },
+                          "vector": {
+                            "type": "string",
+                            "enum": [
+                              "jailbreak",
+                              "indirect_prompt_injection",
+                              "data_exfiltration",
+                              "cross_tenant_access",
+                              "unsafe_tool_use",
+                              "excessive_agency",
+                              "denial_of_wallet",
+                              "rag_poisoning"
+                            ]
+                          },
+                          "passed": {
+                            "type": "boolean"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": ["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+                          },
+                          "evidenceDigest": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "scenarioId",
+                          "vector",
+                          "passed",
+                          "severity",
+                          "evidenceDigest"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "executedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "executionErrorDigest": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organizationId",
+                    "version",
+                    "createdAt",
+                    "updatedAt",
+                    "targetKind",
+                    "targetId",
+                    "campaignVersion",
+                    "status",
+                    "scenarioCount",
+                    "findings"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer access token is missing or invalid"
+          },
+          "403": {
+            "description": "Organization mismatch or models.manage is missing"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Execute a governed red-team campaign",
+        "tags": ["Providers and models"]
+      }
+    },
     "/api/v1/organizations/{organizationId}/evaluation-runs": {
       "post": {
         "operationId": "ModelAdminController_createEvaluationRun",
@@ -4036,6 +4765,181 @@
         "tags": ["Providers and models"]
       }
     },
+    "/api/v1/organizations/{organizationId}/models/{modelId}/approval-override": {
+      "post": {
+        "operationId": "ModelAdminController_overrideModelApproval",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "description": "Organization scope",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "modelId",
+            "required": true,
+            "in": "path",
+            "description": "Internal model definition ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                  "justification": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  }
+                },
+                "required": ["justification", "expiresAt"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "organizationId": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "displayName": {
+                      "type": "string"
+                    },
+                    "providerId": {
+                      "type": "string"
+                    },
+                    "providerModel": {
+                      "type": "string"
+                    },
+                    "aliases": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "capabilities": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": ["chat", "vision", "tools", "embeddings", "reasoning"]
+                      }
+                    },
+                    "contextWindow": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "pricing": {
+                      "type": "object",
+                      "properties": {
+                        "inputPerMillion": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "outputPerMillion": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "currency": {
+                          "type": "string",
+                          "const": "USD"
+                        }
+                      },
+                      "required": ["inputPerMillion", "outputPerMillion", "currency"],
+                      "additionalProperties": false
+                    },
+                    "lifecycle": {
+                      "type": "string",
+                      "enum": [
+                        "DRAFT",
+                        "EVALUATED",
+                        "APPROVED",
+                        "PUBLISHED",
+                        "DEPRECATED",
+                        "RETIRED"
+                      ]
+                    },
+                    "evaluationSuiteVersion": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organizationId",
+                    "version",
+                    "createdAt",
+                    "updatedAt",
+                    "displayName",
+                    "providerId",
+                    "providerModel",
+                    "aliases",
+                    "capabilities",
+                    "contextWindow",
+                    "pricing",
+                    "lifecycle"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer access token is missing or invalid"
+          },
+          "403": {
+            "description": "Organization mismatch or models.manage is missing"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Override model evaluation approval with expiry and justification",
+        "tags": ["Providers and models"]
+      }
+    },
     "/api/v1/organizations/{organizationId}/prompt-versions/{promptVersionId}/evaluation-gates": {
       "post": {
         "operationId": "ModelAdminController_recordPromptEvaluationGate",
@@ -4550,6 +5454,176 @@
         "tags": ["Providers and models"]
       }
     },
+    "/api/v1/organizations/{organizationId}/prompt-versions/{promptVersionId}/approval-override": {
+      "post": {
+        "operationId": "ModelAdminController_overridePromptApproval",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "description": "Organization scope",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "promptVersionId",
+            "required": true,
+            "in": "path",
+            "description": "Immutable prompt version ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                  "justification": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  }
+                },
+                "required": ["justification", "expiresAt"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "organizationId": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "promptId": {
+                      "type": "string"
+                    },
+                    "versionLabel": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "contentDigest": {
+                      "type": "string"
+                    },
+                    "variables": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "description": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "defaultValue": {
+                            "type": "string",
+                            "maxLength": 10000
+                          }
+                        },
+                        "required": ["name", "required"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "modelDefinitionId": {
+                      "type": "string"
+                    },
+                    "lifecycle": {
+                      "type": "string",
+                      "enum": [
+                        "DRAFT",
+                        "EVALUATED",
+                        "APPROVED",
+                        "PUBLISHED",
+                        "DEPRECATED",
+                        "RETIRED"
+                      ]
+                    },
+                    "evaluationSuiteVersion": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organizationId",
+                    "version",
+                    "createdAt",
+                    "updatedAt",
+                    "promptId",
+                    "versionLabel",
+                    "content",
+                    "contentDigest",
+                    "variables",
+                    "modelDefinitionId",
+                    "lifecycle"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer access token is missing or invalid"
+          },
+          "403": {
+            "description": "Organization mismatch or models.manage is missing"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Override prompt evaluation approval with expiry and justification",
+        "tags": ["Providers and models"]
+      }
+    },
     "/api/v1/organizations/{organizationId}/model-responses": {
       "post": {
         "operationId": "ModelAdminController_createModelResponse",
@@ -5033,6 +6107,31 @@
         ],
         "summary": "Create a versioned model pricing record",
         "tags": ["Budgets and usage"]
+      },
+      "get": {
+        "operationId": "BudgetController_listPricing",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List versioned model pricing records",
+        "tags": ["Budgets and usage"]
       }
     },
     "/api/v1/organizations/{organizationId}/capabilities": {
@@ -5059,6 +6158,66 @@
           }
         ],
         "summary": "List capabilities available on the API channel",
+        "tags": ["Capabilities"]
+      },
+      "post": {
+        "operationId": "CapabilityController_create",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Register a capability descriptor",
+        "tags": ["Capabilities"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/capabilities/{slug}/publish": {
+      "post": {
+        "operationId": "CapabilityController_publish",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publish a capability descriptor",
         "tags": ["Capabilities"]
       }
     },
@@ -5132,6 +6291,523 @@
         "tags": ["Capabilities"]
       }
     },
+    "/api/v1/capabilities": {
+      "get": {
+        "operationId": "PublicCapabilityController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List capabilities for the authenticated organization",
+        "tags": ["Capabilities"]
+      }
+    },
+    "/api/v1/capabilities/{slug}": {
+      "get": {
+        "operationId": "PublicCapabilityController_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resolve a capability for the authenticated organization",
+        "tags": ["Capabilities"]
+      }
+    },
+    "/api/v1/capabilities/{slug}/run": {
+      "post": {
+        "operationId": "PublicCapabilityController_run",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Execute a capability for the authenticated organization",
+        "tags": ["Capabilities"]
+      }
+    },
+    "/mcp/servers/{organizationId}": {
+      "get": {
+        "operationId": "McpController_listServers",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List configured MCP client servers for an organization",
+        "tags": ["MCP"]
+      },
+      "post": {
+        "operationId": "McpController_registerServer",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Register an organization MCP client server",
+        "tags": ["MCP"]
+      }
+    },
+    "/mcp/servers/{organizationId}/{serverId}/discover": {
+      "post": {
+        "operationId": "McpController_discover",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serverId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Discover tools exposed by an MCP client server",
+        "tags": ["MCP"]
+      }
+    },
+    "/mcp/servers/{organizationId}/{serverId}/reconnect": {
+      "post": {
+        "operationId": "McpController_reconnect",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serverId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reconnect an MCP client server transport",
+        "tags": ["MCP"]
+      }
+    },
+    "/mcp/servers/{organizationId}/{serverId}/tools": {
+      "get": {
+        "operationId": "McpController_listTools",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serverId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List tools discovered from an MCP client server",
+        "tags": ["MCP"]
+      }
+    },
+    "/mcp/servers/{organizationId}/{serverId}/discover-resources": {
+      "post": {
+        "operationId": "McpController_discoverResources",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serverId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Discover resources exposed by an MCP client server",
+        "tags": ["MCP"]
+      }
+    },
+    "/mcp/servers/{organizationId}/{serverId}/resources": {
+      "get": {
+        "operationId": "McpController_listResources",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serverId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List persisted MCP resources for an MCP client server",
+        "tags": ["MCP"]
+      }
+    },
+    "/mcp/servers/{organizationId}/{serverId}/discover-prompts": {
+      "post": {
+        "operationId": "McpController_discoverPrompts",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serverId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Discover prompts exposed by an MCP client server",
+        "tags": ["MCP"]
+      }
+    },
+    "/mcp/servers/{organizationId}/{serverId}/prompts": {
+      "get": {
+        "operationId": "McpController_listPrompts",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serverId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List persisted MCP prompts for an MCP client server",
+        "tags": ["MCP"]
+      }
+    },
+    "/mcp/servers/{organizationId}/{serverId}/tools/{toolName}/call": {
+      "post": {
+        "operationId": "McpController_callTool",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serverId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toolName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Execute a discovered MCP tool for the authenticated principal",
+        "tags": ["MCP"]
+      }
+    },
+    "/mcp/servers/{organizationId}/{serverId}/credentials": {
+      "post": {
+        "operationId": "McpController_saveCredential",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serverId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Store an encrypted per-user MCP credential",
+        "tags": ["MCP"]
+      }
+    },
+    "/mcp/servers/{organizationId}/{serverId}/oauth/start": {
+      "post": {
+        "operationId": "McpController_startOAuth",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serverId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start an MCP OAuth authorization-code flow",
+        "tags": ["MCP"]
+      }
+    },
+    "/mcp/servers/{organizationId}/{serverId}/oauth/callback": {
+      "post": {
+        "operationId": "McpController_completeOAuth",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serverId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Complete an MCP OAuth authorization-code flow",
+        "tags": ["MCP"]
+      }
+    },
     "/mcp": {
       "post": {
         "operationId": "McpController_handle",
@@ -5177,6 +6853,467 @@
         "tags": ["MCP"]
       }
     },
+    "/api/v1/organizations/{organizationId}/plugins": {
+      "get": {
+        "operationId": "PluginAdminController_list",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List installed tenant plugins",
+        "tags": ["Plugin administration"]
+      },
+      "post": {
+        "operationId": "PluginAdminController_install",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["manifest", "checksum", "source"],
+                "properties": {
+                  "manifest": {
+                    "type": "object",
+                    "required": ["name", "version", "handstack"],
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "handstack": {
+                        "type": "object",
+                        "required": ["apiVersion", "capabilities"],
+                        "properties": {
+                          "apiVersion": {
+                            "type": "string"
+                          },
+                          "capabilities": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "permissions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "mode": {
+                            "type": "string",
+                            "enum": ["trusted", "isolated"]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "checksum": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "approvedPermissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "source": {
+                    "type": "object",
+                    "required": ["kind", "locator", "checksum", "supplyChain"],
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": ["LOCAL", "NPM", "GITHUB"]
+                      },
+                      "locator": {
+                        "type": "string"
+                      },
+                      "checksum": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "supplyChain": {
+                        "type": "object",
+                        "required": ["publisher", "signature", "sbomDigest", "provenanceDigest"],
+                        "properties": {
+                          "publisher": {
+                            "type": "string"
+                          },
+                          "signature": {
+                            "type": "string",
+                            "description": "Ed25519 base64url signature for external sources."
+                          },
+                          "sbomDigest": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          },
+                          "provenanceDigest": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          }
+                        }
+                      },
+                      "supplyChainDocuments": {
+                        "type": "object",
+                        "required": ["sbom", "provenance"],
+                        "properties": {
+                          "sbom": {
+                            "type": "string",
+                            "maxLength": 2000000,
+                            "description": "Raw CycloneDX or SPDX JSON."
+                          },
+                          "provenance": {
+                            "type": "string",
+                            "maxLength": 1000000,
+                            "description": "Raw in-toto SLSA provenance JSON."
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Install a tenant plugin with approved permissions",
+        "tags": ["Plugin administration"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/plugins/{pluginName}/disable": {
+      "patch": {
+        "operationId": "PluginAdminController_disable",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pluginName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Disable an installed tenant plugin",
+        "tags": ["Plugin administration"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/plugins/{pluginName}/enable": {
+      "patch": {
+        "operationId": "PluginAdminController_enable",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pluginName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enable an installed tenant plugin",
+        "tags": ["Plugin administration"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/plugins/{pluginName}/quarantine": {
+      "patch": {
+        "operationId": "PluginAdminController_quarantine",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pluginName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Quarantine and disable an installed plugin version",
+        "tags": ["Plugin administration"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/plugins/{pluginName}/upgrade": {
+      "patch": {
+        "operationId": "PluginAdminController_upgrade",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pluginName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["manifest", "checksum", "source"],
+                "properties": {
+                  "manifest": {
+                    "type": "object",
+                    "required": ["name", "version", "handstack"],
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "handstack": {
+                        "type": "object",
+                        "required": ["apiVersion", "capabilities"],
+                        "properties": {
+                          "apiVersion": {
+                            "type": "string"
+                          },
+                          "capabilities": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "permissions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "mode": {
+                            "type": "string",
+                            "enum": ["trusted", "isolated"]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "checksum": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "approvedPermissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "source": {
+                    "type": "object",
+                    "required": ["kind", "locator", "checksum", "supplyChain"],
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": ["LOCAL", "NPM", "GITHUB"]
+                      },
+                      "locator": {
+                        "type": "string"
+                      },
+                      "checksum": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "supplyChain": {
+                        "type": "object",
+                        "required": ["publisher", "signature", "sbomDigest", "provenanceDigest"],
+                        "properties": {
+                          "publisher": {
+                            "type": "string"
+                          },
+                          "signature": {
+                            "type": "string",
+                            "description": "Ed25519 base64url signature for external sources."
+                          },
+                          "sbomDigest": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          },
+                          "provenanceDigest": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          }
+                        }
+                      },
+                      "supplyChainDocuments": {
+                        "type": "object",
+                        "required": ["sbom", "provenance"],
+                        "properties": {
+                          "sbom": {
+                            "type": "string",
+                            "maxLength": 2000000,
+                            "description": "Raw CycloneDX or SPDX JSON."
+                          },
+                          "provenance": {
+                            "type": "string",
+                            "maxLength": 1000000,
+                            "description": "Raw in-toto SLSA provenance JSON."
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Upgrade a tenant plugin from a verified local artifact",
+        "tags": ["Plugin administration"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/plugins/{pluginName}": {
+      "delete": {
+        "operationId": "PluginAdminController_uninstall",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pluginName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Uninstall an installed tenant plugin",
+        "tags": ["Plugin administration"]
+      }
+    },
     "/registry/plugins": {
       "get": {
         "operationId": "PluginRegistryController_list",
@@ -5187,14 +7324,6 @@
             "in": "query",
             "schema": {
               "enum": ["OFFICIAL", "COMMUNITY", "INSTALLED", "UPDATES"],
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "required": true,
-            "in": "query",
-            "schema": {
               "type": "string"
             }
           }
@@ -5235,6 +7364,50 @@
           }
         },
         "summary": "Resolve a plugin registry entry",
+        "tags": ["Plugin Registry"]
+      }
+    },
+    "/registry/plugins/{name}/quarantine": {
+      "patch": {
+        "operationId": "PluginRegistryController_quarantine",
+        "parameters": [
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Quarantine a tenant plugin version",
+        "tags": ["Plugin Registry"]
+      }
+    },
+    "/registry/plugins/{name}/revoke-publisher": {
+      "patch": {
+        "operationId": "PluginRegistryController_revokePublisher",
+        "parameters": [
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Revoke a plugin publisher for a tenant",
         "tags": ["Plugin Registry"]
       }
     },
@@ -5324,6 +7497,33 @@
           }
         ],
         "summary": "Query append-only audit events for the organization",
+        "tags": ["Operations"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/audit/verify": {
+      "get": {
+        "operationId": "OperationsController_verifyAudit",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify the organization audit hash chain",
         "tags": ["Operations"]
       }
     },
@@ -5624,6 +7824,68 @@
         "tags": ["Agents"]
       }
     },
+    "/api/v1/organizations/{organizationId}/agents/templates": {
+      "get": {
+        "operationId": "AgentController_templates",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List first-party agent templates",
+        "tags": ["Agents"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/agents/templates/{templateId}/install": {
+      "post": {
+        "operationId": "AgentController_installTemplate",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "templateId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Install a first-party agent template",
+        "tags": ["Agents"]
+      }
+    },
     "/api/v1/organizations/{organizationId}/agents/{agentId}/versions": {
       "get": {
         "operationId": "AgentController_versions",
@@ -5692,6 +7954,41 @@
         "tags": ["Agents"]
       }
     },
+    "/api/v1/organizations/{organizationId}/agents/{agentId}/runs": {
+      "get": {
+        "operationId": "AgentController_runs",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "agentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List persisted agent runs",
+        "tags": ["Agents"]
+      }
+    },
     "/api/v1/organizations/{organizationId}/agents/{agentId}/versions/{versionId}/publish": {
       "post": {
         "operationId": "AgentController_publish",
@@ -5732,6 +8029,95 @@
           }
         ],
         "summary": "Publish one agent version",
+        "tags": ["Agents"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/agents/{agentId}/rollback": {
+      "post": {
+        "operationId": "AgentController_rollback",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "agentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rollback an agent to its previous persisted version",
+        "tags": ["Agents"]
+      }
+    },
+    "/api/v1/agents/{agentId}/run": {
+      "post": {
+        "operationId": "PublicAgentController_run",
+        "parameters": [
+          {
+            "name": "agentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Run a published agent",
+        "tags": ["Agents"]
+      }
+    },
+    "/api/v1/agents/{agentId}/stream": {
+      "post": {
+        "operationId": "PublicAgentController_stream",
+        "parameters": [
+          {
+            "name": "agentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Stream events from a published agent run",
         "tags": ["Agents"]
       }
     },
@@ -5784,6 +8170,68 @@
           }
         ],
         "summary": "Create a workflow draft",
+        "tags": ["Workflows"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/workflows/events/{eventName}": {
+      "post": {
+        "operationId": "WorkflowController_dispatchEvent",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eventName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Dispatch an event-triggered workflow",
+        "tags": ["Workflows"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/workflows/schedules/tick": {
+      "post": {
+        "operationId": "WorkflowController_dispatchSchedules",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Dispatch due scheduled workflows",
         "tags": ["Workflows"]
       }
     },
@@ -6089,6 +8537,33 @@
         "tags": ["Access governance"]
       }
     },
+    "/api/v1/organizations/{organizationId}/access-requests/grants": {
+      "get": {
+        "operationId": "AccessController_grants",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List active and revoked access grants",
+        "tags": ["Access governance"]
+      }
+    },
     "/api/v1/organizations/{organizationId}/access-requests/{requestId}/approve": {
       "post": {
         "operationId": "AccessController_approve",
@@ -6130,6 +8605,14 @@
         "parameters": [
           {
             "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "requestId",
             "required": true,
             "in": "path",
             "schema": {
@@ -6393,7 +8876,7 @@
             "bearer": []
           }
         ],
-        "summary": "Send a tenant in-app notification",
+        "summary": "Send a tenant-scoped notification",
         "tags": ["Notifications"]
       }
     },
@@ -6996,6 +9479,1952 @@
           }
         },
         "tags": ["ScimAdmin"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/settings": {
+      "get": {
+        "operationId": "SettingsController_get",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Settings"]
+      },
+      "patch": {
+        "operationId": "SettingsController_update",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Settings"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/users": {
+      "get": {
+        "operationId": "DirectoryController_users",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      },
+      "post": {
+        "operationId": "DirectoryController_createUser",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/users/{userId}": {
+      "patch": {
+        "operationId": "DirectoryController_updateUser",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/groups": {
+      "get": {
+        "operationId": "DirectoryController_groups",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      },
+      "post": {
+        "operationId": "DirectoryController_createGroup",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/groups/{groupId}": {
+      "patch": {
+        "operationId": "DirectoryController_updateGroup",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/roles": {
+      "get": {
+        "operationId": "DirectoryController_roles",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      },
+      "post": {
+        "operationId": "DirectoryController_createRole",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/roles/{roleId}": {
+      "patch": {
+        "operationId": "DirectoryController_updateRole",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "roleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/group-memberships": {
+      "get": {
+        "operationId": "DirectoryController_groupMemberships",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      },
+      "post": {
+        "operationId": "DirectoryController_addPrincipalToGroup",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      },
+      "delete": {
+        "operationId": "DirectoryController_removePrincipalFromGroup",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/principal-roles": {
+      "get": {
+        "operationId": "DirectoryController_principalRoles",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      },
+      "post": {
+        "operationId": "DirectoryController_assignRole",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      },
+      "delete": {
+        "operationId": "DirectoryController_unassignRole",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/permissions": {
+      "get": {
+        "operationId": "DirectoryController_permissions",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      },
+      "post": {
+        "operationId": "DirectoryController_createPermission",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/role-permissions": {
+      "get": {
+        "operationId": "DirectoryController_rolePermissions",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      },
+      "post": {
+        "operationId": "DirectoryController_grantPermission",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      },
+      "delete": {
+        "operationId": "DirectoryController_revokePermission",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Directory"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/knowledge/bases": {
+      "get": {
+        "operationId": "KnowledgeController_listBases",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Knowledge"]
+      },
+      "post": {
+        "operationId": "KnowledgeController_createBase",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Knowledge"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/knowledge/documents": {
+      "get": {
+        "operationId": "KnowledgeController_listDocuments",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Knowledge"]
+      },
+      "post": {
+        "operationId": "KnowledgeController_createDocument",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Knowledge"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/knowledge/documents/{documentId}/ingest": {
+      "post": {
+        "operationId": "KnowledgeController_ingest",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Knowledge"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/knowledge/documents/{documentId}/sync-source": {
+      "post": {
+        "operationId": "KnowledgeController_syncSource",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Knowledge"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/knowledge/documents/{documentId}/sync": {
+      "post": {
+        "operationId": "KnowledgeController_sync",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Knowledge"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/knowledge/documents/{documentId}/versions": {
+      "get": {
+        "operationId": "KnowledgeController_listVersions",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Knowledge"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/knowledge/search": {
+      "post": {
+        "operationId": "KnowledgeController_search",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Knowledge"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/knowledge/reindex-jobs": {
+      "post": {
+        "operationId": "KnowledgeController_createReindexJob",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Knowledge"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/knowledge/reindex-jobs/{jobId}": {
+      "get": {
+        "operationId": "KnowledgeController_getReindexJob",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Knowledge"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/knowledge/reindex-jobs/{jobId}/run": {
+      "post": {
+        "operationId": "KnowledgeController_runReindexJob",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Knowledge"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/knowledge/reindex-jobs/{jobId}/cancel": {
+      "post": {
+        "operationId": "KnowledgeController_cancelReindexJob",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Knowledge"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/routing-policies": {
+      "get": {
+        "operationId": "RoutingController_list",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List tenant model routing policies",
+        "tags": ["Model routing"]
+      },
+      "post": {
+        "operationId": "RoutingController_create",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a tenant model routing policy",
+        "tags": ["Model routing"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/service-accounts": {
+      "get": {
+        "operationId": "ServiceAccountController_list",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List tenant service accounts without secrets",
+        "tags": ["Service accounts"]
+      },
+      "post": {
+        "operationId": "ServiceAccountController_create",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Issue a tenant service account; secret returned once",
+        "tags": ["Service accounts"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/service-accounts/{accountId}/rotate": {
+      "post": {
+        "operationId": "ServiceAccountController_rotate",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rotate a tenant service account secret",
+        "tags": ["Service accounts"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/service-accounts/{accountId}/revoke": {
+      "patch": {
+        "operationId": "ServiceAccountController_revoke",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a tenant service account",
+        "tags": ["Service accounts"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/secrets": {
+      "get": {
+        "operationId": "SecretController_list",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Secret"]
+      },
+      "post": {
+        "operationId": "SecretController_create",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Secret"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/secrets/{secretId}/rotate": {
+      "patch": {
+        "operationId": "SecretController_rotate",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "secretId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Secret"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/secrets/{secretId}": {
+      "delete": {
+        "operationId": "SecretController_remove",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "secretId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Secret"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/policies": {
+      "get": {
+        "operationId": "PolicyController_list",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List tenant authorization policies",
+        "tags": ["Policies"]
+      },
+      "post": {
+        "operationId": "PolicyController_create",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a tenant authorization policy",
+        "tags": ["Policies"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/policies/evaluate": {
+      "post": {
+        "operationId": "PolicyController_evaluate",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Evaluate a persisted tenant authorization policy",
+        "tags": ["Policies"]
+      }
+    },
+    "/api/v1/admin/settings/database": {
+      "get": {
+        "operationId": "DatabaseSettingsController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["DatabaseSettings"]
+      },
+      "patch": {
+        "operationId": "DatabaseSettingsController_update",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["DatabaseSettings"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/retention": {
+      "get": {
+        "operationId": "PrivacyController_retention",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      },
+      "post": {
+        "operationId": "PrivacyController_setRetention",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/retention/run": {
+      "post": {
+        "operationId": "PrivacyController_runRetention",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/retention/usage/run": {
+      "post": {
+        "operationId": "PrivacyController_runUsageRetention",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/retention/attachments/run": {
+      "post": {
+        "operationId": "PrivacyController_runAttachmentRetention",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/retention/traces/run": {
+      "post": {
+        "operationId": "PrivacyController_runTraceRetention",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/legal-holds": {
+      "get": {
+        "operationId": "PrivacyController_holds",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      },
+      "post": {
+        "operationId": "PrivacyController_createHold",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/legal-holds/{holdId}/release": {
+      "patch": {
+        "operationId": "PrivacyController_releaseHold",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "holdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/subject-requests": {
+      "get": {
+        "operationId": "PrivacyController_requests",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      },
+      "post": {
+        "operationId": "PrivacyController_createRequest",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/subject-requests/{requestId}": {
+      "patch": {
+        "operationId": "PrivacyController_updateRequest",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/subject-requests/{requestId}/execute": {
+      "post": {
+        "operationId": "PrivacyController_executeRequest",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/subject-requests/{requestId}/export": {
+      "get": {
+        "operationId": "PrivacyController_getExport",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/inventory": {
+      "get": {
+        "operationId": "PrivacyController_inventory",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      },
+      "post": {
+        "operationId": "PrivacyController_createInventory",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/purposes": {
+      "get": {
+        "operationId": "PrivacyController_purposes",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      },
+      "post": {
+        "operationId": "PrivacyController_createPurpose",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/consents": {
+      "get": {
+        "operationId": "PrivacyController_consents",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      },
+      "post": {
+        "operationId": "PrivacyController_createConsent",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/consents/{consentId}/withdraw": {
+      "patch": {
+        "operationId": "PrivacyController_withdrawConsent",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "consentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/processors": {
+      "get": {
+        "operationId": "PrivacyController_processors",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      },
+      "post": {
+        "operationId": "PrivacyController_createProcessor",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/incidents": {
+      "get": {
+        "operationId": "PrivacyController_incidents",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      },
+      "post": {
+        "operationId": "PrivacyController_createIncident",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/deletion-jobs": {
+      "get": {
+        "operationId": "PrivacyController_deletionJobs",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/deletion-jobs/{jobId}/evidence": {
+      "get": {
+        "operationId": "PrivacyController_deletionEvidence",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/privacy/residency": {
+      "get": {
+        "operationId": "PrivacyController_residency",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
+      },
+      "post": {
+        "operationId": "PrivacyController_setResidency",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": ["Privacy"]
       }
     }
   },

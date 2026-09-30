@@ -10,3 +10,4 @@ graphify-out
 .dependency-backup-*
 pnpm-lock.yaml
 deploy/helm/handstack/templates
+**/next-env.d.ts

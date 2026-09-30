@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { uuidV7 } from '@handstack/domain';
-import type { EvaluationDataset, EvaluationSuite } from '@handstack/evaluation';
+import type { EvaluationDataset, EvaluationSuite, RedTeamCampaign } from '@handstack/evaluation';
 import { IdentityAdministrationService } from '@handstack/identity-service';
 import { ModelRuntimeError } from '@handstack/model-runtime';
 import type {
@@ -44,6 +44,7 @@ import {
 } from '../auth/authentication-context.js';
 import {
   createModelSchema,
+  modelApprovalOverrideSchema,
   createModelResponseSchema,
   createPromptSchema,
   createPromptVersionSchema,
@@ -51,11 +52,14 @@ import {
   createEvaluationDatasetSchema,
   createEvaluationRunSchema,
   createEvaluationSuiteSchema,
+  createRedTeamCampaignSchema,
   emptyOperationSchema,
   evaluationDatasetPageSchema,
   evaluationGateRecordResponseSchema,
   evaluationRunResultSchema,
   evaluationSuitePageSchema,
+  redTeamCampaignPageSchema,
+  publicRedTeamCampaignSchema,
   modelPageSchema,
   modelResponseSchema,
   promptEvaluationGateRecordResponseSchema,
@@ -72,6 +76,7 @@ import {
   type CreateEvaluationDatasetInput,
   type CreateEvaluationRunInput,
   type CreateEvaluationSuiteInput,
+  type CreateRedTeamCampaignInput,
   type CreateModelInput,
   type CreateModelResponseInput,
   type CreatePromptInput,
@@ -202,6 +207,26 @@ function publicSuite(suite: EvaluationSuite) {
     version: suite.version,
     createdAt: suite.createdAt,
     updatedAt: suite.updatedAt,
+  };
+}
+
+function publicRedTeamCampaign(campaign: RedTeamCampaign) {
+  return {
+    id: campaign.id,
+    organizationId: campaign.organizationId,
+    targetKind: campaign.targetKind,
+    targetId: campaign.targetId,
+    campaignVersion: campaign.campaignVersion,
+    status: campaign.status,
+    scenarioCount: campaign.scenarios.length,
+    findings: campaign.findings,
+    ...(campaign.executedAt === undefined ? {} : { executedAt: campaign.executedAt }),
+    ...(campaign.executionErrorDigest === undefined
+      ? {}
+      : { executionErrorDigest: campaign.executionErrorDigest }),
+    version: campaign.version,
+    createdAt: campaign.createdAt,
+    updatedAt: campaign.updatedAt,
   };
 }
 
@@ -412,6 +437,59 @@ export class ModelAdminController {
     );
   }
 
+  @Get('red-team-campaigns')
+  @ApiOperation({ summary: 'List versioned red-team campaigns' })
+  @ApiOkResponse({ schema: schema(redTeamCampaignPageSchema) })
+  async listRedTeamCampaigns(
+    @Param('organizationId') organizationId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    await this.authorize(organizationId, request, 'models.manage');
+    const page = await this.runtime.redTeam.list(organizationId);
+    return { ...page, items: page.items.map(publicRedTeamCampaign) };
+  }
+
+  @Post('red-team-campaigns')
+  @ApiOperation({ summary: 'Register a governed red-team campaign' })
+  @ApiBody({ schema: schema(createRedTeamCampaignSchema) })
+  @ApiCreatedResponse({ schema: schema(publicRedTeamCampaignSchema) })
+  async createRedTeamCampaign(
+    @Param('organizationId') organizationId: string,
+    @Req() request: AuthenticatedRequest,
+    @Body() value: unknown,
+  ) {
+    await this.authorize(organizationId, request, 'models.manage');
+    const input: CreateRedTeamCampaignInput = parse(createRedTeamCampaignSchema, value);
+    const timestamp = new Date();
+    const campaign: RedTeamCampaign = {
+      id: uuidV7(timestamp.getTime()),
+      tenantId: organizationId,
+      organizationId,
+      version: 1,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      ...input,
+      status: 'DRAFT',
+      findings: [],
+    };
+    return this.execute(() => this.runtime.redTeam.register(campaign).then(publicRedTeamCampaign));
+  }
+
+  @Post('red-team-campaigns/:campaignId/execute')
+  @ApiParam({ name: 'campaignId', description: 'Red-team campaign ID' })
+  @ApiOperation({ summary: 'Execute a governed red-team campaign' })
+  @ApiCreatedResponse({ schema: schema(publicRedTeamCampaignSchema) })
+  async executeRedTeamCampaign(
+    @Param('organizationId') organizationId: string,
+    @Param('campaignId') campaignId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    await this.authorize(organizationId, request, 'models.manage');
+    return this.execute(() =>
+      this.runtime.redTeam.execute(organizationId, campaignId).then(publicRedTeamCampaign),
+    );
+  }
+
   @Post('evaluation-runs')
   @ApiOperation({ summary: 'Execute a versioned suite against a model candidate' })
   @ApiBody({ schema: schema(createEvaluationRunSchema) })
@@ -530,6 +608,31 @@ export class ModelAdminController {
     );
   }
 
+  @Post('models/:modelId/approval-override')
+  @ApiParam({ name: 'modelId', description: 'Internal model definition ID' })
+  @ApiOperation({ summary: 'Override model evaluation approval with expiry and justification' })
+  @ApiBody({ schema: schema(modelApprovalOverrideSchema) })
+  @ApiCreatedResponse({ schema: schema(publicModelSchema) })
+  async overrideModelApproval(
+    @Param('organizationId') organizationId: string,
+    @Param('modelId') modelId: string,
+    @Req() request: AuthenticatedRequest,
+    @Body() value: unknown,
+  ) {
+    await this.authorize(organizationId, request, 'models.override');
+    const input = parse(modelApprovalOverrideSchema, value);
+    const authentication = requireAuthentication(request);
+    return this.execute(() =>
+      this.runtime.registry
+        .overrideApproval(organizationId, modelId, {
+          approvedBy: authentication.subject,
+          justification: input.justification,
+          expiresAt: new Date(input.expiresAt),
+        })
+        .then(publicModel),
+    );
+  }
+
   @Post('prompt-versions/:promptVersionId/evaluation-gates')
   @ApiParam({ name: 'promptVersionId', description: 'Immutable prompt version ID' })
   @ApiOperation({ summary: 'Record a prompt-version gate from a persisted evaluation run' })
@@ -619,6 +722,31 @@ export class ModelAdminController {
     return this.execute(() =>
       this.runtime.registry
         .publishPromptVersion(organizationId, promptVersionId)
+        .then(publicPromptVersion),
+    );
+  }
+
+  @Post('prompt-versions/:promptVersionId/approval-override')
+  @ApiParam({ name: 'promptVersionId', description: 'Immutable prompt version ID' })
+  @ApiOperation({ summary: 'Override prompt evaluation approval with expiry and justification' })
+  @ApiBody({ schema: schema(modelApprovalOverrideSchema) })
+  @ApiCreatedResponse({ schema: schema(publicPromptVersionSchema) })
+  async overridePromptApproval(
+    @Param('organizationId') organizationId: string,
+    @Param('promptVersionId') promptVersionId: string,
+    @Req() request: AuthenticatedRequest,
+    @Body() value: unknown,
+  ) {
+    await this.authorize(organizationId, request, 'prompts.override');
+    const input = parse(modelApprovalOverrideSchema, value);
+    const authentication = requireAuthentication(request);
+    return this.execute(() =>
+      this.runtime.registry
+        .overridePromptApproval(organizationId, promptVersionId, {
+          approvedBy: authentication.subject,
+          justification: input.justification,
+          expiresAt: new Date(input.expiresAt),
+        })
         .then(publicPromptVersion),
     );
   }
@@ -809,9 +937,15 @@ export class ModelAdminController {
         'Model not found',
         'Evaluation gate does not match its run result',
         'Evaluation provider decision does not match the gate',
+        'Red-team campaign metadata is incomplete',
+        'Red-team campaign is missing vectors: jailbreak, indirect_prompt_injection, data_exfiltration, cross_tenant_access, unsafe_tool_use, excessive_agency, denial_of_wallet, rag_poisoning',
+        'Red-team scenario IDs must be unique',
+        'Red-team campaign not found',
+        'Red-team campaign is already running',
         'Passing evaluation gate is required',
         'Approved evaluation gate is required for publication',
         'Evaluation gate is stale or failed',
+        'Evaluation gate is stale or failed (model approval missing or expired)',
         'Prompt slug already exists',
         'Prompt not found',
         'Prompt version not found',
@@ -830,6 +964,10 @@ export class ModelAdminController {
         'Passing prompt evaluation gate is required',
         'Approved prompt evaluation gate is required for publication',
         'Prompt evaluation gate is stale or failed',
+        'Override approver and justification are required',
+        'Override expiration must be in the future',
+        'Published or retired models cannot receive an override',
+        'Published or retired prompt versions cannot receive an override',
       ]);
       if (error instanceof Error && error.message.startsWith('Evaluation suite is missing')) {
         throw new ValidationError(error.message);

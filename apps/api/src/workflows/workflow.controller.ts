@@ -18,6 +18,7 @@ import { AccessTokenGuard } from '../auth/access-token.guard.js';
 import { AuthRuntimeService } from '../auth/auth-runtime.service.js';
 import {
   requireAuthentication,
+  requestTraceContext,
   type AuthenticatedRequest,
 } from '../auth/authentication-context.js';
 import { IdentityAdministrationService } from '@handstack/identity-service';
@@ -47,6 +48,12 @@ const createSchema = z.object({
   trigger: z.enum(['manual', 'api', 'webhook', 'schedule', 'event']),
   nodes: z.array(nodeSchema).min(1).max(100),
   edges: z.array(edgeSchema).max(200),
+  triggerConfig: z
+    .object({
+      eventName: z.string().trim().min(1).max(200).optional(),
+      intervalSeconds: z.number().int().min(1).max(31_536_000).optional(),
+    })
+    .optional(),
 });
 const startSchema = z.object({
   trigger: z.enum(['manual', 'api', 'webhook', 'schedule', 'event']),
@@ -99,7 +106,55 @@ export class WorkflowController {
           ? { from: edge.from, to: edge.to }
           : { from: edge.from, to: edge.to, condition: edge.condition },
       ),
+      ...(parsed.data.triggerConfig === undefined
+        ? {}
+        : {
+            triggerConfig: {
+              ...(parsed.data.triggerConfig.eventName === undefined
+                ? {}
+                : { eventName: parsed.data.triggerConfig.eventName }),
+              ...(parsed.data.triggerConfig.intervalSeconds === undefined
+                ? {}
+                : { intervalSeconds: parsed.data.triggerConfig.intervalSeconds }),
+            },
+          }),
     });
+  }
+
+  @Post('events/:eventName')
+  @ApiOperation({ summary: 'Dispatch an event-triggered workflow' })
+  async dispatchEvent(
+    @Param('organizationId') organizationId: string,
+    @Param('eventName') eventName: string,
+    @Req() request: AuthenticatedRequest,
+    @Body() payload: unknown,
+  ) {
+    const authentication = await this.authorize(organizationId, request, 'workflows.run');
+    return {
+      items: await this.runtime.dispatchEvent({
+        organizationId,
+        eventName,
+        principalId: authentication.subject,
+        payload,
+      }),
+    };
+  }
+
+  @Post('schedules/tick')
+  @ApiOperation({ summary: 'Dispatch due scheduled workflows' })
+  async dispatchSchedules(
+    @Param('organizationId') organizationId: string,
+    @Req() request: AuthenticatedRequest,
+    @Body() payload: unknown,
+  ) {
+    const authentication = await this.authorize(organizationId, request, 'workflows.run');
+    return {
+      items: await this.runtime.dispatchDueSchedules({
+        organizationId,
+        principalId: authentication.subject,
+        payload,
+      }),
+    };
   }
 
   @Post(':workflowId/publish')
@@ -136,6 +191,11 @@ export class WorkflowController {
       principalId: authentication.subject,
       ...parsed.data,
       idempotencyKey: idempotencyKey.trim(),
+      context: {
+        ...requestTraceContext(request),
+        principalId: authentication.subject,
+        source: 'API',
+      },
     });
   }
 

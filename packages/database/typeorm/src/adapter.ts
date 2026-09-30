@@ -75,6 +75,12 @@ export class TypeOrmAdapter implements TransactionManager {
   repository<T extends TenantEntity>(name: RepositoryName): Repository<T> {
     return new TypeOrmRepository<T>(this.dataSource.manager, name);
   }
+  async listAll<T extends TenantEntity>(
+    name: RepositoryName,
+    page: { limit: number; cursor?: string },
+  ) {
+    return new TypeOrmRepository<T>(this.dataSource.manager, name).listAll(page);
+  }
   async run<T>(
     operation: (context: TransactionContext) => Promise<T>,
     options?: TransactionOptions,

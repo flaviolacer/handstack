@@ -7,7 +7,7 @@ permissions: [feature-flags.manage, audit.read, jobs.manage]
 features: [operations-api, feature-flags, audit, jobs]
 deploymentProfiles: [compact, distributed]
 introducedIn: 0.21.0
-lastReviewedAt: 2026-09-09
+lastReviewedAt: 2026-09-28
 owner: platform-team
 tags: [api, operations, governance]
 ---
@@ -26,12 +26,15 @@ exige bearer token, organização coincidente e decisão explícita de permissã
 
 1. Use `GET/PUT /feature-flags/:key` para overrides de organização/usuário.
 2. Use `GET /audit` para evidência append-only da organização atual.
-3. Use `POST /jobs/:queue` com chave de idempotência para enfileirar trabalho limitado.
+3. Use `GET /audit/verify` para verificar a cadeia de hashes tamper-evident do tenant. A operação
+   grava um evento `AUDIT_VERIFIED` com contagem e validade, sem expor segredos de auditoria.
+4. Use `POST /jobs/:queue` com chave de idempotência para enfileirar trabalho limitado.
 
 ## Verify
 
 Requests cross-tenant, tokens ausentes e permissões negadas devem falhar. Capacidade da fila retorna
-backpressure tipado; audit nunca devolve outro tenant.
+backpressure tipado; audit nunca devolve outro tenant. A verificação exige `audit.read` e retorna
+os campos `valid`, `checked` e `errors` limitados.
 
 ## Troubleshooting
 

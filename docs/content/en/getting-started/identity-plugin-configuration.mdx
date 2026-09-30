@@ -17,18 +17,23 @@ tags: [plugins, identity, configuration]
 ## Prerequisites
 
 - A registered identity provider plugin and an organization administrator.
-- A secret manager reference such as `secret://vault/idp-client` for confidential fields.
+- A HandStack secret ID or an environment-backed reference such as
+  `env://HANDSTACK_SECRET_OIDC_CLIENT` for confidential fields.
 
 ## Steps
 
 1. Create an `InMemoryIdentityProviderConfigurationStore` for local/offline use or implement the same adapter contract for durable storage.
 2. Set configuration with both `organizationId` and provider ID.
-3. Put only opaque `secret://` references in fields named password, secret, token or private key.
-4. Resolve configuration by the same organization and provider scope before starting the adapter.
+3. Store a value with the tenant Secrets API and use `secret://<returned-secret-id>`, or provision a
+   `HANDSTACK_SECRET_*` environment variable and use `env://<exact-variable-name>`.
+4. Put only those references in confidential identity-provider fields. The runtime resolves them
+   through the secret broker for the same organization and provider scope.
 
 ## Expected results
 
-Configuration cannot be read across organizations, empty scopes fail closed and inline confidential values are rejected. The store never resolves or persists secret material.
+Configuration cannot be read across organizations, empty scopes fail closed and inline confidential
+values are rejected. Persistent secret values are encrypted and tenant/plugin-bound; environment
+references are namespace-restricted and audited without recording values.
 
 ## Verify
 

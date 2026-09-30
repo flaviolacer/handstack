@@ -26,10 +26,20 @@ Grafo de workflow pode pausar em Human Approval e retomar somente após todos os
 
 1. Avalie resource/action com `PolicyEngine` e atributos explícitos.
 2. Inicie workflow manual, API, webhook, schedule ou event.
+   Workflows publicados restauram suas subscriptions no startup e enfileiram uma execução
+   tenant-scoped e idempotente ao receber o domain event configurado (inclusive pelo Redis Streams
+   em deployments distribuídos). O evento interno `operation.created` é excluído para evitar criação
+   recursiva de workflows.
 3. Persista execução e approval id no nó humano.
 4. Aprove e retome usando mesma organização e execution id.
 5. Leia `GET /api/v1/organizations/{organizationId}/workflows/{workflowId}/executions/{executionId}/steps`
    para consultar o histórico de checkpoints isolado por tenant após restart ou falha.
+
+O endpoint de execução retorna `202 Accepted` com uma `Operation` durável. No perfil distribuído,
+o worker BullMQ `workflow-executions` chama o endpoint interno de execução da API; configure o mesmo
+`HANDSTACK_INTERNAL_SERVICE_TOKEN` aleatório (com pelo menos 32 caracteres) para API e worker pelo
+secret manager do ambiente. Não reutilize o valor de desenvolvimento em produção. A fila e a rota
+interna não fazem parte da superfície OpenAPI pública.
 
 ## Verify
 

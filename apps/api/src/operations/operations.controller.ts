@@ -23,6 +23,7 @@ import { AccessTokenGuard } from '../auth/access-token.guard.js';
 import { AuthRuntimeService } from '../auth/auth-runtime.service.js';
 import {
   requireAuthentication,
+  requestTraceContext,
   type AuthenticatedRequest,
 } from '../auth/authentication-context.js';
 import { IdentityAdministrationService } from '@handstack/identity-service';
@@ -76,7 +77,7 @@ export class OperationsController {
     @Req() request: AuthenticatedRequest,
   ) {
     const auth = await this.authorize(organizationId, request, 'feature-flags.read');
-    return { items: this.runtime.flags.list({ organizationId, userId: auth.subject }) };
+    return { items: await this.runtime.listFeatureFlags(organizationId, auth.subject) };
   }
 
   @Put('feature-flags/:key')
@@ -92,13 +93,15 @@ export class OperationsController {
     if (!parsed.success)
       throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid feature flag');
     const body = parsed.data;
-    return this.runtime.flags.set({
+    return this.runtime.setFeatureFlag({
       key,
       scope: body.scope,
       enabled: body.enabled,
-      ...(body.scope === 'organization'
-        ? { organizationId }
-        : { organizationId, userId: body.userId ?? auth.subject }),
+      ...(body.scope === 'global'
+        ? {}
+        : body.scope === 'organization'
+          ? { organizationId }
+          : { organizationId, userId: body.userId ?? auth.subject }),
     });
   }
 
@@ -108,8 +111,50 @@ export class OperationsController {
     @Param('organizationId') organizationId: string,
     @Req() request: AuthenticatedRequest,
   ) {
-    await this.authorize(organizationId, request, 'audit.read');
-    return { items: await this.runtime.audit.query(organizationId) };
+    const auth = await this.authorize(organizationId, request, 'audit.read');
+    const items = await this.runtime.audit.query(organizationId);
+    const trace = requestTraceContext(request);
+    await this.runtime.audit.record({
+      organizationId,
+      actorId: auth.subject,
+      action: 'AUDIT_QUERIED',
+      resourceType: 'audit',
+      decision: 'ALLOW',
+      metadata: { returned: String(items.length) },
+      context: {
+        requestId: trace.requestId,
+        traceId: trace.traceId,
+        principalId: auth.subject,
+        source: 'API',
+      },
+    });
+    return { items };
+  }
+
+  @Get('audit/verify')
+  @ApiOperation({ summary: 'Verify the organization audit hash chain' })
+  async verifyAudit(
+    @Param('organizationId') organizationId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const auth = await this.authorize(organizationId, request, 'audit.read');
+    const result = await this.runtime.audit.verify(organizationId);
+    const trace = requestTraceContext(request);
+    await this.runtime.audit.record({
+      organizationId,
+      actorId: auth.subject,
+      action: 'AUDIT_VERIFIED',
+      resourceType: 'audit',
+      decision: result.valid ? 'ALLOW' : 'DENY',
+      metadata: { checked: String(result.checked), valid: String(result.valid) },
+      context: {
+        requestId: trace.requestId,
+        traceId: trace.traceId,
+        principalId: auth.subject,
+        source: 'API',
+      },
+    });
+    return result;
   }
 
   @Post('jobs/:queue')
@@ -120,7 +165,8 @@ export class OperationsController {
     @Req() request: AuthenticatedRequest,
     @Body() value: unknown,
   ) {
-    await this.authorize(organizationId, request, 'jobs.manage');
+    const auth = await this.authorize(organizationId, request, 'jobs.manage');
+    const trace = requestTraceContext(request);
     if (!(queues as readonly string[]).includes(queue))
       throw new ValidationError('Unknown job queue');
     const parsed = jobSchema.safeParse(value);
@@ -131,6 +177,12 @@ export class OperationsController {
       idempotencyKey: parsed.data.idempotencyKey,
       payload: parsed.data.payload,
       ...(parsed.data.priority === undefined ? {} : { priority: parsed.data.priority }),
+      context: {
+        requestId: trace.requestId,
+        traceId: trace.traceId,
+        principalId: auth.subject,
+        source: 'API',
+      },
     });
   }
 
@@ -155,6 +207,7 @@ export class OperationsController {
     @Req() request: AuthenticatedRequest,
   ) {
     const auth = await this.authorize(organizationId, request, 'jobs.manage');
+    const trace = requestTraceContext(request);
     const jobQueue = this.parseQueue(queue);
     const job = await this.runtime.queue(jobQueue, organizationId).retryDeadLetter(idempotencyKey);
     if (job === undefined) throw new ValidationError('Dead-letter job was not found');
@@ -164,6 +217,12 @@ export class OperationsController {
       action: 'JOB_DEAD_LETTER_RETRIED',
       resourceType: 'job',
       resourceId: job.id,
+      context: {
+        requestId: trace.requestId,
+        traceId: trace.traceId,
+        principalId: auth.subject,
+        source: 'API',
+      },
       metadata: { queue: jobQueue, idempotencyKey },
     });
     return { job };
@@ -178,6 +237,7 @@ export class OperationsController {
     @Req() request: AuthenticatedRequest,
   ) {
     const auth = await this.authorize(organizationId, request, 'jobs.manage');
+    const trace = requestTraceContext(request);
     const jobQueue = this.parseQueue(queue);
     const discarded = await this.runtime
       .queue(jobQueue, organizationId)
@@ -189,6 +249,12 @@ export class OperationsController {
       action: 'JOB_DEAD_LETTER_DISCARDED',
       resourceType: 'job',
       resourceId: idempotencyKey,
+      context: {
+        requestId: trace.requestId,
+        traceId: trace.traceId,
+        principalId: auth.subject,
+        source: 'API',
+      },
       metadata: { queue: jobQueue, idempotencyKey },
     });
     return { discarded: true };
@@ -252,6 +318,11 @@ export class AsyncOperationsController {
       organizationId: auth.organizationId,
       type: parsed.data.type,
       idempotencyKey: idempotencyKey.trim(),
+      context: {
+        ...requestTraceContext(request),
+        principalId: auth.subject,
+        source: 'API',
+      },
     });
     response.header('etag', operationEtag(operation.version));
     return operation;

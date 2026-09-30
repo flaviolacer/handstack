@@ -82,6 +82,7 @@ describe('identity storage', () => {
         principals: 'identity-principals',
         users: 'identity-users',
         organizationMemberships: 'identity-organization-memberships',
+        organizationSettings: 'identity-organization-settings',
         groups: 'identity-groups',
         groupMemberships: 'identity-group-memberships',
         externalIdentities: 'identity-external-identities',

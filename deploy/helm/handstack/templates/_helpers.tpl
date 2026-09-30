@@ -31,6 +31,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   valueFrom: { secretKeyRef: { name: {{ include "handstack.secretName" . }}, key: database-url } }
 - name: HANDSTACK_REDIS_URL
   valueFrom: { secretKeyRef: { name: {{ include "handstack.secretName" . }}, key: redis-url } }
+- name: HANDSTACK_MASTER_KEY
+  valueFrom: { secretKeyRef: { name: {{ include "handstack.secretName" . }}, key: master-key } }
+- name: HANDSTACK_WEBHOOK_MASTER_KEY
+  valueFrom: { secretKeyRef: { name: {{ include "handstack.secretName" . }}, key: webhook-master-key, optional: true } }
+- name: HANDSTACK_INTERNAL_SERVICE_TOKEN
+  valueFrom: { secretKeyRef: { name: {{ include "handstack.secretName" . }}, key: internal-service-token } }
 {{- end -}}
 {{- define "handstack.probes" -}}
 readinessProbe:

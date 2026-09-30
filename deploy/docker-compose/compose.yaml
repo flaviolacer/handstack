@@ -9,7 +9,25 @@ services:
       HANDSTACK_API_PORT: '3001'
       HANDSTACK_DATABASE_ADAPTER: ${HANDSTACK_DATABASE_ADAPTER:-sqlite}
       HANDSTACK_DATABASE_URL: ${HANDSTACK_DATABASE_URL:-file:/data/handstack.db}
+      HANDSTACK_ACCESS_TOKEN_SECRET: ${HANDSTACK_ACCESS_TOKEN_SECRET:-handstack-development-access-secret-change-me}
+      HANDSTACK_TOKEN_PEPPER: ${HANDSTACK_TOKEN_PEPPER:-handstack-development-token-pepper-change-me}
+      HANDSTACK_GATEWAY_KEY_PEPPER: ${HANDSTACK_GATEWAY_KEY_PEPPER:-handstack-development-gateway-key-pepper-change-me}
+      HANDSTACK_MASTER_KEY: ${HANDSTACK_MASTER_KEY:-1111111111111111111111111111111111111111111111111111111111111111}
+      HANDSTACK_WEBHOOK_MASTER_KEY: ${HANDSTACK_WEBHOOK_MASTER_KEY:-handstack-development-webhook-master-key-change-me}
+      HANDSTACK_INTERNAL_SERVICE_TOKEN: ${HANDSTACK_INTERNAL_SERVICE_TOKEN:-handstack-development-internal-service-token-change-me}
+      HANDSTACK_SCIM_TOKEN_PEPPER: ${HANDSTACK_SCIM_TOKEN_PEPPER:-handstack-development-scim-token-pepper-change-me}
+      HANDSTACK_OIDC_STATE_PEPPER: ${HANDSTACK_OIDC_STATE_PEPPER:-handstack-development-oidc-state-pepper-change-me}
+      HANDSTACK_PLUGIN_TRUSTED_PUBLISHERS_JSON: ${HANDSTACK_PLUGIN_TRUSTED_PUBLISHERS_JSON:-}
       HANDSTACK_TELEMETRY_ENABLED: 'false'
+      HANDSTACK_REDIS_STREAM_PENDING_CLAIM_IDLE_MS: ${HANDSTACK_REDIS_STREAM_PENDING_CLAIM_IDLE_MS:-30000}
+      HANDSTACK_PRIVACY_RETENTION_ENABLED: ${HANDSTACK_PRIVACY_RETENTION_ENABLED:-false}
+      HANDSTACK_PRIVACY_RETENTION_INTERVAL_MS: ${HANDSTACK_PRIVACY_RETENTION_INTERVAL_MS:-86400000}
+      HANDSTACK_AUDIT_INTEGRITY_ENABLED: ${HANDSTACK_AUDIT_INTEGRITY_ENABLED:-false}
+      HANDSTACK_AUDIT_INTEGRITY_INTERVAL_MS: ${HANDSTACK_AUDIT_INTEGRITY_INTERVAL_MS:-86400000}
+      HANDSTACK_AUDIT_INTEGRITY_ORGANIZATIONS: ${HANDSTACK_AUDIT_INTEGRITY_ORGANIZATIONS:-}
+      HANDSTACK_KNOWLEDGE_SYNC_ENABLED: ${HANDSTACK_KNOWLEDGE_SYNC_ENABLED:-false}
+      HANDSTACK_KNOWLEDGE_SYNC_INTERVAL_MS: ${HANDSTACK_KNOWLEDGE_SYNC_INTERVAL_MS:-300000}
+      HANDSTACK_KNOWLEDGE_SYNC_ORGANIZATIONS: ${HANDSTACK_KNOWLEDGE_SYNC_ORGANIZATIONS:-}
     ports:
       - '3001:3001'
     volumes:
@@ -39,6 +57,98 @@ services:
       api:
         condition: service_healthy
 
+  mcp:
+    build:
+      context: ../..
+      dockerfile: docker/api.Dockerfile
+    environment:
+      HANDSTACK_API_PORT: '3001'
+      HANDSTACK_DATABASE_ADAPTER: ${HANDSTACK_DATABASE_ADAPTER:-sqlite}
+      HANDSTACK_DATABASE_URL: ${HANDSTACK_DATABASE_URL:-file:/data/handstack.db}
+      HANDSTACK_ACCESS_TOKEN_SECRET: ${HANDSTACK_ACCESS_TOKEN_SECRET:-handstack-development-access-secret-change-me}
+      HANDSTACK_TOKEN_PEPPER: ${HANDSTACK_TOKEN_PEPPER:-handstack-development-token-pepper-change-me}
+      HANDSTACK_GATEWAY_KEY_PEPPER: ${HANDSTACK_GATEWAY_KEY_PEPPER:-handstack-development-gateway-key-pepper-change-me}
+      HANDSTACK_MASTER_KEY: ${HANDSTACK_MASTER_KEY:-1111111111111111111111111111111111111111111111111111111111111111}
+      HANDSTACK_WEBHOOK_MASTER_KEY: ${HANDSTACK_WEBHOOK_MASTER_KEY:-handstack-development-webhook-master-key-change-me}
+      HANDSTACK_SCIM_TOKEN_PEPPER: ${HANDSTACK_SCIM_TOKEN_PEPPER:-handstack-development-scim-token-pepper-change-me}
+      HANDSTACK_OIDC_STATE_PEPPER: ${HANDSTACK_OIDC_STATE_PEPPER:-handstack-development-oidc-state-pepper-change-me}
+      HANDSTACK_PLUGIN_TRUSTED_PUBLISHERS_JSON: ${HANDSTACK_PLUGIN_TRUSTED_PUBLISHERS_JSON:-}
+      HANDSTACK_TELEMETRY_ENABLED: 'false'
+    ports:
+      - '3003:3001'
+    volumes:
+      - handstack-data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/health/ready').then(r=>{if(!r.ok)process.exit(1)})",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  worker-agents: &worker-defaults
+    profiles: [distributed]
+    build:
+      context: ../..
+      dockerfile: docker/worker.Dockerfile
+    environment:
+      HANDSTACK_DEPLOYMENT_PROFILE: distributed
+      HANDSTACK_REDIS_URL: redis://redis:6379
+      HANDSTACK_API_URL: http://api:3001
+      HANDSTACK_WORKER_ORGANIZATION_ID: ${HANDSTACK_WORKER_ORGANIZATION_ID:-development}
+      HANDSTACK_WORKER_HANDLER_MODULE: /workspace/apps/worker/dist/domain-handlers.js
+      HANDSTACK_INTERNAL_SERVICE_TOKEN: ${HANDSTACK_INTERNAL_SERVICE_TOKEN:-handstack-development-internal-service-token-change-me}
+      HANDSTACK_INTERNAL_API_KEY: ${HANDSTACK_INTERNAL_API_KEY:-}
+      HANDSTACK_MASTER_KEY: ${HANDSTACK_MASTER_KEY:-1111111111111111111111111111111111111111111111111111111111111111}
+      HANDSTACK_WEBHOOK_MASTER_KEY: ${HANDSTACK_WEBHOOK_MASTER_KEY:-handstack-development-webhook-master-key-change-me}
+      HANDSTACK_DATABASE_ADAPTER: ${HANDSTACK_DATABASE_ADAPTER:-sqlite}
+      HANDSTACK_DATABASE_URL: ${HANDSTACK_DATABASE_URL:-file:/data/handstack.db}
+    volumes:
+      - handstack-data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: ['agents']
+
+  worker-knowledge:
+    <<: *worker-defaults
+    command: ['embeddings']
+  worker-integrations:
+    <<: *worker-defaults
+    command: ['plugins']
+  worker-webhooks:
+    <<: *worker-defaults
+    command: ['webhooks']
+  worker-audit-billing:
+    <<: *worker-defaults
+    command: ['audit']
+  worker-maintenance:
+    <<: *worker-defaults
+    command: ['cleanup']
+  worker-documents:
+    <<: *worker-defaults
+    command: ['documents']
+  worker-indexing:
+    <<: *worker-defaults
+    command: ['indexing']
+  worker-billing:
+    <<: *worker-defaults
+    command: ['billing']
+  worker-workflows:
+    <<: *worker-defaults
+    command: ['workflow-executions']
+
   docs:
     profiles: [docs]
     build:
@@ -67,6 +177,7 @@ services:
   mongo:
     profiles: [mongodb]
     image: mongo:7
+    command: ['mongod', '--replSet', 'rs0', '--bind_ip_all']
     ports:
       - '27017:27017'
     volumes:

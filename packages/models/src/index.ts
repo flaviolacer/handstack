@@ -169,6 +169,18 @@ export interface EvaluationGate extends TenantEntity {
   readonly scores: Readonly<Record<string, number>>;
 }
 
+export interface ModelApproval extends TenantEntity {
+  readonly organizationId: string;
+  readonly modelDefinitionId: string;
+  readonly promptVersionId?: string;
+  readonly gateId: string;
+  readonly approvedBy: string;
+  readonly approvedAt: Date;
+  readonly expiresAt?: Date;
+  readonly justification?: string;
+  readonly override: boolean;
+}
+
 export interface PromptEvaluationGate extends EvaluationGate {
   readonly promptVersionId: string;
   readonly promptContentDigest: string;
@@ -210,12 +222,16 @@ export type ModelAuditEventType =
   | 'EVALUATION_RUN_COMPLETED'
   | 'MODEL_GATE_RECORDED'
   | 'MODEL_APPROVED'
+  | 'MODEL_APPROVAL_OVERRIDDEN'
   | 'MODEL_PUBLISHED'
   | 'PROMPT_REGISTERED'
   | 'PROMPT_VERSION_REGISTERED'
   | 'PROMPT_GATE_RECORDED'
   | 'PROMPT_APPROVED'
-  | 'PROMPT_PUBLISHED';
+  | 'PROMPT_APPROVAL_OVERRIDDEN'
+  | 'PROMPT_PUBLISHED'
+  | 'RED_TEAM_CAMPAIGN_REGISTERED'
+  | 'RED_TEAM_CAMPAIGN_COMPLETED';
 
 export interface ModelAuditEvent extends TenantEntity {
   readonly organizationId: string;
@@ -227,7 +243,8 @@ export interface ModelAuditEvent extends TenantEntity {
     | 'prompt_version'
     | 'evaluation_dataset'
     | 'evaluation_suite'
-    | 'evaluation_run';
+    | 'evaluation_run'
+    | 'red_team_campaign';
   readonly resourceId: string;
   readonly outcome: 'SUCCESS' | 'FAILURE';
   readonly metadata: Readonly<Record<string, string | number | boolean>>;

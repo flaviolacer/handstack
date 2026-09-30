@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BackpressureError,
+  JOB_QUEUES,
   BullMqJobTransport,
   DistributedJobQueue,
   InMemoryOperationStore,
@@ -22,6 +23,60 @@ import type {
 } from '@handstack/domain';
 
 describe('job queues', () => {
+  it('exposes every official queue and preserves timeout/checkpoint evidence', async () => {
+    expect(JOB_QUEUES).toEqual([
+      'agents',
+      'embeddings',
+      'documents',
+      'plugins',
+      'webhooks',
+      'audit',
+      'billing',
+      'cleanup',
+      'indexing',
+      'workflow-executions',
+    ]);
+    const queue = new InMemoryJobQueue('documents', {
+      maxAttempts: 1,
+      timeoutMs: 5,
+      retryAfterSeconds: 13,
+    });
+    queue.enqueue({ id: 'timeout', payload: {}, idempotencyKey: 'timeout' });
+    const result = await queue.process(async (_payload, context) => {
+      await context.checkpoint({ stage: 'started' });
+      await new Promise<void>(() => undefined);
+    });
+    expect(result).toMatchObject({
+      status: 'DEAD_LETTERED',
+      checkpoint: { value: { stage: 'started' } },
+    });
+    expect(queue.listDeadLetters()).toHaveLength(1);
+  });
+
+  it('purges subject payloads from pending jobs and dead letters', async () => {
+    const queue = new InMemoryJobQueue('agents', { maxAttempts: 1 });
+    queue.enqueue({
+      id: 'subject-job',
+      payload: { subjectId: 'user-a', nested: ['x'] },
+      idempotencyKey: 'subject-job',
+    });
+    queue.enqueue({
+      id: 'other-job',
+      payload: { subjectId: 'user-b' },
+      idempotencyKey: 'other-job',
+    });
+    await queue.process(async () => {
+      await Promise.resolve();
+      throw new Error('dead');
+    });
+    expect(await queue.deleteBySubject('user-a')).toBe(1);
+    expect(queue.backlog).toBe(1);
+    expect(queue.listDeadLetters()).toHaveLength(0);
+    expect(await queue.deleteBySubject('user-b')).toBe(1);
+    expect(queue.backlog).toBe(0);
+    await expect(queue.deleteBySubject(' ')).rejects.toThrow('subject');
+  });
+
   it('emits queue observations without exposing job payloads', async () => {
     const observations: { operation: string; outcome: string; durationMs: number }[] = [];
     const queue = new InMemoryJobQueue('agents');
@@ -46,6 +101,37 @@ describe('job queues', () => {
     expect(observations).toMatchObject([{ operation: 'enqueue', outcome: 'success' }]);
     expect(observations[0]).not.toHaveProperty('payload');
     expect(Number.isFinite(observations[0]?.durationMs)).toBe(true);
+  });
+
+  it('preserves execution context from a queued job to its handler', async () => {
+    const queue = new InMemoryJobQueue('workflow-executions');
+    queue.enqueue({
+      id: 'context-job',
+      payload: { value: 'safe' },
+      idempotencyKey: 'context-job',
+      context: {
+        requestId: 'req-job',
+        traceId: 'trace-job',
+        principalId: 'user-job',
+        source: 'API',
+      },
+    });
+    let received: Record<string, string | undefined> | undefined;
+    await queue.process((_payload, context) => {
+      received = {
+        requestId: context.requestId,
+        traceId: context.traceId,
+        principalId: context.principalId,
+        source: context.source,
+      };
+      return Promise.resolve();
+    });
+    expect(received).toEqual({
+      requestId: 'req-job',
+      traceId: 'trace-job',
+      principalId: 'user-job',
+      source: 'API',
+    });
   });
 
   it('enforces idempotency, backpressure, retries and DLQ', async () => {
@@ -279,8 +365,8 @@ describe('job queues', () => {
     });
     await transport.deadLetter('agents', job, new Error('poison'));
     expect([...queues.keys()]).toEqual([
-      'hs-test:org-a:agents',
-      'hs-test:org-a:agents:dead-letter',
+      'hs-test__org-a__agents',
+      'hs-test__org-a__agents_dead-letter',
     ]);
   });
 
@@ -426,6 +512,40 @@ describe('job queues', () => {
     await running;
     expect(active).toBe(0);
     expect(pending).toHaveLength(2);
+  });
+
+  it('preserves execution context through the durable transport boundary', async () => {
+    let pending: Job<{ value: number }> | undefined;
+    const transport: DurableJobTransport<{ value: number }> = {
+      enqueue: (_queue, job) => {
+        pending = job;
+        return Promise.resolve();
+      },
+      dequeue: () => Promise.resolve(pending),
+      requeue: () => Promise.resolve(),
+      deadLetter: () => Promise.resolve(),
+      backlog: () => Promise.resolve(pending === undefined ? 0 : 1),
+    };
+    const queue = new DistributedJobQueue('agents', transport, { timeoutMs: 1000 });
+    await queue.enqueue({
+      id: 'durable-context',
+      payload: { value: 1 },
+      idempotencyKey: 'durable-context',
+      context: {
+        requestId: 'req-durable',
+        traceId: 'trace-durable',
+        principalId: 'user-durable',
+        source: 'API',
+      },
+    });
+    let received: string | undefined;
+    await queue.process((_payload, context) => {
+      received = [context.requestId, context.traceId, context.principalId, context.source]
+        .map((value) => value ?? '')
+        .join(':');
+      return Promise.resolve();
+    });
+    expect(received).toBe('req-durable:trace-durable:user-durable:API');
   });
 });
 

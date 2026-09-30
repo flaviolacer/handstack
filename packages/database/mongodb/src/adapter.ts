@@ -41,10 +41,28 @@ export class MongoAdapter implements TransactionManager {
     return this;
   }
   repository<T extends TenantEntity>(name: RepositoryName): Repository<T> {
+    let repository: MongoRepository<T> | undefined;
+    return new Proxy({} as Repository<T>, {
+      get: (_target, property) => {
+        repository ??= new MongoRepository<T>(
+          this.requireDatabase().collection<EntityDocument>(entityCollectionName),
+          name,
+        );
+        const activeRepository = repository;
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        const value = activeRepository[property as keyof MongoRepository<T>];
+        return typeof value === 'function' ? value.bind(activeRepository) : value;
+      },
+    });
+  }
+  async listAll<T extends TenantEntity>(
+    name: RepositoryName,
+    page: { limit: number; cursor?: string },
+  ) {
     return new MongoRepository<T>(
       this.requireDatabase().collection<EntityDocument>(entityCollectionName),
       name,
-    );
+    ).listAll(page);
   }
   async run<T>(
     operation: (context: TransactionContext) => Promise<T>,

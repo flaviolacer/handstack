@@ -7,7 +7,7 @@ permissions: [audit.read, audit.write]
 features: [audit, observability, siem]
 deploymentProfiles: [compact, distributed]
 introducedIn: 0.18.0
-lastReviewedAt: 2026-09-09
+lastReviewedAt: 2026-09-28
 owner: security-platform-team
 tags: [audit, observability, siem]
 ---
@@ -18,27 +18,47 @@ Append audit events for authentication, model, agent, tool, MCP, plugin, policy 
 decisions. Events are immutable and organization-scoped; OpenTelemetry traces may link through
 `traceId` without carrying prompts or secrets.
 
+API and worker paths use the same tamper-evident sink. Worker jobs and webhook secret access preserve
+the tenant sequence, previous hash and event hash; this does not replace the distributed failover
+drill required for production certification.
+
 ## Prerequisites
 
 - Register an `AuditSink` and configure retention separately from traces and usage.
 - Configure an OTLP/SIEM exporter with explicit redaction keys. Set `HANDSTACK_TELEMETRY_ENABLED=true`
   and `HANDSTACK_OTLP_ENDPOINT=http://otel-collector:4318` to export traces and metrics over OTLP/HTTP.
+  Both the log level and OTLP endpoint are validated by the typed configuration layer; use
+  `handstack config validate` to verify the non-sensitive endpoint-presence flag before deployment.
 
 ## Steps
 
 1. Append an event after each governed decision.
 2. Query only with the authenticated organization id.
-3. Export sanitized metadata to SIEM and retain the local immutable evidence.
+3. Export sanitized metadata to SIEM and retain the local immutable evidence. The audit package
+   provides `FormattedSiemExporter` for JSON Lines, CEF, and RFC 5424 syslog; the injected sender
+   remains responsible for transport retry, backpressure, and dead-letter handling.
 4. Verify the chain and create a signed checkpoint before compliance export:
    `handstack audit verify --tenant <organizationId>` and
    `handstack audit checkpoint --tenant <organizationId>`.
-5. Export only the selected tenant as JSON Lines:
+5. For periodic integrity checks, enable `HANDSTACK_AUDIT_INTEGRITY_ENABLED=true` and choose
+   `HANDSTACK_AUDIT_INTEGRITY_INTERVAL_MS` (minimum 60 seconds). The scheduler discovers active
+   tenants unless `HANDSTACK_AUDIT_INTEGRITY_ORGANIZATIONS` is set and coordinates replicas with
+   a persistent tenant lease.
+6. Export only the selected tenant as JSON Lines:
    `handstack audit export --tenant <organizationId> --output audit.ndjson`.
+   The command also writes `audit.ndjson.manifest.json`, binding the tenant, event count, chain
+   head and SHA-256 of the exact NDJSON bytes for evidence verification.
+7. When an immutable archive is required, send the same redacted tenant export through
+   `WormAuditExporter` and a store implementing `putIfAbsent`; the store must reject overwrites.
+8. Verify the exported bytes and manifest before attaching evidence:
+   `handstack audit verify-export --tenant <organizationId> --input audit.ndjson
+--manifest audit.ndjson.manifest.json`.
 
 ## Verify
 
 Check tenant isolation, append-only behavior, redaction of prompt/response/token/secret fields,
-and that verification reports `valid: true`. A changed event must make verification fail closed.
+and that verification reports `valid: true`. Verify the manifest SHA-256 against the exported bytes;
+a changed event or export must fail closed.
 The API `/metrics` endpoint exposes the canonical `handstack_*` counters in Prometheus text format;
 it contains no request payloads, credentials, tenant ids, or user ids.
 

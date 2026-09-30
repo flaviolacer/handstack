@@ -52,9 +52,14 @@ describe('BudgetEngine', () => {
           inputTokens: 100,
           outputTokens: 50,
         },
+        traceId: 'trace-billing-1',
       });
       expect(settled.reservation.status).toBe('SETTLED');
       expect(settled.cost.amountUsd).toBe(4.5);
+      expect(settled.cost.traceId).toBe('trace-billing-1');
+      await expect(engine.listUsage('org')).resolves.toMatchObject({
+        items: [expect.objectContaining({ traceId: 'trace-billing-1' })],
+      });
       const budgets = await engine.listBudgets('org');
       expect(budgets.items[0]).toMatchObject({ id: budget.id, spentUsd: 4.5, reservedUsd: 0 });
       await expect(

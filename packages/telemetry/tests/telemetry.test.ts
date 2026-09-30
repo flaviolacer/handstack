@@ -2,6 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { initializeTelemetry, PrometheusRegistry } from '../src/index.js';
 
 describe('OpenTelemetry bootstrap', () => {
+  it('does not initialize exporters when the privacy telemetry gate is disabled', async () => {
+    const runtime = initializeTelemetry({
+      enabled: true,
+      privacyAllowed: false,
+      serviceName: 'handstack-test',
+      serviceVersion: '1.0.0',
+    });
+    expect(runtime.enabled).toBe(false);
+    await expect(runtime.shutdown()).resolves.toBeUndefined();
+  });
+
   it('is opt-in and shuts down safely while disabled', async () => {
     const runtime = initializeTelemetry({
       enabled: false,

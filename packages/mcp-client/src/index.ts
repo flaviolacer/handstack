@@ -24,8 +24,22 @@ export interface McpServerConfig {
   readonly args?: readonly string[];
   readonly environment?: Readonly<Record<string, string>>;
   readonly auth?: McpCredential;
+  readonly oauth?: McpOAuthConfig;
   readonly credentialResolver?: (context: McpCallContext) => Promise<McpCredential | undefined>;
   readonly allowedPermissions: readonly string[];
+}
+
+export interface McpOAuthConfig {
+  readonly authorizationUrl: string;
+  readonly tokenUrl: string;
+  readonly clientId: string;
+  readonly scopes?: readonly string[];
+  readonly redirectUri: string;
+}
+
+export interface McpOAuthAuthorization {
+  readonly state: string;
+  readonly authorizationUrl: string;
 }
 
 export interface McpTool {
@@ -151,6 +165,10 @@ class StdioTransport implements McpTransport {
   request(method: string, params: Record<string, unknown>, signal?: AbortSignal) {
     const id = randomUUID();
     return new Promise<unknown>((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(new Error('MCP request aborted'));
+        return;
+      }
       const abort = () => {
         this.pending.delete(id);
         reject(new Error('MCP request aborted'));
@@ -213,8 +231,26 @@ export class McpClientRegistry {
   private readonly tools = new Map<string, readonly McpTool[]>();
   private readonly resources = new Map<string, readonly McpResource[]>();
   private readonly prompts = new Map<string, readonly McpPrompt[]>();
+  private readonly oauthStates = new Map<
+    string,
+    {
+      readonly organizationId: string;
+      readonly serverId: string;
+      readonly principalId: string;
+      readonly config: McpOAuthConfig;
+      readonly expiresAt: number;
+    }
+  >();
 
-  constructor(private readonly observe?: McpObservationSink) {}
+  constructor(
+    private readonly observe?: McpObservationSink,
+    private readonly timeoutMs = 30_000,
+    private readonly cacheNamespace = 'handstack:cache',
+  ) {
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1)
+      throw new ValidationError('MCP timeout must be a positive integer');
+    if (cacheNamespace.trim() === '') throw new ValidationError('MCP cache namespace is required');
+  }
 
   register(server: McpServerConfig): void {
     if (server.organizationId === '' || server.id === '')
@@ -222,6 +258,93 @@ export class McpClientRegistry {
     if (this.servers.has(`${server.organizationId}:${server.id}`))
       throw new ValidationError('MCP server already exists');
     this.servers.set(`${server.organizationId}:${server.id}`, server);
+  }
+
+  list(organizationId: string): readonly McpServerConfig[] {
+    return [...this.servers.values()].filter((server) => server.organizationId === organizationId);
+  }
+
+  async purgeOrganization(organizationId: string): Promise<number> {
+    const servers = this.list(organizationId);
+    for (const server of servers) await this.close(organizationId, server.id);
+    const prefix = `${this.cacheNamespace}:${organizationId}:`;
+    for (const key of [...this.tools.keys()]) if (key.startsWith(prefix)) this.tools.delete(key);
+    for (const key of [...this.resources.keys()])
+      if (key.startsWith(prefix)) this.resources.delete(key);
+    for (const key of [...this.prompts.keys()])
+      if (key.startsWith(prefix)) this.prompts.delete(key);
+    for (const [state, pending] of this.oauthStates)
+      if (pending.organizationId === organizationId) this.oauthStates.delete(state);
+    return servers.length;
+  }
+
+  beginOAuth(
+    organizationId: string,
+    serverId: string,
+    principalId: string,
+    now = Date.now(),
+  ): McpOAuthAuthorization {
+    const server = this.require(organizationId, serverId);
+    const oauth = server.oauth;
+    if (oauth === undefined) throw new ValidationError('MCP server does not have OAuth configured');
+    const state = randomUUID();
+    this.oauthStates.set(state, {
+      organizationId,
+      serverId,
+      principalId,
+      config: oauth,
+      expiresAt: now + 10 * 60_000,
+    });
+    const authorization = new URL(oauth.authorizationUrl);
+    authorization.searchParams.set('response_type', 'code');
+    authorization.searchParams.set('client_id', oauth.clientId);
+    authorization.searchParams.set('redirect_uri', oauth.redirectUri);
+    authorization.searchParams.set('state', state);
+    if (oauth.scopes !== undefined && oauth.scopes.length > 0)
+      authorization.searchParams.set('scope', oauth.scopes.join(' '));
+    return { state, authorizationUrl: authorization.toString() };
+  }
+
+  async completeOAuth(
+    organizationId: string,
+    serverId: string,
+    principalId: string,
+    state: string,
+    code: string,
+    request: typeof fetch = fetch,
+    now = Date.now(),
+  ): Promise<McpCredential> {
+    const pending = this.oauthStates.get(state);
+    if (pending === undefined) throw new ValidationError('MCP OAuth state is invalid or expired');
+    if (
+      pending.organizationId !== organizationId ||
+      pending.serverId !== serverId ||
+      pending.principalId !== principalId ||
+      pending.expiresAt < now
+    )
+      throw new ValidationError('MCP OAuth state is invalid or expired');
+    this.oauthStates.delete(state);
+    if (code.trim() === '') throw new ValidationError('MCP OAuth code is required');
+    const response = await request(pending.config.tokenUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        client_id: pending.config.clientId,
+        redirect_uri: pending.config.redirectUri,
+      }).toString(),
+    });
+    if (!response.ok)
+      throw new Error(`MCP OAuth token endpoint returned HTTP ${String(response.status)}`);
+    const value = (await response.json()) as unknown;
+    if (
+      !isRecord(value) ||
+      typeof value.access_token !== 'string' ||
+      value.access_token.trim() === ''
+    )
+      throw new ValidationError('MCP OAuth token response is invalid');
+    return { type: 'OAUTH2', secret: value.access_token };
   }
 
   async discover(
@@ -252,12 +375,26 @@ export class McpClientRegistry {
         }));
       },
     );
-    this.tools.set(`${organizationId}:${serverId}`, discovered);
+    this.tools.set(this.cacheKey(organizationId, serverId), discovered);
     return discovered;
   }
 
   listTools(organizationId: string, serverId: string): readonly McpTool[] {
-    return this.tools.get(`${organizationId}:${serverId}`) ?? [];
+    return this.tools.get(this.cacheKey(organizationId, serverId)) ?? [];
+  }
+
+  /** Hydrates discovered tool metadata after an API restart. */
+  restoreTools(organizationId: string, serverId: string, tools: readonly McpTool[]): void {
+    this.tools.set(this.cacheKey(organizationId, serverId), [...tools]);
+  }
+
+  /** Hydrates discovery metadata after an API restart without calling the remote server. */
+  restoreResources(
+    organizationId: string,
+    serverId: string,
+    resources: readonly McpResource[],
+  ): void {
+    this.resources.set(this.cacheKey(organizationId, serverId), [...resources]);
   }
 
   async discoverResources(
@@ -285,12 +422,17 @@ export class McpClientRegistry {
         }));
       },
     );
-    this.resources.set(`${organizationId}:${serverId}`, discovered);
+    this.resources.set(this.cacheKey(organizationId, serverId), discovered);
     return discovered;
   }
 
   listResources(organizationId: string, serverId: string): readonly McpResource[] {
-    return this.resources.get(`${organizationId}:${serverId}`) ?? [];
+    return this.resources.get(this.cacheKey(organizationId, serverId)) ?? [];
+  }
+
+  /** Hydrates prompt discovery metadata after an API restart. */
+  restorePrompts(organizationId: string, serverId: string, prompts: readonly McpPrompt[]): void {
+    this.prompts.set(this.cacheKey(organizationId, serverId), [...prompts]);
   }
 
   async discoverPrompts(
@@ -324,12 +466,12 @@ export class McpClientRegistry {
         }));
       },
     );
-    this.prompts.set(`${organizationId}:${serverId}`, discovered);
+    this.prompts.set(this.cacheKey(organizationId, serverId), discovered);
     return discovered;
   }
 
   listPrompts(organizationId: string, serverId: string): readonly McpPrompt[] {
-    return this.prompts.get(`${organizationId}:${serverId}`) ?? [];
+    return this.prompts.get(this.cacheKey(organizationId, serverId)) ?? [];
   }
 
   /** Exposes discovered MCP tools as AGENT capabilities for AgentHarness. */
@@ -410,10 +552,24 @@ export class McpClientRegistry {
     }
   }
 
+  /**
+   * Drops a broken or restarted remote transport without discarding the
+   * registered server or its persisted discovery cache. The next operation
+   * lazily creates a fresh transport, which keeps reconnection out of the
+   * current failed request and avoids retrying non-idempotent tool calls.
+   */
+  async reconnect(organizationId: string, serverId: string): Promise<void> {
+    await this.close(organizationId, serverId);
+  }
+
   private require(organizationId: string, serverId: string) {
     const server = this.servers.get(`${organizationId}:${serverId}`);
     if (server === undefined) throw new ValidationError('MCP server not found');
     return server;
+  }
+
+  private cacheKey(organizationId: string, serverId: string): string {
+    return `${this.cacheNamespace}:${organizationId}:${serverId}`;
   }
 
   private async observedRequest<T = unknown>(
@@ -427,11 +583,14 @@ export class McpClientRegistry {
   ): Promise<T> {
     const started = performance.now();
     try {
+      const timeoutSignal = AbortSignal.timeout(this.timeoutMs);
+      const requestSignal =
+        signal === undefined ? timeoutSignal : AbortSignal.any([signal, timeoutSignal]);
       const resolvedCredential = typeof credential === 'function' ? await credential() : credential;
       const result = await this.transport(server).request(
         method,
         params,
-        signal,
+        requestSignal,
         resolvedCredential,
       );
       const transformed = transform(result);

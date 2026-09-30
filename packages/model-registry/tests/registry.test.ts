@@ -18,7 +18,7 @@ import type {
   PromptVersion,
   ProviderDefinition,
 } from '@handstack/models';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ModelRegistry } from '../src/index.js';
 
 const organizationId = 'models-organization';
@@ -121,13 +121,54 @@ class FailingAuditAdapter implements DatabaseAdapter {
 }
 
 describe('model registry', () => {
+  it('requires the configured red-team publication gate', async () => {
+    const adapter = createDatabaseAdapter(
+      defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),
+    );
+    await adapter.initialize();
+    try {
+      let redTeamPassed = false;
+      const gate = vi.fn(() => {
+        if (!redTeamPassed)
+          return Promise.reject(
+            new Error('Passing red-team campaign is required for model publication'),
+          );
+        return Promise.resolve();
+      });
+      const registry = new ModelRegistry(adapter, evaluationProvider, undefined, () => now, gate);
+      await registry.registerProvider(provider());
+      await registry.registerModel(model());
+      const passed: EvaluationGate = {
+        ...base('gate-for-red-team'),
+        modelDefinitionId: 'coding',
+        suiteId: 'model-quality',
+        suiteVersion: '1',
+        datasetVersion: 'dataset-v1',
+        runId: 'persisted-passing-run',
+        passed: true,
+        evaluatedAt: now,
+        scores: { taskSuccess: 1 },
+      };
+      await registry.recordGate(passed, result(passed.runId, true, passed.scores));
+      await registry.approve(organizationId, 'coding');
+      await expect(registry.publish(organizationId, 'coding')).rejects.toThrow(/red-team/);
+      redTeamPassed = true;
+      await expect(registry.publish(organizationId, 'coding')).resolves.toMatchObject({
+        lifecycle: 'PUBLISHED',
+      });
+      expect(gate).toHaveBeenCalledTimes(2);
+    } finally {
+      await adapter.close();
+    }
+  });
+
   it('is tenant-aware and fails closed until a versioned gate passes', async () => {
     const adapter = createDatabaseAdapter(
       defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),
     );
     await adapter.initialize();
     try {
-      const registry = new ModelRegistry(adapter, evaluationProvider);
+      const registry = new ModelRegistry(adapter, evaluationProvider, undefined, () => now);
       await registry.registerProvider(provider());
       await registry.registerModel(model());
       await expect(registry.publish(organizationId, 'coding')).rejects.toThrow(/evaluation gate/);
@@ -204,6 +245,31 @@ describe('model registry', () => {
     }
   });
 
+  it('supports an expiring, auditable approval override without a passing gate', async () => {
+    const adapter = createDatabaseAdapter(
+      defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),
+    );
+    await adapter.initialize();
+    const clock = now;
+    try {
+      const registry = new ModelRegistry(adapter, evaluationProvider, undefined, () => clock);
+      await registry.registerProvider(provider());
+      await registry.registerModel(model());
+      await registry.overrideApproval(organizationId, 'coding', {
+        approvedBy: 'security-admin',
+        justification: 'Emergency controlled release for incident response',
+        expiresAt: new Date(now.getTime() + 60_000),
+      });
+      await expect(registry.publish(organizationId, 'coding')).resolves.toMatchObject({
+        lifecycle: 'PUBLISHED',
+      });
+      const audits = await registry.listAuditEvents(organizationId);
+      expect(audits.items.map(({ eventType }) => eventType)).toContain('MODEL_APPROVAL_OVERRIDDEN');
+    } finally {
+      await adapter.close();
+    }
+  });
+
   it('rejects fabricated results and requires a provider-backed persisted decision', async () => {
     const adapter = createDatabaseAdapter(
       defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),
@@ -255,7 +321,23 @@ describe('model registry', () => {
     );
     await adapter.initialize();
     try {
-      const registry = new ModelRegistry(adapter, evaluationProvider);
+      let redTeamPassed = false;
+      const publicationGate = vi.fn(
+        (_organizationId: string, targetKind: 'MODEL' | 'PROMPT', targetId: string) => {
+          if (!redTeamPassed)
+            return Promise.reject(
+              new Error(`red-team campaign required for ${targetKind}:${targetId}`),
+            );
+          return Promise.resolve();
+        },
+      );
+      const registry = new ModelRegistry(
+        adapter,
+        evaluationProvider,
+        undefined,
+        () => now,
+        publicationGate,
+      );
       await registry.registerProvider(provider());
       await registry.registerModel(model());
       await registry.registerPrompt(prompt());
@@ -279,6 +361,11 @@ describe('model registry', () => {
       };
       await registry.recordPromptGate(gate, run);
       await registry.approvePromptVersion(organizationId, first.id);
+      await expect(registry.publishPromptVersion(organizationId, first.id)).rejects.toThrow(
+        /red-team campaign/,
+      );
+      expect(publicationGate).toHaveBeenLastCalledWith(organizationId, 'PROMPT', first.id);
+      redTeamPassed = true;
       await expect(registry.publishPromptVersion(organizationId, first.id)).resolves.toMatchObject({
         lifecycle: 'PUBLISHED',
         versionLabel: '1.0.0',
@@ -303,6 +390,36 @@ describe('model registry', () => {
       const audit = await registry.listAuditEvents(organizationId);
       expect(audit.items.map(({ eventType }) => eventType)).toContain('PROMPT_PUBLISHED');
       expect(JSON.stringify(audit.items)).not.toContain('Answer {{question}}');
+    } finally {
+      await adapter.close();
+    }
+  });
+
+  it('supports an expiring, auditable prompt approval override', async () => {
+    const adapter = createDatabaseAdapter(
+      defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),
+    );
+    await adapter.initialize();
+    try {
+      const registry = new ModelRegistry(adapter, evaluationProvider, undefined, () => now);
+      await registry.registerProvider(provider());
+      await registry.registerModel(model());
+      await registry.registerPrompt(prompt());
+      const version = await registry.registerPromptVersion(promptVersion());
+      await registry.overridePromptApproval(organizationId, version.id, {
+        approvedBy: 'security-admin',
+        justification: 'Emergency controlled prompt release',
+        expiresAt: new Date(now.getTime() + 60_000),
+      });
+      await expect(
+        registry.publishPromptVersion(organizationId, version.id),
+      ).resolves.toMatchObject({
+        lifecycle: 'PUBLISHED',
+      });
+      const audits = await registry.listAuditEvents(organizationId);
+      expect(audits.items.map(({ eventType }) => eventType)).toContain(
+        'PROMPT_APPROVAL_OVERRIDDEN',
+      );
     } finally {
       await adapter.close();
     }

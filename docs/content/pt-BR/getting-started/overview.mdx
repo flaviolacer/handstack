@@ -45,6 +45,21 @@ Use este procedimento para instalar dependências e verificar a fundação do re
 
 Inicie a API e consulte `/health/live`. Uma resposta bem-sucedida contém `status: "ok"`. `/health/ready` também informa checks das dependências configuradas.
 
+Para configuração versionada em Git, use `handstack config sync --repo <path> --ref <ref> -f <manifest.yaml>`.
+Antes de aplicar uma configuração local, execute `handstack config validate` para analisar a
+configuração efetiva e imprimir um resumo de preflight sem dados sensíveis; URLs de banco e
+referências de segredos nunca aparecem nessa saída.
+O comando lê o manifesto da referência Git selecionada e o aplica pela API autenticada de
+Configuration as Code. É uma sincronização explícita; reconciliação contínua e rollback automático
+não são fornecidos por este comando.
+Os comandos `apply`, `export`, `admin`, `audit` e `backup/restore` usam o mesmo layer tipado para
+`HANDSTACK_API_URL`, `HANDSTACK_ORGANIZATION_ID`, `HANDSTACK_ACCESS_TOKEN` e
+`HANDSTACK_PORTABLE_SIGNING_KEY`; mantenha esses valores no ambiente ou em um secret manager e
+nunca os passe como argumentos.
+
+Para atualizar o grafo local do código usado nas auditorias, execute `npm run graphify`. O comando
+grava `graphify-out/graph.json` e exclui dependências e outputs de build.
+
 ## Troubleshooting
 
 - Se o Node informar engine incompatível, instale Node.js 22 ou 24 LTS e reinstale as dependências.

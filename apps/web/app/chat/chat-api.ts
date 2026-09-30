@@ -50,6 +50,11 @@ export interface PublicModel {
   readonly lifecycle: string;
   readonly capabilities: readonly string[];
 }
+export interface PublicAgent {
+  readonly id: string;
+  readonly slug: string;
+  readonly name: string;
+}
 export interface StreamEvent {
   readonly sequence: number;
   readonly type: string;
@@ -93,6 +98,7 @@ export function chatApi(session: ChatSession, baseUrl = '') {
   const conversation = (id: string) => `/conversations/${encodeURIComponent(id)}`;
   return {
     models: () => request<ChatPage<PublicModel>>('/chat/models'),
+    agents: () => request<{ items: readonly PublicAgent[] }>('/chat/agents'),
     conversations: (cursor?: string) =>
       request<ChatPage<Conversation>>(
         `/conversations?limit=30${cursor === undefined ? '' : `&cursor=${encodeURIComponent(cursor)}`}`,
@@ -114,13 +120,26 @@ export function chatApi(session: ChatSession, baseUrl = '') {
         `${conversation(conversationId)}/branches/${encodeURIComponent(branchId)}/messages`,
         { method: 'POST', body: JSON.stringify({ role: 'user', parts }) },
       ),
-    execute: (conversationId: string, branchId: string, model: string, parentMessageId: string) =>
+    execute: (
+      conversationId: string,
+      branchId: string,
+      model: string,
+      parentMessageId: string,
+      knowledgeBaseId?: string,
+      agentId?: string,
+    ) =>
       request<Message>(
         `${conversation(conversationId)}/branches/${encodeURIComponent(branchId)}/executions`,
         {
           method: 'POST',
           headers: { 'Idempotency-Key': key() },
-          body: JSON.stringify({ model, dataClassification: 'INTERNAL', parentMessageId }),
+          body: JSON.stringify({
+            model,
+            dataClassification: 'INTERNAL',
+            parentMessageId,
+            ...(knowledgeBaseId === undefined || knowledgeBaseId === '' ? {} : { knowledgeBaseId }),
+            ...(agentId === undefined || agentId === '' ? {} : { agentId }),
+          }),
         },
       ),
     cancel: (messageId: string) =>

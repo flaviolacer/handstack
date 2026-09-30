@@ -17,18 +17,23 @@ tags: [plugins, identity, configuration]
 ## Prerequisites
 
 - Um plugin de identidade registrado e um administrador da organização.
-- Uma referência ao gerenciador de segredos, como `secret://vault/idp-client`, para campos confidenciais.
+- Um ID de secret do HandStack ou uma referência de ambiente como
+  `env://HANDSTACK_SECRET_OIDC_CLIENT` para campos confidenciais.
 
 ## Steps
 
 1. Crie um `InMemoryIdentityProviderConfigurationStore` para uso local/offline ou implemente o mesmo contrato para armazenamento durável.
 2. Defina a configuração com `organizationId` e ID do provedor.
-3. Coloque somente referências `secret://` nos campos chamados password, secret, token ou private key.
-4. Resolva a configuração com o mesmo escopo de organização e provedor antes de iniciar o adapter.
+3. Armazene o valor pela API de Secrets do tenant e use `secret://<id-retornado>`, ou provisione uma
+   variável de ambiente `HANDSTACK_SECRET_*` e use `env://<nome-exato-da-variável>`.
+4. Use somente essas referências nos campos confidenciais do provedor de identidade. O runtime as
+   resolve pelo broker de segredos no mesmo escopo de organização e provedor.
 
 ## Expected results
 
-A configuração não pode ser lida entre organizações, escopos vazios falham fechados e valores confidenciais inline são rejeitados. O store não resolve nem persiste material secreto.
+A configuração não pode ser lida entre organizações, escopos vazios falham fechados e valores
+confidenciais inline são rejeitados. Secrets persistidos são criptografados e vinculados ao
+tenant/plugin; referências de ambiente são restritas ao namespace e auditadas sem registrar valores.
 
 ## Verify
 

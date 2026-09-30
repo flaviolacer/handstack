@@ -16,7 +16,7 @@ export class GatewayRuntimeService {
     @Inject(AuthRuntimeService) private readonly auth: AuthRuntimeService,
     @Inject(DatabaseService) database: DatabaseService,
   ) {
-    const configuredPepper = process.env.HANDSTACK_GATEWAY_KEY_PEPPER;
+    const configuredPepper = database.config.security.gatewayKeyPepper;
     const pepper =
       configuredPepper ?? 'handstack-development-gateway-key-pepper-change-me-at-least-32';
     if (process.env.NODE_ENV === 'production' && configuredPepper === undefined)

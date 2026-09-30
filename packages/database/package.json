@@ -12,12 +12,13 @@
     "lint": "eslint src tests",
     "test": "vitest run",
     "test:mongodb-portable": "vitest run --config vitest.mongodb.config.ts",
+    "test:portable-sql": "vitest run --config vitest.portable-sql.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@handstack/config": "file:../config",
-    "@handstack/database-mongodb": "file:./mongodb",
-    "@handstack/database-typeorm": "file:./typeorm",
+    "@handstack/database-mongodb": "file:mongodb",
+    "@handstack/database-typeorm": "file:typeorm",
     "@handstack/domain": "file:../domain"
   }
 }

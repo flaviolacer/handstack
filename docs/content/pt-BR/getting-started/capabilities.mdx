@@ -7,7 +7,7 @@ permissions: [capability.execute]
 features: [capabilities, policy, api]
 deploymentProfiles: [compact, distributed]
 introducedIn: 0.6.0
-lastReviewedAt: 2026-09-09
+lastReviewedAt: 2026-09-28
 owner: platform-team
 tags: [capability, authorization, execution]
 ---
@@ -28,6 +28,11 @@ permitidos e handler. Adaptadores de API, Web, MCP e Agents devem usar o mesmo e
 2. Resolva com `GET /api/v1/organizations/{organizationId}/capabilities`.
 3. Execute com `POST /api/v1/organizations/{organizationId}/capabilities/{slug}/run`.
 
+Para uma capability que trata dados pessoais, defina `metadata.consentPurposeId` com o ID de uma
+finalidade de privacidade persistida. O engine verifica o consentimento mais recente do principal
+autenticado antes da execução e falha fechado após a retirada. Destinos externos continuam exigindo
+classificação, provider e metadados explícitos de residência.
+
 ## Verify
 
 Confirme resultado para chamada autorizada e 403 para permissão ausente ou outro tenant.
@@ -38,3 +43,5 @@ Confirme falha fechada quando o canal não estiver publicado.
 - `capability.execute permission is required` indica permissão ausente.
 - `Capability is unavailable` indica slug ou canal não publicado.
 - Timeout e abort liberam a reserva de budget antes do erro.
+- `Consent is not granted for purpose ...` indica que o principal precisa conceder a finalidade de
+  privacidade declarada antes de executar a capability.

@@ -46,6 +46,25 @@ function decodeCursor(cursor: string): string {
   }
 }
 
+function encodeAllCursor(document: EntityDocument): string {
+  return Buffer.from(JSON.stringify({ tenantId: document.tenantId, id: document.id })).toString(
+    'base64url',
+  );
+}
+
+function decodeAllCursor(cursor: string): { tenantId: string; id: string } {
+  try {
+    const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as {
+      tenantId?: unknown;
+      id?: unknown;
+    };
+    if (typeof value.tenantId !== 'string' || typeof value.id !== 'string') throw new Error();
+    return value as { tenantId: string; id: string };
+  } catch {
+    throw new TypeError('Invalid repository cursor');
+  }
+}
+
 function toDocument(entity: TenantEntity, repositoryName: string): EntityDocument {
   return {
     repositoryName,
@@ -107,6 +126,30 @@ export class MongoRepository<T extends TenantEntity> implements Repository<T> {
     return {
       items: selected.map((item) => fromDocument(item) as T),
       ...(hasMore && last !== undefined ? { nextCursor: encodeCursor(last.id) } : {}),
+    };
+  }
+  async listAll(page: PageRequest): Promise<Page<T>> {
+    if (!Number.isInteger(page.limit) || page.limit < 1 || page.limit > 200)
+      throw new RangeError('Page limit must be between 1 and 200');
+    const filter: Filter<EntityDocument> = { repositoryName: this.name };
+    if (page.cursor !== undefined) {
+      const cursor = decodeAllCursor(page.cursor);
+      filter.$or = [
+        { tenantId: { $gt: cursor.tenantId } },
+        { tenantId: cursor.tenantId, id: { $gt: cursor.id } },
+      ];
+    }
+    const documents = await this.collection
+      .find(filter, this.operationOptions())
+      .sort({ tenantId: 1, id: 1 })
+      .limit(page.limit + 1)
+      .toArray();
+    const hasMore = documents.length > page.limit;
+    const selected = documents.slice(0, page.limit);
+    const last = selected.at(-1);
+    return {
+      items: selected.map((item) => fromDocument(item) as T),
+      ...(hasMore && last !== undefined ? { nextCursor: encodeAllCursor(last) } : {}),
     };
   }
   async insert(entity: T): Promise<T> {

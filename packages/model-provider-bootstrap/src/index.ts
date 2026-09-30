@@ -14,8 +14,14 @@ import {
 
 export interface OfficialProviderBootstrapOptions {
   readonly fetch?: typeof fetch;
-  readonly timeoutMs?: number;
+  readonly timeoutMs?: number | (() => number);
   readonly bedrockTransport?: (region: string) => BedrockTransport;
+}
+
+function timeoutOption(options: OfficialProviderBootstrapOptions): { timeoutMs?: number } {
+  const timeoutMs =
+    typeof options.timeoutMs === 'function' ? options.timeoutMs() : options.timeoutMs;
+  return timeoutMs === undefined ? {} : { timeoutMs };
 }
 
 function setting(definition: ProviderDefinition, key: string, fallback?: string): string {
@@ -32,7 +38,7 @@ function compatibleOptions(
   return {
     resolveApiKey: context.resolveSecret,
     ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
-    ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+    ...timeoutOption(options),
   };
 }
 
@@ -58,7 +64,7 @@ export function createOfficialProviderFactories(
   registry.register('ollama', (context) =>
     createOllamaProvider({
       ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
-      ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+      ...timeoutOption(options),
       ...(context.definition.baseUrl === undefined ? {} : { baseUrl: context.definition.baseUrl }),
     }),
   );
@@ -84,7 +90,7 @@ export function createOfficialProviderFactories(
     createAnthropicProvider({
       resolveApiKey: context.resolveSecret,
       ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
-      ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+      ...timeoutOption(options),
       ...(context.definition.baseUrl === undefined ? {} : { baseUrl: context.definition.baseUrl }),
     }),
   );
@@ -92,7 +98,7 @@ export function createOfficialProviderFactories(
     createGeminiProvider({
       resolveApiKey: context.resolveSecret,
       ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
-      ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+      ...timeoutOption(options),
       ...(context.definition.baseUrl === undefined ? {} : { baseUrl: context.definition.baseUrl }),
     }),
   );
@@ -111,7 +117,7 @@ export function createOfficialProviderFactories(
     const region = setting(context.definition, 'region');
     return createBedrockProvider({
       region,
-      ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+      ...timeoutOption(options),
       ...(options.bedrockTransport === undefined
         ? {}
         : { transport: options.bedrockTransport(region) }),

@@ -15,13 +15,17 @@ tags: [plugins, sdk, supply-chain]
 # Instalar plugins governados
 
 `@handstack/plugin-sdk` valida manifesto, registra checksum SHA-256 dos bytes e exige aprovação
-administrativa de cada permissão declarada. Plugins oficiais trusted podem rodar no processo;
-plugins comunitários exigem runner RPC isolado.
+administrativa de cada permissão declarada. Artefatos externos de npm/GitHub são resolvidos somente
+de cache provisionado, devem executar em modo isolado e exigem assinatura Ed25519 do publisher.
+Artefatos locais de desenvolvimento podem usar trusted in-process; não use esse modo para conteúdo
+externo de publishers.
 
 ## Prerequisites
 
 - Pacote que exponha `definePlugin` com manifesto compatível.
 - Aprovação para permissões de rede, filesystem, secrets, database, identidade, MCP ou models.
+- Cache de artefatos provisionado e `HANDSTACK_PLUGIN_TRUSTED_PUBLISHERS_JSON`, que mapeia IDs de
+  publishers para chaves públicas Ed25519 em formato PEM.
 
 ## Steps
 
@@ -30,13 +34,42 @@ plugins comunitários exigem runner RPC isolado.
 3. Aprove apenas permissões solicitadas e habilite no modo escolhido.
 4. Desabilite ou desinstale pelo host ao retirar o plugin.
 
+Para fontes externas, assine os bytes UTF-8 deste objeto JSON compacto (a ordem das propriedades é
+significativa) com a chave privada Ed25519 do publisher e codifique a assinatura de 64 bytes como
+base64url:
+
+```json
+{
+  "publisher": "publisher-id",
+  "pluginName": "@vendor/plugin",
+  "pluginVersion": "1.2.3",
+  "checksum": "<artifact-sha256>",
+  "sbomDigest": "<sbom-sha256>",
+  "provenanceDigest": "<provenance-sha256>"
+}
+```
+
+A assinatura vincula publisher, identidade/versão do plugin, checksum da origem e digests de SBOM e
+proveniência. Mantenha a chave privada fora do HandStack; somente chaves públicas pertencem à
+configuração de confiança.
+
+Envie os documentos JSON UTF-8 originais em `source.supplyChainDocuments.sbom` e
+`source.supplyChainDocuments.provenance`. O HandStack recalcula os dois digests SHA-256 e verifica
+se o SBOM identifica o pacote/versão exatos (JSON CycloneDX ou SPDX), e se a proveniência é um
+in-toto Statement v1 com predicate SLSA cujo subject SHA-256 corresponde ao artefato. Os documentos
+brutos são descartados após a validação e não são persistidos na instalação do tenant.
+
 ## Verify
 
-Confirme checksum, impossibilidade de elevar permissões, falha fechada do modo isolado sem runner
-RPC e execução ordenada dos hooks.
+Confirme checksum e assinatura de publisher confiável, bloqueio de modo trusted para plugins
+externos, impossibilidade de elevar permissões, falha fechada sem runner RPC e execução ordenada dos
+hooks.
 
 ## Troubleshooting
 
 - `isolated plugin runner is unavailable` indica ausência de fronteira worker/RPC.
+- `publisher is not trusted` indica que o ID não consta em
+  `HANDSTACK_PLUGIN_TRUSTED_PUBLISHERS_JSON`; falha de assinatura indica incompatibilidade entre
+  identidade, versão, checksum ou digests da cadeia de suprimentos assinados.
 - Nome duplicado exige desinstalar ou versionar a instalação existente.
 - Nunca coloque valores secretos no manifesto ou metadata de auditoria.
