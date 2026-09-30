@@ -262,7 +262,7 @@
 - `npm run format:check` e `docs:validate` aprovados; documentação em 120 artigos localizados,
   104 requisitos e 4 alvos.
 - O Turbo foi executado com o bypass não-mutante da checagem de `packageManager`, mas falhou antes
-  das tarefas porque `.handstack-codex/autopilot-v2.lock` está em uso por outro processo (Windows
+  das tarefas porque `the supervisor lock` está em uso por outro processo (Windows
   error 32). Lint, typecheck, test e build globais permanecem pendentes até o supervisor liberar o lock.
 - Após nova sondagem, `npm run format:check` e `docs:validate` passaram novamente; o lock voltou a
   ser ocupado durante o Turbo. O teste Vitest focal não inicializou por `Access is denied` ao
@@ -741,12 +741,12 @@ packages/docs-engine/dist/validate.js` (60 artigos, 73 requisitos, 4 alvos).
 
 ## Objetivo
 
-Implementar integralmente `C:\Users\flavi\Desktop\handstack-master-specification-v1.md` neste repositório. A especificação é a fonte de verdade. O marcador `.handstack-codex/COMPLETE` só poderá existir depois da auditoria integral de requisitos e de todos os gates relevantes aprovados.
+Implementar integralmente `C:\Users\flavi\Desktop\the project specification` neste repositório. A especificação é a fonte de verdade. O marcador `the completion marker` só poderá existir depois da auditoria integral de requisitos e de todos os gates relevantes aprovados.
 
 ## Estado inicial confirmado
 
 - Especificação lida integralmente: 7.408 linhas (`Get-Content ...`).
-- Repositório inicialmente vazio, exceto por `.handstack-codex/`.
+- Repositório inicialmente vazio, exceto por `the supervisor workspace/`.
 - Não havia Git, `STATUS.md`, manifests, código ou testes a preservar.
 - Ambiente detectado: Node.js `v26.7.0`, Git `2.45.1.windows.1`.
 - `pnpm`/Corepack e `graphify` não estavam instalados no PATH no início.
@@ -3872,7 +3872,7 @@ pnpm graph:update + graph:validate              PASS (4851 nós, 6525 links diri
 Pendências materiais continuam: persistência durável do runtime de agents/workflows/access,
 adapters reais de transporte/notificação/webhook, execução de conformance em PostgreSQL/MySQL/
 MariaDB/SQL Server/MongoDB, builds Docker sem daemon local e auditoria manual dos capítulos M0–M18.
-Não criar `.handstack-codex/COMPLETE`.
+Não criar `the completion marker`.
 
 ### Incremento 74: Durable workflow repository contract (M34)
 
@@ -3979,7 +3979,7 @@ adicionado como contrato explícito antes de habilitar esse adapter.
 
 Próximo passo efetivo: investigar persistência durável de access/agents/webhooks sem quebrar os
 contratos síncronos atuais, ou avançar a matriz de conformance externa quando os serviços forem
-disponibilizados. Pendências enterprise e `.handstack-codex/COMPLETE` permanecem abertas.
+disponibilizados. Pendências enterprise e `the completion marker` permanecem abertas.
 
 Verificação estrutural pós-M39 em 2026-09-09:
 
@@ -4000,7 +4000,7 @@ validação estrutural permaneceu íntegra.
 Estado atual (2026-09-09): integração do `RepositoryAgentStore`, round-trip SQLite, paginação multi-página
 e proteção contra cursor repetido já concluídos; Compose profiles e seleção de adapter/URL também concluídos.
 Próximo passo efetivo depende de infraestrutura externa: conformance real dos bancos, Redis HA/BullMQ/KEDA
-e builds Docker. Não criar `.handstack-codex/COMPLETE` enquanto essas verificações permanecerem pendentes.
+e builds Docker. Não criar `the completion marker` enquanto essas verificações permanecerem pendentes.
 
 ### Incremento 120: CI Compose profile validation (M100)
 
@@ -4045,7 +4045,7 @@ nesses arquivos não relacionados para evitar reformatar o repositório inteiro.
 - [x] `docker compose config` validou defaults e seleção PostgreSQL via profile
 
 Próximo passo efetivo: executar imagens e conformance em infraestrutura real quando Docker/serviços estiverem
-disponíveis; demais requisitos enterprise continuam pendentes e impedem `.handstack-codex/COMPLETE`.
+disponíveis; demais requisitos enterprise continuam pendentes e impedem `the completion marker`.
 
 Tentativa adicional em 2026-09-09: `docker info` falhou porque o pipe
 `dockerDesktopLinuxEngine` não está disponível neste host (daemon parado/ausente). Build e execução reais
@@ -4067,7 +4067,7 @@ real dos cinco bancos, Redis HA e imagens Docker. O marcador COMPLETE permanece 
 - [x] Agents typecheck, lint e 7 testes PASS em 2026-09-09
 
 Próximo passo efetivo: continuar revisão local de contratos/documentação operacional; conformance externa
-e hardening enterprise permanecem pendentes e impedem `.handstack-codex/COMPLETE`.
+e hardening enterprise permanecem pendentes e impedem `the completion marker`.
 
 Atualização de continuidade (2026-09-09): M96 e gates globais estão concluídos; o próximo incremento
 executável local é revisar contratos/documentação de operação e fortalecer guardas de paginação. As
@@ -4081,7 +4081,7 @@ registradas como pendências reais, portanto o marcador COMPLETE permanece ausen
 
 Próximo passo efetivo: integrar `RepositoryAgentStore` ao `AgentRuntimeService` com fallback em memória
 e validar round-trip SQLite, incluindo normalização de datas e publicação exclusiva. Conformance externa,
-hardening enterprise e `.handstack-codex/COMPLETE` permanecem pendentes.
+hardening enterprise e `the completion marker` permanecem pendentes.
 
 Gate global pós-M96 iniciado em 2026-09-09 (`pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`);
 aguardando conclusão para registrar resultados.
@@ -4096,7 +4096,7 @@ pnpm build      PASS (50 tarefas)
 ```
 
 Próximo passo efetivo: revisar conformance operacional externa (PostgreSQL/MySQL/MariaDB/SQL Server/MongoDB,
-Redis, Docker/Kubernetes) e requisitos enterprise ainda pendentes; não criar `.handstack-codex/COMPLETE`.
+Redis, Docker/Kubernetes) e requisitos enterprise ainda pendentes; não criar `the completion marker`.
 
 ### Incremento 100: Notification endpoint resolution hardening (M80)
 
@@ -4107,7 +4107,7 @@ Redis, Docker/Kubernetes) e requisitos enterprise ainda pendentes; não criar `.
 
 Pendências materiais permanecem: provisionamento/rotação operacional de SMTP e plugins Slack/Teams/Discord,
 conformance real dos cinco bancos externos, Redis/BullMQ/KEDA, SIEM, HA/backup/restore e certificações
-enterprise. `.handstack-codex/COMPLETE` continua proibido.
+enterprise. `the completion marker` continua proibido.
 
 Próximo passo efetivo: integrar configuração tenant-scoped segura dos providers externos ao runtime/API
 ou iniciar harness de conformance externa condicionado a URLs/credenciais presentes.
@@ -4136,7 +4136,7 @@ pendentes, assim como conformance de bancos e hardening enterprise; `COMPLETE` p
 - [x] notifications lint/typecheck/test/build PASS (6 testes, sem skips)
 
 Provisionamento de endpoints/segredos, conformance externa e demais itens enterprise continuam
-pendentes; o marcador `.handstack-codex/COMPLETE` não foi criado.
+pendentes; o marcador `the completion marker` não foi criado.
 
 ### Incremento 105: Distributed job input validation (M85)
 
@@ -4266,7 +4266,7 @@ Provisionamento externo, conformance dos bancos e hardening enterprise permanece
 
 Pendências materiais inalteradas: conformance real PostgreSQL/MySQL/MariaDB/SQL Server/MongoDB,
 worker/queue durável de produção, SIEM/auditoria persistente operacional, adapters externos,
-Docker/HA/backup/restore e demais itens de hardening enterprise. `.handstack-codex/COMPLETE` segue
+Docker/HA/backup/restore e demais itens de hardening enterprise. `the completion marker` segue
 proibido até a implementação e verificação integral da especificação.
 
 Verificação de grafo pós-M71 em 2026-09-09:
@@ -4286,7 +4286,7 @@ pnpm graph:update + graph:validate PASS (5107 nós, 6945 links dirigidos, 0 toke
 
 Pendências materiais permanecem: conformance externa dos cinco bancos, SIEM externo operacional,
 fila/worker durável Redis/BullMQ, adapters de transporte/notificação, HA/backup/restore,
-certificações de browser/performance/acessibilidade e auditoria enterprise. `.handstack-codex/COMPLETE`
+certificações de browser/performance/acessibilidade e auditoria enterprise. `the completion marker`
 continua proibido.
 
 ### Incremento 90: Durable repository job transport (M74)
@@ -4315,7 +4315,7 @@ pnpm graph:update + graph:validate PASS (5149 nós, 7020 links dirigidos, 0 toke
 - [x] lockfile sincronizado (51 projetos workspace)
 
 Integração de configuração SMTP/Slack/Teams/Discord e provisionamento de segredos permanecem
-pendentes como trabalho operacional; `.handstack-codex/COMPLETE` segue ausente.
+pendentes como trabalho operacional; `the completion marker` segue ausente.
 
 ### Incremento 92: Durable notification store (M76)
 
@@ -4325,7 +4325,7 @@ pendentes como trabalho operacional; `.handstack-codex/COMPLETE` segue ausente.
 - [x] lockfile permanece sincronizado após dependência `@handstack/domain`
 
 Integração do store ao runtime/API e provisionamento real de SMTP/plugins Slack, Teams e Discord
-continuam pendentes; `.handstack-codex/COMPLETE` não deve ser criado.
+continuam pendentes; `the completion marker` não deve ser criado.
 
 ### Incremento 93: Notification runtime integration (M77)
 
@@ -4345,7 +4345,7 @@ provisionamento operacional; conformance externa e hardening enterprise permanec
 - [x] API lint/typecheck/build/test PASS (19 arquivos, 41 testes)
 
 Provisionamento SMTP/Slack/Teams/Discord e conformance/hardening enterprise continuam pendentes;
-`.handstack-codex/COMPLETE` permanece ausente.
+`the completion marker` permanece ausente.
 
 ### Incremento 95: Native notification plugin adapters (M79)
 
@@ -4414,7 +4414,7 @@ pnpm graph:update + graph:validate PASS (5125 nós, 6974 links dirigidos, 0 toke
 - [x] `/api/v1/organizations/:organizationId/audit` consulta os mesmos eventos persistidos pelos webhooks
 - [x] API lint/typecheck/build PASS após a unificação
 
-Conformance externa e hardening enterprise continuam pendentes; o marcador `.handstack-codex/COMPLETE`
+Conformance externa e hardening enterprise continuam pendentes; o marcador `the completion marker`
 permanece deliberadamente ausente.
 
 ### Incremento 89: Repository index audit (M49)
@@ -4460,7 +4460,7 @@ Próximo passo efetivo: normalizar datas de agents/versions após leitura de ada
 O índice genérico de `handstack_entities` continua cobrindo os novos repositórios; não foram
 introduzidas migrations específicas. Permanecem pendentes conformance real dos cinco bancos externos,
 endpoint/worker webhook autenticado e tenant-scoped, adapters de transporte/notificação reais e a
-auditoria enterprise completa (M18). `.handstack-codex/COMPLETE` não deve ser criado.
+auditoria enterprise completa (M18). `the completion marker` não deve ser criado.
 
 Próximo passo efetivo: implementar o boundary de entrega webhook tenant-scoped/autorizado (ou,
 caso a especificação exija prioridade diferente, iniciar a matriz de conformance externa), adicionando
@@ -4478,7 +4478,7 @@ testes de contrato e atualizando este ledger antes dos gates.
 Próximo passo efetivo: expor gerenciamento tenant-scoped/autorizado de deliveries (consulta de
 dead-letter e replay auditável) ou iniciar conformance externa quando os serviços de banco estiverem
 disponíveis. A entrega ainda não cobre endpoint/worker HTTP real nem rotação de segredos; não criar
-`.handstack-codex/COMPLETE`.
+`the completion marker`.
 
 ### Incremento 92: Auditable webhook replay contract (M52)
 
@@ -4509,7 +4509,7 @@ conformance externa e demais requisitos enterprise permanecem pendentes.
 - [x] Compatível com adapters que serializam datas como strings
 - [x] webhooks lint/typecheck/test/build PASS (16 testes)
 
-Conformance multi-adapter e auditoria operacional continuam pendentes; `.handstack-codex/COMPLETE` segue
+Conformance multi-adapter e auditoria operacional continuam pendentes; `the completion marker` segue
 proibido.
 
 Verificação global pós-M66 em 2026-09-09:
@@ -4531,7 +4531,7 @@ pnpm graph:update + graph:validate              PASS (5094 nós, 6922 links diri
 - [x] webhooks lint/typecheck/test/build PASS (17 testes); API typecheck/build PASS
 
 Rotação real em secret manager, auditoria centralizada, conformance externa e demais controles enterprise
-continuam pendentes. `.handstack-codex/COMPLETE` não foi criado.
+continuam pendentes. `the completion marker` não foi criado.
 
 `graph:update + graph:validate` após M68: PASS (5096 nós, 6927 links dirigidos, 0 tokens).
 
@@ -4542,7 +4542,7 @@ continuam pendentes. `.handstack-codex/COMPLETE` não foi criado.
 - [x] Teste cobre bloqueio de host não permitido (17 testes)
 - [x] webhooks lint/typecheck/test/build PASS
 
-Políticas de egress/SSRF em infraestrutura e conformance externa continuam pendentes; `.handstack-codex/COMPLETE`
+Políticas de egress/SSRF em infraestrutura e conformance externa continuam pendentes; `the completion marker`
 permanece proibido.
 
 `graph:update + graph:validate` após M69: PASS (5097 nós, 6928 links dirigidos, 0 tokens).
@@ -4554,7 +4554,7 @@ permanece proibido.
 - [x] API lint/typecheck/build/test PASS (18 arquivos, 40 testes)
 
 Provisionamento da variável e controles de rede permanecem operacionais; conformance externa e requisitos
-enterprise continuam pendentes. `.handstack-codex/COMPLETE` não foi criado.
+enterprise continuam pendentes. `the completion marker` não foi criado.
 
 Documentação e grafo após M53:
 
@@ -4600,7 +4600,7 @@ PASS (90/90, 90/90 e 49/49 tarefas respectivamente).
 
 Limitações restantes: API ainda usa provider em memória por padrão e precisa wiring de chave mestra/config
 durável em produção; worker assíncrono, auditoria e conformance PostgreSQL/MySQL/MariaDB/SQL Server/MongoDB
-continuam pendentes. Não criar `.handstack-codex/COMPLETE`.
+continuam pendentes. Não criar `the completion marker`.
 
 ### Incremento 96: API wiring for encrypted webhook secret provider (M56)
 
@@ -4610,7 +4610,7 @@ continuam pendentes. Não criar `.handstack-codex/COMPLETE`.
 - [x] API lint/typecheck/test PASS (18 arquivos, 40 testes); webhooks build PASS
 
 Ainda pendente: provisionamento operacional da master key/secret manager, persistência de endpoint/source
-configuração, worker assíncrono e conformance externa. `.handstack-codex/COMPLETE` continua proibido.
+configuração, worker assíncrono e conformance externa. `the completion marker` continua proibido.
 
 ### Incremento 97: Durable tenant webhook endpoint configuration (M57)
 
@@ -4634,7 +4634,7 @@ de limite informativo de 5000 nós permanece sem impacto na validação estrutur
 - [x] webhooks lint/typecheck/test/build PASS; API typecheck/test PASS (18 arquivos, 40 testes)
 
 Adapters de fila duráveis e execução contínua em deployment permanecem pendentes; o contrato está pronto
-para integração com `DistributedJobQueue`/BullMQ. `.handstack-codex/COMPLETE` segue proibido.
+para integração com `DistributedJobQueue`/BullMQ. `the completion marker` segue proibido.
 
 `graph:update + graph:validate` após M58: PASS (5071 nós, 6896 links dirigidos, 0 tokens); limite
 informativo de 5000 nós excedido sem falha estrutural.
@@ -4648,7 +4648,7 @@ informativo de 5000 nós excedido sem falha estrutural.
 - [x] webhooks lint/typecheck/test/build PASS; API typecheck/build/test PASS (18 arquivos, 40 testes)
 
 Persistem pendências de auditoria externa, retenção/limpeza de logs, adapter de fila durável e conformance
-dos bancos externos. `.handstack-codex/COMPLETE` não deve ser criado.
+dos bancos externos. `the completion marker` não deve ser criado.
 
 `graph:update + graph:validate` após M59: PASS (5073 nós, 6898 links dirigidos, 0 tokens).
 
@@ -4661,7 +4661,7 @@ dos bancos externos. `.handstack-codex/COMPLETE` não deve ser criado.
 - [x] webhooks lint/typecheck/test/build PASS; API typecheck PASS
 
 Permanecem pendentes job de limpeza agendado, métricas/auditoria externa, adapters de fila duráveis e
-conformance real dos cinco bancos. `.handstack-codex/COMPLETE` continua proibido.
+conformance real dos cinco bancos. `the completion marker` continua proibido.
 
 `graph:update + graph:validate` após M60: PASS (5078 nós, 6903 links dirigidos, 0 tokens).
 
@@ -4673,7 +4673,7 @@ conformance real dos cinco bancos. `.handstack-codex/COMPLETE` continua proibido
 - [x] webhooks lint/typecheck/test/build PASS; API typecheck/build PASS
 
 Ainda pendentes métricas/auditoria operacional, integração do worker com scheduler/queue de produção e
-conformance externa dos bancos. `.handstack-codex/COMPLETE` permanece proibido.
+conformance externa dos bancos. `the completion marker` permanece proibido.
 
 `graph:update + graph:validate` após M61: PASS (5084 nós, 6912 links dirigidos, 0 tokens).
 
@@ -4686,7 +4686,7 @@ conformance externa dos bancos. `.handstack-codex/COMPLETE` permanece proibido.
 - [x] webhooks lint/typecheck/test/build PASS; API typecheck/build PASS
 
 Observabilidade real, dashboards/alertas e auditoria centralizada continuam pendentes junto à conformance
-externa. `.handstack-codex/COMPLETE` não deve ser criado.
+externa. `the completion marker` não deve ser criado.
 
 `graph:update + graph:validate` após M62: PASS (5088 nós, 6916 links dirigidos, 0 tokens).
 
@@ -4699,7 +4699,7 @@ externa. `.handstack-codex/COMPLETE` não deve ser criado.
 - [x] webhooks lint/typecheck/test/build PASS; API typecheck/build PASS
 
 Persistem integração operacional com auditoria/SIEM, dashboards/alertas, filas duráveis e conformance
-externa. `.handstack-codex/COMPLETE` continua proibido.
+externa. `the completion marker` continua proibido.
 
 `graph:update + graph:validate` após M63: PASS (5092 nós, 6920 links dirigidos, 0 tokens).
 
@@ -4727,7 +4727,7 @@ worker HTTP real e rotação de segredos permanecem pendentes.
 
 Limitação registrada: configuração de endpoint permanece em memória e deve migrar para secret/config
 provider durável com rotação e overlap; worker assíncrono dedicado, auditoria de replay e conformance
-externa dos bancos ainda estão pendentes. `.handstack-codex/COMPLETE` segue proibido.
+externa dos bancos ainda estão pendentes. `the completion marker` segue proibido.
 
 Verificação global pós-M53 em 2026-09-09:
 
@@ -4747,7 +4747,7 @@ pnpm build                                      PASS (49 tarefas)
 
 Próximo passo efetivo: adaptar o store de webhook a um repository tenant-scoped real, ou implementar
 um boundary equivalente para access/agents; conformance externo e demais hardening enterprise seguem
-pendentes. Não criar `.handstack-codex/COMPLETE`.
+pendentes. Não criar `the completion marker`.
 
 Verificação estrutural pós-M40 em 2026-09-09:
 
@@ -4774,7 +4774,7 @@ pnpm build                                      PASS (49 tarefas)
 
 Próximo passo efetivo: integrar esse store ao runtime NestJS mediante `DatabaseService` opcional e
 avaliar a mesma fronteira para access/agents. Conformance dos adapters externos e hardening enterprise
-continuam pendentes; `.handstack-codex/COMPLETE` segue proibido.
+continuam pendentes; `the completion marker` segue proibido.
 
 ### Incremento 82: API webhook durable-store integration (M42)
 
@@ -4785,7 +4785,7 @@ continuam pendentes; `.handstack-codex/COMPLETE` segue proibido.
 
 Próximo passo efetivo: adicionar endpoint/worker de entrega webhook somente após definir autorização
 e configuração tenant-scoped; em paralelo, avaliar persistência de access/agents. Conformance externo,
-hardening enterprise e `.handstack-codex/COMPLETE` continuam pendentes.
+hardening enterprise e `the completion marker` continuam pendentes.
 
 ### Incremento 83: Durable access governance store (M43)
 
@@ -4808,7 +4808,7 @@ será feita separadamente para não quebrar consumidores existentes.
 
 Próximo passo efetivo: validar round-trip SQLite dos repositórios `access-requests`/`access-grants` e
 adicionar índices/migration se necessário; depois auditar persistência de agents. Conformance externo,
-hardening enterprise e `.handstack-codex/COMPLETE` permanecem pendentes.
+hardening enterprise e `the completion marker` permanecem pendentes.
 
 Verificação global pós-M44 em 2026-09-09:
 
@@ -4829,7 +4829,7 @@ pnpm build                                      PASS (49 tarefas)
 ```
 
 Próximo passo efetivo: revisar adapters de produção e executar conformance externo quando os
-serviços estiverem disponíveis; não criar `.handstack-codex/COMPLETE` enquanto essas pendências e
+serviços estiverem disponíveis; não criar `the completion marker` enquanto essas pendências e
 a auditoria integral da especificação existirem.
 
 Verificação global pós-M37 em 2026-09-09:
@@ -4871,7 +4871,7 @@ eliminou esse erro de integração. Próximo passo: aplicar a mesma conformance 
 
 Próximo passo efetivo: integrar `RepositoryAgentStore` ao `AgentRuntimeService` com fallback em memória
 e validar round-trip SQLite, incluindo normalização de datas e publicação exclusiva. Não criar
-`.handstack-codex/COMPLETE` enquanto a conformance e as pendências enterprise permanecerem abertas.
+`the completion marker` enquanto a conformance e as pendências enterprise permanecerem abertas.
 
 ### Incremento 120: Atomic agent version publication (M100)
 
@@ -4882,7 +4882,7 @@ e validar round-trip SQLite, incluindo normalização de datas e publicação ex
 
 Limitações permanecem deliberadas: conformance real PostgreSQL/MySQL/MariaDB/SQL Server/MongoDB, Docker
 com daemon, adapters de infraestrutura externos e auditoria integral da especificação ainda não foram
-verificados. `.handstack-codex/COMPLETE` continua proibido.
+verificados. `the completion marker` continua proibido.
 
 Próximo passo efetivo: executar gates globais e revisar a matriz de requisitos para escolher a próxima
 lacuna material, priorizando persistência/transação dos demais runtimes ou conformance externa disponível.
@@ -4973,7 +4973,7 @@ packages/cli typecheck/build/lint               PASS
 
 Próximo passo efetivo: corrigir qualquer falha dos gates globais/docs e validar o fluxo do binário
 contra SQLite em arquivo; depois revisar a próxima lacuna enterprise (audit durável, Redis real,
-conformance externa e backup restore operacional). `.handstack-codex/COMPLETE` continua proibido.
+conformance externa e backup restore operacional). `the completion marker` continua proibido.
 
 ### Incremento 123: workflow step execution checkpoints (M101)
 
@@ -4993,7 +4993,7 @@ apps/api workflow tests: vitest 3/3, eslint PASS, tsc typecheck PASS, tsc build 
 
 Pendências globais permanecem: conformance real PostgreSQL/MySQL/MariaDB/SQL Server/MongoDB, Docker
 com daemon, adapters externos, observabilidade/auditoria operacional completa e revisão integral da
-matriz da especificação. `.handstack-codex/COMPLETE` continua proibido.
+matriz da especificação. `the completion marker` continua proibido.
 
 Próximo passo efetivo: executar os gates globais com os binários locais disponíveis e revisar a próxima
 lacuna material de durabilidade/conformance, priorizando propagação de falhas de checkpoint e testes
@@ -5015,7 +5015,7 @@ código; requer apenas restauração/disponibilização do gerenciador para a co
 
 Próximo passo efetivo: restaurar o comando global quando `pnpm` estiver disponível e, em paralelo,
 adicionar teste de recuperação de checkpoint após crash/restart e revisar a matriz de conformance dos
-adapters externos. `.handstack-codex/COMPLETE` continua proibido.
+adapters externos. `the completion marker` continua proibido.
 
 ### Incremento 125: workflow checkpoint recovery (concluído e verificado)
 
@@ -5042,7 +5042,7 @@ preservando paginação máxima de 200 e testes de recuperação/auditoria após
 Atualização desta sessão (2026-09-09): o código atual já contém a implementação do incremento
 M125 (checkpoint de `currentNodeId`, `recover` no runtime/serviço e teste de restart), mas os gates
 da sessão ainda precisam ser executados para confirmar o estado efetivo. Após os gates, registrar
-qualquer correção necessária e escolher a próxima lacuna material; não criar `.handstack-codex/COMPLETE`.
+qualquer correção necessária e escolher a próxima lacuna material; não criar `the completion marker`.
 
 ### Incremento 126: histórico de checkpoints de workflow (concluído e verificado)
 
@@ -5082,7 +5082,7 @@ prettier focal, lint, typecheck e build: PASS
 
 Próximo passo efetivo: concluir a rodada global desta sessão, depois priorizar a próxima lacuna
 material da matriz (conformance externa, adapters de infraestrutura, ou hardening enterprise).
-O marcador `.handstack-codex/COMPLETE` continua proibido enquanto houver requisitos ou verificações
+O marcador `the completion marker` continua proibido enquanto houver requisitos ou verificações
 pendentes.
 
 Verificação global pós-M127 em 2026-09-10:
@@ -5142,13 +5142,13 @@ não está no PATH; Node 26.7.0 está fora da matriz declarada 22/24 e emite o w
 
 Próximo passo efetivo: validar o binário `handstack audit` com SQLite em arquivo e depois
 priorizar conformance externa ou a próxima lacuna de produção (Redis/BullMQ/HA). Não criar
-`.handstack-codex/COMPLETE`.
+`the completion marker`.
 
 ### Incremento 130: validação end-to-end do audit CLI com SQLite (em andamento)
 
 Contexto confirmado antes da execução: o CLI já inicializa o adapter configurado por ambiente,
 usa `RepositoryAuditSink` persistente e o adapter SQLite aceita `file:` com autosave. A validação
-será feita em arquivo temporário dentro de `.handstack-codex`, sem alterar dados do usuário.
+será feita em arquivo temporário dentro de `the supervisor workspace`, sem alterar dados do usuário.
 
 - [ ] Inicializar SQLite persistente e gravar evento auditável
 - [ ] Executar o binário real `handstack audit verify|checkpoint|export`
@@ -5159,7 +5159,7 @@ registrar evidência e escolher a próxima lacuna operacional.
 
 Preparação da execução 2026-09-10: contexto dos entrypoints `packages/cli/src/bin.ts`,
 `audit-command.ts`, `file-runtime.ts` e do seed SQLite relido. O smoke usará somente um arquivo
-SQLite temporário em `.handstack-codex`, com `HANDSTACK_PORTABLE_SIGNING_KEY` efêmera; o arquivo
+SQLite temporário em `the supervisor workspace`, com `HANDSTACK_PORTABLE_SIGNING_KEY` efêmera; o arquivo
 será removido ao final se a execução concluir, preservando apenas evidência no ledger.
 
 Execução iniciada em 2026-09-10: antes do smoke será recompilado o CLI e seus workspaces dependentes.
@@ -5176,7 +5176,7 @@ secundário será confirmado ausente.
 - [x] `export` PASS: 3 linhas JSON Lines, 1 tenant (`org-smoke-130`), 1313 bytes
 - [x] Persistência entre reinicializações e isolamento tenant-scoped confirmados
 
-Comando executado com `HANDSTACK_DATABASE_URL=file:.handstack-codex/audit-smoke-130.db`:
+Comando executado com `HANDSTACK_DATABASE_URL=file:the supervisor workspace/audit-smoke-130.db`:
 
 ```text
 node packages/cli/dist/bin.js audit verify --tenant org-smoke-130       PASS
@@ -5187,7 +5187,7 @@ node packages/cli/dist/bin.js audit export --tenant org-smoke-130 ...    PASS
 Próximo passo efetivo: revisar os requisitos M18 de Redis/filas e HA e implementar a próxima
 fronteira verificável localmente, começando pelo comportamento de falha/backpressure do provider
 de filas; conformance dos cinco bancos, serviços externos e builds Docker com daemon continuam
-pendentes. `.handstack-codex/COMPLETE` continua proibido.
+pendentes. `the completion marker` continua proibido.
 
 ### Incremento 131: queue transport failure boundary (concluído e verificado)
 
@@ -5250,7 +5250,7 @@ e registrados acima.
 - [x] Teste offline cobre deduplicação, isolamento de nomes, round-trip e DLQ
 - [x] Prettier, ESLint, typecheck, build e Vitest do package jobs PASS (7 testes)
 - [ ] Conformance contra Redis/BullMQ real, Sentinel/Cluster, métricas/heartbeat de worker e
-      graceful shutdown ainda dependem de infraestrutura externa; `.handstack-codex/COMPLETE`
+      graceful shutdown ainda dependem de infraestrutura externa; `the completion marker`
       permanece proibido
 
 Verificação focal em 2026-09-10:
@@ -5295,7 +5295,7 @@ Este incremento implementará a fronteira portátil (sem dependência obrigatór
 - [ ] prettier, lint, typecheck, testes e build do package jobs
 
 Conformance Redis/BullMQ real, Sentinel/Cluster, KEDA e integração com processos externos continuam
-dependentes de infraestrutura; `.handstack-codex/COMPLETE` permanece proibido.
+dependentes de infraestrutura; `the completion marker` permanece proibido.
 
 Preparação/implementação 2026-09-10: `packages/jobs/src/index.ts` e `tests/jobs.test.ts` foram
 relidos antes da alteração. O incremento adiciona `JobProcessOptions`, cancelamento cooperativo
@@ -5313,7 +5313,7 @@ controlado e graceful shutdown. O teste offline cobre concorrência máxima, hea
 
 Próximo passo efetivo: executar os gates focais; corrigir falhas e então executar os gates globais.
 Conformance Redis/BullMQ real, Sentinel/Cluster, KEDA e integração com processos externos continuam
-dependentes de infraestrutura; `.handstack-codex/COMPLETE` permanece proibido.
+dependentes de infraestrutura; `the completion marker` permanece proibido.
 
 Verificação focal em 2026-09-09:
 
@@ -5331,7 +5331,7 @@ ambiente local Node 26.7.0, fora da matriz declarada Node 22/24.
 
 Próximo passo efetivo: executar os gates globais, atualizar/validar o grafo e auditar a próxima lacuna
 material de M18. Redis/BullMQ real, Sentinel/Cluster, KEDA, conformance dos adapters externos e Docker
-com daemon continuam pendentes; não criar `.handstack-codex/COMPLETE`.
+com daemon continuam pendentes; não criar `the completion marker`.
 
 Gates globais após M133 em 2026-09-09/10:
 
@@ -5402,7 +5402,7 @@ porque o ambiente usa Node 26.7.0, fora da matriz Node 22/24.
 
 Próximo passo efetivo: implementar a superfície UI administrativa de DLQ consumindo as três rotas
 novas, com ações condicionadas às permissões; em seguida retomar conformance Redis/BullMQ real e
-as lacunas de HA/observabilidade de M18. Não criar `.handstack-codex/COMPLETE`.
+as lacunas de HA/observabilidade de M18. Não criar `the completion marker`.
 
 ### Incremento 135: superfície web de administração de DLQ (concluído e verificado)
 
@@ -5467,7 +5467,7 @@ testável por injeção, preservando o modo compacto sem dependência obrigatór
 - [x] gates globais, documentação/rastreabilidade e grafo após a integração
 
 Redis real/Sentinel/Cluster, BullMQ conectado e conformance multi-node continuam dependentes de
-infraestrutura externa; `.handstack-codex/COMPLETE` permanece proibido.
+infraestrutura externa; `the completion marker` permanece proibido.
 
 Verificação focal em 2026-09-10:
 
@@ -5503,7 +5503,7 @@ o gate estrutural.
 Próximo passo efetivo: implementar a próxima lacuna verificável de M18, priorizando o wiring real
 do `BullMqJobTransport`/worker com Redis e depois endurecer HA dos manifests. Conformance externa
 dos adapters, Redis/Sentinel/Cluster real, KEDA e builds Docker com daemon continuam pendentes;
-`.handstack-codex/COMPLETE` permanece proibido.
+`the completion marker` permanece proibido.
 
 ### Incremento 137: worker BullMQ runtime (concluído e verificado focalmente)
 
@@ -5518,7 +5518,7 @@ ponte para o `BullMqJobTransport`, mantendo handlers de domínio injetáveis:
 - [x] testes offline do bootstrap/configuração e gates focais
 
 Redis real, Sentinel/Cluster, conformance multi-node, KEDA e execução Docker continuam pendentes;
-não criar `.handstack-codex/COMPLETE`.
+não criar `the completion marker`.
 
 Verificação focal em 2026-09-10:
 
@@ -5560,7 +5560,7 @@ impede conformance real Redis/BullMQ e builds locais de imagens, sem impedir os 
 Próximo passo efetivo: executar os gates globais, atualizar/validar o grafo e auditar a próxima
 lacuna material de M18. Conformance contra Redis/BullMQ real, Sentinel/Cluster, métricas de worker,
 KEDA, operação multi-node, conformance dos adapters externos e builds Docker com daemon continuam
-pendentes; não criar `.handstack-codex/COMPLETE`.
+pendentes; não criar `the completion marker`.
 
 ### Incremento 138: métricas operacionais do worker (em andamento)
 
@@ -5575,7 +5575,7 @@ injetáveis e sem payload sensível, conectadas aos eventos BullMQ e cobertas of
 - [ ] testes offline e gates focais do worker
 - [x] gates globais, documentação/rastreabilidade e grafo
 - [ ] conformance Redis/BullMQ real, exportação Prometheus e operação multi-node continuam
-      dependentes de infraestrutura/decisão operacional; `.handstack-codex/COMPLETE` permanece proibido
+      dependentes de infraestrutura/decisão operacional; `the completion marker` permanece proibido
 
 Próximo passo efetivo: concluir a fronteira de métricas e executar os gates focais; depois repetir os
 gates globais e atualizar o grafo.
@@ -5589,7 +5589,7 @@ gates globais e atualizar o grafo.
 - [x] Prettier, lint, typecheck, testes (5, sem skips) e build do worker
 - [ ] gates globais, documentação/rastreabilidade e grafo após a integração
 - [ ] exportação Prometheus, conformance Redis/BullMQ real e operação multi-node permanecem
-      pendentes; `.handstack-codex/COMPLETE` permanece proibido
+      pendentes; `the completion marker` permanece proibido
 
 Verificação focal em 2026-09-10:
 
@@ -5625,7 +5625,7 @@ código/documentação do projeto (resultados de `node_modules` foram desconside
 Próximo passo efetivo: auditar a implementação de Enterprise Hardening de Identity Providers,
 priorizando a lacuna local mais verificável entre HA de identidade, eventos/auditoria e contratos
 de integração; conformance externa, Prometheus, Redis/Sentinel/Cluster, multi-node e Docker seguem
-pendentes e `.handstack-codex/COMPLETE` não deve ser criado.
+pendentes e `the completion marker` não deve ser criado.
 
 ### Incremento 139: auditoria da superfície administrativa de identidade (concluído e verificado)
 
@@ -5640,7 +5640,7 @@ no interceptor, sem payloads, credenciais ou referências de segredo, cobrindo s
 - [x] gates focais de API
 - [ ] gates globais, documentação/rastreabilidade e grafo
 - [ ] conformance externa, Prometheus, Redis/Sentinel/Cluster, multi-node e Docker continuam
-      pendentes; `.handstack-codex/COMPLETE` permanece proibido
+      pendentes; `the completion marker` permanece proibido
 
 Verificação focal em 2026-09-10:
 
@@ -5677,7 +5677,7 @@ não invalida o gate.
 Próximo passo efetivo: auditar e implementar a próxima lacuna de M18 entre exportação operacional
 Prometheus/OpenTelemetry do worker e HA/observabilidade multi-node, priorizando uma fronteira local
 testável. Conformance Redis/BullMQ real, Sentinel/Cluster, KEDA, adapters externos e builds Docker
-com daemon continuam pendentes; `.handstack-codex/COMPLETE` permanece proibido.
+com daemon continuam pendentes; `the completion marker` permanece proibido.
 
 ### Incremento 140: exportação Prometheus do worker (concluído e verificado)
 
@@ -5693,7 +5693,7 @@ configurável para scrape operacional.
 - [x] testes offline e gates focais
 - [x] gates globais, documentação operacional, paridade localizada e grafo
 - [ ] Prometheus real, exportação OTLP de métricas, conformance Redis/BullMQ, multi-node e Docker
-      continuam pendentes; `.handstack-codex/COMPLETE` permanece proibido
+      continuam pendentes; `the completion marker` permanece proibido
 
 Verificação focal em 2026-09-10:
 
@@ -5740,7 +5740,7 @@ e métricas OTLP configuráveis por ambiente, mantendo o opt-in e o comportament
 - [ ] testes focais e documentação EN/pt-BR
 - [ ] gates globais e grafo após a integração
 - [ ] conformance externa, Redis/Sentinel/Cluster, multi-node e Docker continuam pendentes;
-      `.handstack-codex/COMPLETE` permanece proibido
+      `the completion marker` permanece proibido
 
 Próximo passo efetivo: implementar os contratos de métricas e o bootstrap OTLP; depois executar os
 gates focais e globais.
@@ -5768,7 +5768,7 @@ explícitos. Nenhum teste foi desabilitado.
 - [x] endpoint Prometheus `/metrics`, integração explícita NestJS e documentação EN/pt-BR
 - [x] gates focais e globais, paridade documental e grafo
 - [ ] exporter OTLP real, Prometheus externo, conformance Redis/BullMQ, HA/multi-node, adapters
-      externos e builds Docker continuam dependentes de infraestrutura externa; `.handstack-codex/COMPLETE`
+      externos e builds Docker continuam dependentes de infraestrutura externa; `the completion marker`
       permanece proibido
 
 Verificação final do incremento em 2026-09-10:
@@ -5819,7 +5819,7 @@ lint/typecheck/build dos pacotes e então repetir os gates globais e o grafo.
 Checkpoint M142 antes da edição (2026-09-10): serão fechados os caminhos de erro de observabilidade
 do MCP client/server e da fila distribuída, preservando hooks sem payloads, credenciais ou labels
 tenant-scoped. Depois da implementação: testes focais, gates dos três pacotes, gates globais e
-grafo. O marcador `.handstack-codex/COMPLETE` continua proibido enquanto houver conformance
+grafo. O marcador `the completion marker` continua proibido enquanto houver conformance
 externa, HA/multi-node ou Docker pendentes.
 
 M142 implementação concluída localmente: hooks MCP client/server cobrem respostas inválidas,
@@ -5839,7 +5839,7 @@ Gates globais pós-patch ainda em execução; não criar COMPLETE.
 - [x] gates globais e grafo
 - [ ] conformance Redis/BullMQ real, Sentinel/Cluster, OTLP/Prometheus externos, HA/multi-node,
       adapters externos e builds Docker continuam pendentes por infraestrutura/ambiente; não criar
-      `.handstack-codex/COMPLETE`
+      `the completion marker`
 
 Verificação global pós-M142 em 2026-09-10:
 
@@ -5876,7 +5876,7 @@ usuário ou modelo; a mesma função poderá ser reutilizada por workers e clien
 - [ ] testes focais e gates dos pacotes afetados
 - [ ] gates globais, documentação/rastreabilidade e grafo
 - [ ] conformance Redis/BullMQ real, HA/multi-node, exporters externos, adapters externos e Docker
-      continuam pendentes; `.handstack-codex/COMPLETE` permanece proibido
+      continuam pendentes; `the completion marker` permanece proibido
 
 Próximo passo efetivo: aplicar os patches da ponte e integração MCP, executar testes focais e
 corrigir qualquer regressão antes dos gates globais.
@@ -5902,7 +5902,7 @@ Verificação focal:
 - [x] testes focais e gates dos pacotes afetados
 - [ ] gates globais, documentação/rastreabilidade e grafo
 - [ ] conformance Redis/BullMQ real, HA/multi-node, exporters externos, adapters externos e Docker
-      continuam pendentes; `.handstack-codex/COMPLETE` permanece proibido
+      continuam pendentes; `the completion marker` permanece proibido
 
 Próximo passo efetivo: executar os gates globais, atualizar/validar o grafo e fechar M143 no ledger.
 
@@ -5915,7 +5915,7 @@ Próximo passo efetivo: executar os gates globais, atualizar/validar o grafo e f
 - [x] documentação EN/pt-BR atualizada e validada
 - [x] gates focais e globais, build e grafo
 - [ ] conformance Redis/BullMQ real, Sentinel/Cluster, HA/multi-node, exporters externos, adapters
-      externos e builds Docker continuam pendentes; `.handstack-codex/COMPLETE` permanece proibido
+      externos e builds Docker continuam pendentes; `the completion marker` permanece proibido
 
 Verificação global final do incremento em 2026-09-10:
 
@@ -5949,7 +5949,7 @@ fora das métricas.
 - [x] teste de integração do ciclo de vida e ausência de prompt na exposição Prometheus
 - [x] gates focais de lint/build e gates globais, documentação/rastreabilidade e grafo
 - [ ] conformance Redis/BullMQ real, Sentinel/Cluster, HA/multi-node, exporters externos, adapters
-      externos e Docker continuam pendentes; `.handstack-codex/COMPLETE` permanece proibido
+      externos e Docker continuam pendentes; `the completion marker` permanece proibido
 
 Verificação final em 2026-09-10:
 
@@ -5972,7 +5972,7 @@ O warning de engine permanece esperado porque o ambiente local usa Node 26.7.0, 
 suportada Node 22/24. O grafo foi validado no modo agregado por exceder 5.000 nós. O próximo passo
 efetivo é auditar a próxima lacuna local de M18, mantendo conformance Redis/BullMQ real,
 Sentinel/Cluster, HA/multi-node, exporters externos, adapters externos e Docker como pendências
-ambientais explícitas; `.handstack-codex/COMPLETE` continua proibido.
+ambientais explícitas; `the completion marker` continua proibido.
 
 ### Incremento 145: Helm Chart distribuído (em andamento)
 
@@ -5987,7 +5987,7 @@ recursos, graceful termination, anti-affinity e topology spread.
 - [ ] documentação e validação estrutural offline
 - [ ] gates globais e grafo
 - [ ] instalação/conformance em cluster real, failover Redis/banco, HA multi-zone e Docker
-      continuam dependentes de infraestrutura; `.handstack-codex/COMPLETE` permanece proibido
+      continuam dependentes de infraestrutura; `the completion marker` permanece proibido
 
 Próximo passo efetivo: criar os arquivos do chart e validar renderização/estrutura localmente.
 
@@ -6002,7 +6002,7 @@ Checkpoint M145 antes da implementação (2026-09-10): relidos `Chart.yaml`, o m
 consultado o Graphify com orçamento explícito de 1200 tokens. O chart será parametrizável, com
 Web/API/MCP stateless, seis classes de worker, HPA, KEDA opcional, PDB, NetworkPolicy, probes,
 recursos, ServiceAccount, Ingress e configuração externa de secrets. Não será criado
-`.handstack-codex/COMPLETE`; instalação em cluster real, failover e builds Docker permanecem
+`the completion marker`; instalação em cluster real, failover e builds Docker permanecem
 pendências ambientais.
 
 Correção M145 em 2026-09-10: a auditoria do render revelou que importar as chaves de Secret
@@ -6040,7 +6040,7 @@ pnpm graph:update && pnpm graph:validate              PASS (5730 nós, 7930 rela
 
 Pendências ambientais: instalação/conformance em cluster real, failover Redis/banco, HA
 multi-zone/multi-node, exporters externos, adapters externos e builds Docker. O marcador
-`.handstack-codex/COMPLETE` permanece proibido.
+`the completion marker` permanece proibido.
 
 Próximo passo efetivo: auditar a próxima lacuna local de M18, priorizando GitOps/configuração como
 código e validação offline de upgrade/rollback do chart, mantendo as conformance externas como
@@ -6075,7 +6075,7 @@ pnpm graph:update && pnpm graph:validate             PASS (5743 nós, 7942 rela�
 M146 está concluído localmente. O aviso de engine Node 26 permanece esperado fora da matriz
 Node 22/24; a execução real em cluster para upgrade/rollback ainda não foi possível. O próximo
 passo efetivo é auditar a próxima lacuna local de M18 em resiliência/DR e testes de carga,
-preservando as pendências de infraestrutura e sem criar `.handstack-codex/COMPLETE`.
+preservando as pendências de infraestrutura e sem criar `the completion marker`.
 
 ### Incremento 147: metadata completo no backup portátil (em andamento)
 
@@ -6085,7 +6085,7 @@ configuração, plugins e storage; secrets devem permanecer somente criptografad
 já assina frames e transporta índices/plugins/storage no manifest portátil, mas o header do backup
 não os expõe nem declara a origem/schema do banco. O próximo patch adicionará esse contrato ao
 header, manterá configuração redigida sem valores secretos e fará `restore` rejeitar headers
-incompletos antes de iniciar staging. Não será criado `.handstack-codex/COMPLETE`.
+incompletos antes de iniciar staging. Não será criado `the completion marker`.
 
 Próximo passo efetivo: alterar `packages/cli/src/backup-command.ts` e seus testes, executar gates
 focais e depois repetir os gates globais/documentação/grafo.
@@ -6113,7 +6113,7 @@ Verificação focal M147:
 - [x] Testes focais e build do CLI
 - [x] Gates globais, documentação e grafo
 - [ ] Conformance de restore em todos os bancos e drills reais de backup/restore/DR permanecem
-      dependentes dos serviços externos; `.handstack-codex/COMPLETE` continua proibido
+      dependentes dos serviços externos; `the completion marker` continua proibido
 
 Verificação global final do M147 em 2026-09-10:
 
@@ -6130,7 +6130,7 @@ python scripts/validate_graph.py               PASS (0 tokens)
 
 O warning de engine permanece esperado porque o ambiente local usa Node 26.7.0, fora da matriz
 suportada Node 22/24. Conformance de restore em todos os bancos e drills reais de backup/restore,
-failover, carga e DR permanecem dependentes de serviços/infraestrutura externa; `.handstack-codex/COMPLETE`
+failover, carga e DR permanecem dependentes de serviços/infraestrutura externa; `the completion marker`
 continua proibido.
 
 Próximo passo efetivo: auditar a próxima lacuna local em resiliência/DR e testes de carga, priorizando
@@ -6143,7 +6143,7 @@ idempotência, retry/DLQ, leases e graceful shutdown, mas não havia um comando 
 executasse cenários determinísticos nem um relatório de capacidade reproduzível. Serão adicionados
 um gate offline baseado na suíte de jobs, um relatório versionado com SLOs/limites e runbooks EN/
 pt-BR. Redis/banco failover, partição de rede, outage de zona/região e carga distribuída real
-continuam explicitamente dependentes de infraestrutura; `.handstack-codex/COMPLETE` permanece
+continuam explicitamente dependentes de infraestrutura; `the completion marker` permanece
 proibido.
 
 Próximo passo efetivo: adicionar o comando `resilience:validate`, os cenários offline e os dois
@@ -6177,7 +6177,7 @@ npx --yes pnpm@10.17.1 graph:validate           PASS (0 tokens)
 - [x] Runbooks EN/pt-BR e validação documental
 - [x] Gates focais, globais, build, formatação e grafo
 - [ ] Load/spike/soak distribuídos, failover Redis/banco, partição, zona/região e restore real
-      continuam dependentes de infraestrutura; `.handstack-codex/COMPLETE` permanece proibido
+      continuam dependentes de infraestrutura; `the completion marker` permanece proibido
 
 O warning de engine Node 26.7.0 permanece esperado fora da matriz suportada Node 22/24. O gate
 offline não substitui certificação de capacidade nem os drills reais exigidos pela especificação.
@@ -6205,7 +6205,7 @@ filas, workers, Redis, banco, providers, budgets e storage, regras de alerta com
 offline de referências/privacidade e runbooks operacionais EN/pt-BR. O gate focal
 `pnpm observability:validate` passou (39 métricas, 12 painéis, 10 alertas). Antes dos gates
 globais, o próximo passo é repetir formatação, documentação, lint, typecheck, testes, build e
-Graphify; `.handstack-codex/COMPLETE` permanece proibido.
+Graphify; `the completion marker` permanece proibido.
 
 ### Incremento 149: dashboards e alertas operacionais (concluído localmente)
 
@@ -6215,7 +6215,7 @@ Graphify; `.handstack-codex/COMPLETE` permanece proibido.
 - [x] Runbooks EN/pt-BR e documentação de operação
 - [x] Gate focal, gates globais e grafo aprovados nesta retomada
 - [ ] Exporters Prometheus/OTLP externos, dashboards instalados e certificação em infraestrutura
-      real continuam dependentes de serviços/cluster; `.handstack-codex/COMPLETE` continua proibido
+      real continuam dependentes de serviços/cluster; `the completion marker` continua proibido
 
 Verificação global final do M149 em 2026-09-10:
 
@@ -6234,7 +6234,7 @@ O warning de engine Node 26.7.0 permanece esperado fora da matriz suportada Node
 Prometheus/OTLP externos, instalação em Grafana/Prometheus e certificação de métricas/alertas em
 cluster real continuam pendentes de infraestrutura. O próximo passo efetivo é auditar a próxima
 lacuna local de M18 em incidentes, release operations e DR, mantendo essas conformance externas
-explícitas; `.handstack-codex/COMPLETE` permanece proibido.
+explícitas; `the completion marker` permanece proibido.
 
 ### Auditoria M150 — incidentes, suporte e release operations (checkpoint 2026-09-10)
 
@@ -6250,7 +6250,7 @@ provider de status/comunicação substituível, persistência tenant-scoped e AP
 timeline e transições fail-closed, acompanhado de testes de autorização/idempotência e artigos
 EN/pt-BR. Depois adicionar o gate offline de support matrix/proveniência de release. Conformance
 com PagerDuty/StatusPage, assinatura/SBOM real e drills de DR permanecem dependentes de ambiente
-externo; não criar `.handstack-codex/COMPLETE`.
+externo; não criar `the completion marker`.
 
 Checkpoint M150 antes da edição (2026-09-10): o núcleo inicial de Incident já existe, porém ações
 de postmortem não podem ser acompanhadas, não há política de escalonamento/on-call nem despacho
@@ -6291,7 +6291,7 @@ pnpm --filter @handstack/api build            PASS
 
 Próximo passo efetivo: implementar o gate offline de support matrix/proveniência de release e
 runbooks correspondentes; depois repetir os gates globais, documentação e grafo. O marcador
-`.handstack-codex/COMPLETE` continua proibido enquanto existirem as conformance externas e
+`the completion marker` continua proibido enquanto existirem as conformance externas e
 requisitos ainda não auditados.
 
 Checkpoint M151 antes da edição (2026-09-10): a seção 159 exige support matrix publicada por
@@ -6300,14 +6300,14 @@ permission diff e compatibilidade de upgrade. O repositório só possui a matriz
 validação do chart Helm. Próximo patch: adicionar contrato JSON versionado com evidências
 redigidas, validador offline `release:validate`, integração CI e runbooks EN/pt-BR. Assinatura
 criptográfica real, SBOM gerada no pipeline e certificação de upgrades em infraestrutura ficam
-explicitamente pendentes; não criar `.handstack-codex/COMPLETE`.
+explicitamente pendentes; não criar `the completion marker`.
 
 Checkpoint M151-A antes da edição (2026-09-10): o contrato e o validador de release já existem,
 mas a auditoria mostrou cobertura incompleta da seção 159: faltam vector stores/object storage,
 janela explícita de upgrade das duas versões estáveis anteriores e um artefato referenciado de
 permission diff. O próximo patch adicionará esses campos, validação estrutural offline e evidência
 redigida; assinatura criptográfica real, SBOM gerada no pipeline e certificação em infraestrutura
-continuam pendentes. `.handstack-codex/COMPLETE` permanece proibido.
+continuam pendentes. `the completion marker` permanece proibido.
 
 Checkpoint M151-B antes da edição (2026-09-10): a matriz, os artefatos de integridade e o permission
 diff agora existem, porém o contrato ainda não torna verificáveis todas as obrigações operacionais
@@ -6317,7 +6317,7 @@ recuperação de certificados, signing keys, master keys, credenciais de provide
 accounts. O próximo incremento adicionará artefatos JSON redigidos, referências no manifesto,
 validação fail-closed e documentação EN/pt-BR. Assinatura criptográfica real, SBOM gerada no pipeline,
 testes em bancos/cluster reais e drills de recuperação continuam dependentes de infraestrutura;
-`.handstack-codex/COMPLETE` permanece proibido.
+`the completion marker` permanece proibido.
 
 Implementação M151-B em andamento: adicionados ao manifesto os contratos de evidência operacional
 para compatibilidade rolling, remediação de segurança e rotação de credenciais; criados os três
@@ -6396,7 +6396,7 @@ validasse de forma fail-closed deny-by-default, armazenamento externo de secrets
 idempotência, dead-letter, redaction e referências de adapters. O incremento adiciona esse contrato,
 um gate `integration:validate`, documentação EN/pt-BR e timeout efetivo no transporte HTTP de webhook.
 Conformance viva com PagerDuty/StatusPage, OIDC externo, Redis/providers reais e infraestrutura
-continuam dependentes de credenciais/serviços; `.handstack-codex/COMPLETE` permanece proibido.
+continuam dependentes de credenciais/serviços; `the completion marker` permanece proibido.
 
 Verificação focal M161 antes dos gates globais:
 
@@ -6414,7 +6414,7 @@ depois auditar a próxima lacuna de M18 mantendo as conformance externas explíc
 Checkpoint de retomada M161 em 2026-09-10: o contrato de integrações e o timeout do transporte
 HTTP já estão implementados. Antes de novas alterações estruturais, serão executados os gates
 globais de formatação, documentação, lint, typecheck, testes, build e Graphify. O marcador
-`.handstack-codex/COMPLETE` permanece proibido enquanto houver conformance externa ou requisito
+`the completion marker` permanece proibido enquanto houver conformance externa ou requisito
 sem verificação viva.
 
 Verificação global M161 em 2026-09-10: integration:validate, format:check, docs:validate,
@@ -6458,7 +6458,7 @@ npx --yes pnpm@10.17.1 docs:validate                          PASS (60 artigos, 
 ```
 
 Próximo passo efetivo: repetir gates globais de formatação, lint, typecheck, testes, build e
-Graphify; depois auditar a próxima lacuna local da especificação sem criar `.handstack-codex/COMPLETE`.
+Graphify; depois auditar a próxima lacuna local da especificação sem criar `the completion marker`.
 
 Verificação global M162-A em 2026-09-10:
 
@@ -6478,7 +6478,7 @@ deduplicação por fonte/hash, workflow de reindexação e migração de modelo 
 ligar a avaliação RAG (recall, precision, groundedness, citation validity, freshness e isolamento
 cross-tenant) ao contrato existente de `@handstack/evaluation`. Conectores vivos, stores vetoriais
 externos e avaliação em infraestrutura real continuam dependentes de adapters/serviços externos;
-`.handstack-codex/COMPLETE` permanece proibido.
+`the completion marker` permanece proibido.
 
 Checkpoint M163 pré-edição (2026-09-10): a implementação atual de Knowledge já garante ACL,
 isolamento por organização, sincronização, citações e detecção básica de conteúdo inseguro, mas
@@ -6487,7 +6487,7 @@ chunks quando o modelo muda. O pacote Evaluation já possui groundedness/citatio
 não expõe contrato/gate específico para recall, precision, freshness e isolamento cross-tenant.
 Próximo patch: adicionar índice canônico de documentos, reindexação versionada e helpers/metrics
 RAG reutilizáveis, com testes focais. Adapters de conectores/stores externos e avaliação viva
-continuam dependentes de infraestrutura; `.handstack-codex/COMPLETE` permanece proibido.
+continuam dependentes de infraestrutura; `the completion marker` permanece proibido.
 
 ### Incremento M163: deduplicação, reindexação e avaliação RAG (concluído localmente)
 
@@ -6517,7 +6517,7 @@ npx --yes pnpm@10.17.1 graph:validate              PASS (6092 nós, 8403 relaç�
 O warning conhecido de engine Node 26.7.0 fora da matriz >=22 <25 e a advertência do plugin ESLint
 do Next.js permanecem sem impacto nos gates. Próximo passo efetivo: auditar a próxima lacuna local
 da especificação, priorizando adapters duráveis de Knowledge e integração operacional do workflow
-de reindexação; `.handstack-codex/COMPLETE` permanece proibido.
+de reindexação; `the completion marker` permanece proibido.
 
 ### Incremento M164: índice e cursores duráveis de Knowledge (em verificação)
 
@@ -6534,12 +6534,12 @@ já confirmado. O contrato in-memory permanece disponível para testes offline.
 - [x] Documentação EN/pt-BR atualizada com construção e semântica de replay.
 - [x] Verificação focal: Knowledge typecheck, lint, 7 testes sem skips, build, docs:validate e
       Prettier dos arquivos alterados passaram via pnpm 10.17.1 em cache; Node 26.7 está fora da matriz.
-- [x] Gates globais foram executados após M164 e registrados na verificação de M165; `AGENTS.md`
+- [x] Gates globais foram executados após M164 e registrados na verificação de M165; `workspace instruction file`
       também foi normalizado pelo Prettier.
 - [ ] VectorStores/conectores externos e conformance viva continuam dependentes de infraestrutura.
 
 Próximo passo efetivo: auditar a próxima lacuna da seção 156, priorizando o workflow durável de
-reindexação/migração. `.handstack-codex/COMPLETE` continua proibido.
+reindexação/migração. `the completion marker` continua proibido.
 
 ### Incremento M165: lifecycle completo em Knowledge (em verificação)
 
@@ -6947,7 +6947,7 @@ packages/jobs/tests/jobs.test.ts`, mas o pnpm ficou bloqueado na verificação d
 - `install --offline --frozen-lockfile` com `auto-install-peers=false` falhou por
   `ERR_PNPM_NO_OFFLINE_TARBALL` para `@eslint/js@9.39.5`; `install --frozen-lockfile` no
   registry padrão falhou com EACCES nos downloads e deixou `node_modules` parcial.
-- O pnpm embutido do runtime Codex foi localizado, mas não produziu execução observável dentro da
+- O pnpm embutido do runtime local foi localizado, mas não produziu execução observável dentro da
   janela; tsc, Vitest, Prettier e turbo continuam ausentes em `node_modules/.bin`.
 
 ### M209 — bloqueio externo de dependências (2026-09-10)
@@ -7042,7 +7042,7 @@ packages/jobs/tests/jobs.test.ts`, mas o pnpm ficou bloqueado na verificação d
 
 - Nova verificação confirmou Node 24.19.0, pnpm 11.19.0, `packageManager: pnpm@10.17.1` e o
   SHA-256 do lockfile `9E380669FCFA1893FDB5875B3C7845293D4FE9E848F3ABE90815A9FE23D996C3`.
-- O pnpm embutido foi localizado no runtime Codex; Corepack não está disponível. A execução focal
+- O pnpm embutido foi localizado no runtime local; Corepack não está disponível. A execução focal
   voltou a falhar antes do teste por `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH` e `node_modules/.bin`
   continua sem tsc, Vitest, Prettier, turbo e eslint.
 - Não houve alteração de código, testes, lockfile ou especificação nesta sondagem; o próximo passo
@@ -7357,7 +7357,7 @@ packages/jobs/tests/jobs.test.ts`, mas o pnpm ficou bloqueado na verificação d
 
 - O manifesto raiz recebeu `packageManager: npm@11.19.0`, removendo a falha anterior de resolução do
   workspace pelo Turbo, sem alterar o `pnpm-lock.yaml` legado.
-- `npm run lint` avançou até o Turbo e falhou ao hashear `.handstack-codex/autopilot-v2.lock`, em uso pelo
+- `npm run lint` avançou até o Turbo e falhou ao hashear `the supervisor lock`, em uso pelo
   supervisor (Windows error 32). O lock é externo ao incremento e não foi removido ou alterado.
 - Os demais gates globais permanecem pendentes e não foram repetidos após essa falha determinística.
 
@@ -7377,7 +7377,7 @@ packages/jobs/tests/jobs.test.ts`, mas o pnpm ficou bloqueado na verificação d
 
 ### M281 — bloqueio externo confirmado (2026-09-11)
 
-- Nova sondagem confirmou que `.handstack-codex/autopilot-v2.lock` existe e permanece sob controle do
+- Nova sondagem confirmou que `the supervisor lock` existe e permanece sob controle do
   supervisor; não foi removido nem alterado.
 - O bloqueio do Turbo foi reproduzido em três tentativas consecutivas, e a alternativa de ESLint direto
   também não produziu resultado conclusivo. Não há próximo incremento local de gate executável sem mudança
@@ -7394,7 +7394,7 @@ packages/jobs/tests/jobs.test.ts`, mas o pnpm ficou bloqueado na verificação d
 
 ### M283 — estado externo sem mudança (2026-09-11)
 
-- Nova sondagem confirmou `.handstack-codex/autopilot-v2.lock` ainda existente; os gates globais não foram
+- Nova sondagem confirmou `the supervisor lock` ainda existente; os gates globais não foram
   repetidos por permanecerem bloqueados pelo mesmo estado externo.
 - Não houve alteração de código, dependências, lockfile, configuração de testes ou arquivos do supervisor.
 
@@ -7406,45 +7406,45 @@ packages/jobs/tests/jobs.test.ts`, mas o pnpm ficou bloqueado na verificação d
 
 ### M285 — bloqueio persistente confirmado (2026-09-11)
 
-- A terceira sondagem desde a retomada confirmou o mesmo `.handstack-codex/autopilot-v2.lock` ativo.
+- A terceira sondagem desde a retomada confirmou o mesmo `the supervisor lock` ativo.
 - Não houve mudança de código ou ambiente que permitisse executar os gates finais; o bloqueio depende da
   liberação do supervisor.
 
 ### M286 — bloqueio reincidente confirmado novamente (2026-09-11)
 
-- Após três turnos desde a última retomada, `.handstack-codex/autopilot-v2.lock` continua ativo e sem
+- Após três turnos desde a última retomada, `the supervisor lock` continua ativo e sem
   alteração de timestamp ou tamanho.
 - Não há próximo incremento local seguro para concluir os gates; nenhum arquivo do supervisor, lockfile,
   dependência ou configuração de teste foi alterado.
 
 ### M287 — bloqueio persistente após nova retomada (2026-09-11)
 
-- A terceira sondagem desde a última marcação de bloqueio confirmou `.handstack-codex/autopilot-v2.lock`
+- A terceira sondagem desde a última marcação de bloqueio confirmou `the supervisor lock`
   ainda ativo, sem mudança externa.
 - Não há próximo incremento local seguro para concluir os gates; o desbloqueio depende do supervisor.
 
 ### M288 — bloqueio reincidente confirmado (2026-09-11)
 
-- A terceira sondagem desde a última marcação de bloqueio confirmou `.handstack-codex/autopilot-v2.lock`
+- A terceira sondagem desde a última marcação de bloqueio confirmou `the supervisor lock`
   ainda ativo, sem mudança de estado externo.
 - Não há próximo incremento local seguro; o supervisor precisa liberar o lock para permitir os gates finais.
 
 ### M289 — bloqueio persistente confirmado novamente (2026-09-11)
 
-- A terceira sondagem desde a última marcação de bloqueio confirmou `.handstack-codex/autopilot-v2.lock`
+- A terceira sondagem desde a última marcação de bloqueio confirmou `the supervisor lock`
   ainda ativo e sem mudança externa.
 - Não há próximo incremento local seguro para concluir os gates; o desbloqueio depende do supervisor.
 
 ### M290 — bloqueio reincidente confirmado (2026-09-11)
 
-- A terceira sondagem desde a última marcação de bloqueio confirmou `.handstack-codex/autopilot-v2.lock`
+- A terceira sondagem desde a última marcação de bloqueio confirmou `the supervisor lock`
   ainda ativo, sem alteração externa.
 - Não há próximo incremento local seguro para concluir os gates; a ação de desbloqueio é o supervisor
   liberar o lock.
 
 ### M291 — bloqueio persistente após retomada (2026-09-11)
 
-- A terceira sondagem consecutiva desde a retomada confirmou `.handstack-codex/autopilot-v2.lock` ainda presente,
+- A terceira sondagem consecutiva desde a retomada confirmou `the supervisor lock` ainda presente,
   sem alteração desde 10/09/2026.
 - Os 104 requisitos continuam implementados no catálogo; não há incremento local seguro restante para concluir a
   auditoria dos gates.
@@ -7453,7 +7453,7 @@ packages/jobs/tests/jobs.test.ts`, mas o pnpm ficou bloqueado na verificação d
 
 ### M292 — bloqueio reincidente após retomada (2026-09-11)
 
-- A terceira sondagem consecutiva após M291 confirmou `.handstack-codex/autopilot-v2.lock` ainda presente, sem
+- A terceira sondagem consecutiva após M291 confirmou `the supervisor lock` ainda presente, sem
   alteração desde 10/09/2026.
 - Os 104 requisitos continuam implementados no catálogo e não há incremento local seguro restante para concluir os
   gates finais.
@@ -7461,7 +7461,7 @@ packages/jobs/tests/jobs.test.ts`, mas o pnpm ficou bloqueado na verificação d
 
 ### M293 — bloqueio persistente após nova retomada (2026-09-11)
 
-- A terceira sondagem consecutiva após M292 confirmou `.handstack-codex/autopilot-v2.lock` ainda presente, sem
+- A terceira sondagem consecutiva após M292 confirmou `the supervisor lock` ainda presente, sem
   alteração desde 10/09/2026.
 - Os 104 requisitos permanecem implementados no catálogo; não há incremento local seguro restante para concluir os
   gates finais.
@@ -7471,7 +7471,7 @@ packages/jobs/tests/jobs.test.ts`, mas o pnpm ficou bloqueado na verificação d
 
 - A sondagem curta confirmou Node v24.19.0, npm 11.19.0 e `node_modules/.bin/tsc.CMD` disponível.
 - O catálogo foi contado novamente: 104 requisitos, todos com `status: implemented`.
-- `.handstack-codex/autopilot-v2.lock` continua presente (0 bytes, atualizado em 10/09/2026); nenhum arquivo do
+- `the supervisor lock` continua presente (0 bytes, atualizado em 10/09/2026); nenhum arquivo do
   supervisor, lockfile, dependência ou configuração de teste foi alterado.
 - Não há próximo incremento local seguro identificável; os gates finais (`format:check`, `docs:validate`, `lint`,
   `typecheck`, `test` e `build`) dependem da liberação do lock pelo supervisor.
@@ -7485,7 +7485,7 @@ packages/jobs/tests/jobs.test.ts`, mas o pnpm ficou bloqueado na verificação d
 
 ### M296 — correção de contexto do lock do supervisor (2026-09-11)
 
-- O arquivo `.handstack-codex/autopilot-v2.lock` é criado pelo supervisor durante cada execução e não representa
+- O arquivo `the supervisor lock` é criado pelo supervisor durante cada execução e não representa
   bloqueio do projeto. Relatos que pedem sua liberação são stale e devem ser ignorados pelo agente.
 
 ### M297 — retomada do plano e incremento inicial do SDK (2026-09-28)
