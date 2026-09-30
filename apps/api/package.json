@@ -14,7 +14,7 @@
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
     "@fastify/helmet": "^13.0.1",
-    "@fastify/multipart": "^9.2.1",
+    "@fastify/multipart": "^10.1.2",
     "@handstack/access": "file:../../packages/access",
     "@handstack/agents": "file:../../packages/agents",
     "@handstack/audit": "file:../../packages/audit",
