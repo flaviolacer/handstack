@@ -1,6 +1,6 @@
 # HandStack
 
-[![CI](https://github.com/handstack/handstack/actions/workflows/ci.yml/badge.svg)](https://github.com/handstack/handstack/actions/workflows/ci.yml)
+[![CI](https://github.com/flaviolacer/handstack/actions/workflows/ci.yml/badge.svg)](https://github.com/flaviolacer/handstack/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](./LICENSE)
 [![Status: pre-1.0](https://img.shields.io/badge/status-pre--1.0-orange.svg)](./docs/roadmap.md)
 
