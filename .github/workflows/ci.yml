@@ -40,10 +40,10 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run docs:validate
+      - run: npm run build
       - name: Validate Compose profiles
         run: docker compose --profile postgres --profile mongodb --profile distributed -f deploy/docker-compose/compose.yaml config
       - run: npm test
-      - run: npm run build
 
   containers:
     name: Container builds
