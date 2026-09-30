@@ -49,6 +49,21 @@ interface RoleInput extends EntityInput {
   readonly description?: string;
 }
 
+interface UserUpdate {
+  readonly displayName?: string;
+  readonly email?: string;
+}
+
+interface GroupUpdate {
+  readonly name?: string;
+  readonly description?: string;
+}
+
+interface RoleUpdate {
+  readonly name?: string;
+  readonly description?: string;
+}
+
 function base(organizationId: string, id = uuidV7(), timestamp = new Date()) {
   return {
     id,
@@ -79,6 +94,121 @@ function duplicate(kind: string, value: string): never {
 
 export class IdentityAdministrationService {
   constructor(private readonly storage: IdentityStorage) {}
+
+  listUsers(organizationId: string): Promise<User[]> {
+    return all(this.storage.forOrganization(organizationId).users);
+  }
+
+  listGroups(organizationId: string): Promise<Group[]> {
+    return all(this.storage.forOrganization(organizationId).groups);
+  }
+
+  listRoles(organizationId: string): Promise<Role[]> {
+    return all(this.storage.forOrganization(organizationId).roles);
+  }
+
+  listGroupMemberships(organizationId: string): Promise<GroupMembership[]> {
+    return all(this.storage.forOrganization(organizationId).groupMemberships);
+  }
+
+  listPrincipalRoles(organizationId: string): Promise<PrincipalRole[]> {
+    return all(this.storage.forOrganization(organizationId).principalRoles);
+  }
+
+  listPermissions(organizationId: string): Promise<Permission[]> {
+    return all(this.storage.forOrganization(organizationId).permissions);
+  }
+
+  listRolePermissions(organizationId: string): Promise<RolePermission[]> {
+    return all(this.storage.forOrganization(organizationId).rolePermissions);
+  }
+
+  async listPrincipalPermissions(organizationId: string, principalId: string): Promise<string[]> {
+    const stores = this.storage.forOrganization(organizationId);
+    const roleIds = new Set(
+      (await all(stores.principalRoles))
+        .filter((item) => item.principalId === principalId)
+        .map((item) => item.roleId),
+    );
+    const permissionIds = new Set(
+      (await all(stores.rolePermissions))
+        .filter((item) => roleIds.has(item.roleId))
+        .map((item) => item.permissionId),
+    );
+    return (await all(stores.permissions))
+      .filter((permission) => permissionIds.has(permission.id))
+      .map((permission) => `${permission.resource}.${permission.action}`)
+      .sort();
+  }
+
+  async updateUser(organizationId: string, userId: string, input: UserUpdate): Promise<User> {
+    return this.storage.run(organizationId, async (stores) => {
+      const current = await stores.users.findById(userId);
+      const principal = await stores.principals.findById(userId);
+      if (current === undefined || principal === undefined) throw new Error('User not found');
+      const timestamp = new Date();
+      const displayName = input.displayName?.trim() ?? current.displayName;
+      const updatedPrincipal: Principal = {
+        ...principal,
+        displayName,
+        version: principal.version + 1,
+        updatedAt: timestamp,
+      };
+      const updated: User = {
+        ...current,
+        displayName,
+        ...(input.email === undefined ? {} : { email: input.email.trim().toLowerCase() }),
+        version: current.version + 1,
+        updatedAt: timestamp,
+      };
+      await stores.principals.update(updatedPrincipal, principal.version);
+      return stores.users.update(updated, current.version);
+    });
+  }
+
+  async updateGroup(organizationId: string, groupId: string, input: GroupUpdate): Promise<Group> {
+    return this.storage.run(organizationId, async (stores) => {
+      const current = await stores.groups.findById(groupId);
+      if (current === undefined) throw new Error('Group not found');
+      const name = input.name?.trim() ?? current.name;
+      const duplicateName = (await all(stores.groups)).some(
+        (item) => item.id !== groupId && item.name === name,
+      );
+      if (duplicateName) duplicate('group', name);
+      return stores.groups.update(
+        {
+          ...current,
+          name,
+          ...(input.description === undefined ? {} : { description: input.description.trim() }),
+          version: current.version + 1,
+          updatedAt: new Date(),
+        },
+        current.version,
+      );
+    });
+  }
+
+  async updateRole(organizationId: string, roleId: string, input: RoleUpdate): Promise<Role> {
+    return this.storage.run(organizationId, async (stores) => {
+      const current = await stores.roles.findById(roleId);
+      if (current === undefined) throw new Error('Role not found');
+      const name = input.name?.trim() ?? current.name;
+      const duplicateName = (await all(stores.roles)).some(
+        (item) => item.id !== roleId && item.name === name,
+      );
+      if (duplicateName) duplicate('role', name);
+      return stores.roles.update(
+        {
+          ...current,
+          name,
+          ...(input.description === undefined ? {} : { description: input.description.trim() }),
+          version: current.version + 1,
+          updatedAt: new Date(),
+        },
+        current.version,
+      );
+    });
+  }
 
   async createOrganization(input: {
     readonly id?: string;
@@ -167,6 +297,21 @@ export class IdentityAdministrationService {
     });
   }
 
+  async removePrincipalFromGroup(
+    organizationId: string,
+    groupId: string,
+    principalId: string,
+  ): Promise<boolean> {
+    return this.storage.run(organizationId, async (stores) => {
+      const existing = (await all(stores.groupMemberships)).find(
+        (item) => item.groupId === groupId && item.principalId === principalId,
+      );
+      if (existing === undefined) return false;
+      await stores.groupMemberships.delete(existing.id, existing.version);
+      return true;
+    });
+  }
+
   createRole(organizationId: string, input: RoleInput): Promise<Role> {
     return this.storage.run(organizationId, async (stores) => {
       const name = input.name.trim();
@@ -224,6 +369,36 @@ export class IdentityAdministrationService {
       );
       if (existing !== undefined) return existing;
       return stores.principalRoles.insert({ ...base(organizationId), principalId, roleId });
+    });
+  }
+
+  async unassignRole(
+    organizationId: string,
+    principalId: string,
+    roleId: string,
+  ): Promise<boolean> {
+    return this.storage.run(organizationId, async (stores) => {
+      const existing = (await all(stores.principalRoles)).find(
+        (item) => item.principalId === principalId && item.roleId === roleId,
+      );
+      if (existing === undefined) return false;
+      await stores.principalRoles.delete(existing.id, existing.version);
+      return true;
+    });
+  }
+
+  async revokePermission(
+    organizationId: string,
+    roleId: string,
+    permissionId: string,
+  ): Promise<boolean> {
+    return this.storage.run(organizationId, async (stores) => {
+      const existing = (await all(stores.rolePermissions)).find(
+        (item) => item.roleId === roleId && item.permissionId === permissionId,
+      );
+      if (existing === undefined) return false;
+      await stores.rolePermissions.delete(existing.id, existing.version);
+      return true;
     });
   }
 

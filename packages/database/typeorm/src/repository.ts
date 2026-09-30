@@ -23,6 +23,25 @@ function decodeCursor(cursor: string): CursorValue {
   }
 }
 
+function encodeAllCursor(record: EntityRecord): string {
+  return Buffer.from(JSON.stringify({ tenantId: record.tenantId, id: record.id })).toString(
+    'base64url',
+  );
+}
+
+function decodeAllCursor(cursor: string): { tenantId: string; id: string } {
+  try {
+    const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as {
+      tenantId?: unknown;
+      id?: unknown;
+    };
+    if (typeof value.tenantId !== 'string' || typeof value.id !== 'string') throw new Error();
+    return value as { tenantId: string; id: string };
+  } catch {
+    throw new TypeError('Invalid repository cursor');
+  }
+}
+
 function serialize(entity: TenantEntity): EntityRecord {
   const payload = Object.fromEntries(
     Object.entries(entity).filter(
@@ -87,6 +106,32 @@ export class TypeOrmRepository<T extends TenantEntity> implements Repository<T> 
     return {
       items: selected.map((record) => deserialize(record) as T),
       ...(hasMore && last !== undefined ? { nextCursor: encodeCursor(last) } : {}),
+    };
+  }
+
+  async listAll(page: PageRequest): Promise<Page<T>> {
+    if (!Number.isInteger(page.limit) || page.limit < 1 || page.limit > 200)
+      throw new RangeError('Page limit must be between 1 and 200');
+    const query = this.manager
+      .createQueryBuilder(entityRecordSchema, 'entity')
+      .where('entity.repository_name = :name', { name: this.name })
+      .orderBy('entity.tenant_id', 'ASC')
+      .addOrderBy('entity.id', 'ASC')
+      .take(page.limit + 1);
+    if (page.cursor !== undefined) {
+      const cursor = decodeAllCursor(page.cursor);
+      query.andWhere(
+        '(entity.tenant_id > :cursorTenantId OR (entity.tenant_id = :cursorTenantId AND entity.id > :cursorId))',
+        { cursorTenantId: cursor.tenantId, cursorId: cursor.id },
+      );
+    }
+    const records = await query.getMany();
+    const hasMore = records.length > page.limit;
+    const selected = records.slice(0, page.limit);
+    const last = selected.at(-1);
+    return {
+      items: selected.map((record) => deserialize(record) as T),
+      ...(hasMore && last !== undefined ? { nextCursor: encodeAllCursor(last) } : {}),
     };
   }
 

@@ -108,6 +108,7 @@ export class InAppNotificationProvider implements NotificationProvider {
 
 export interface SmtpTransport {
   send(input: {
+    readonly organizationId?: string;
     readonly to: string;
     readonly subject: string;
     readonly text: string;
@@ -118,12 +119,16 @@ export class SmtpNotificationProvider implements NotificationProvider {
   readonly channel = 'EMAIL' as const;
   constructor(
     private readonly transport: SmtpTransport,
-    private readonly resolveRecipient: (recipientId: string) => Promise<string>,
+    private readonly resolveRecipient: (
+      recipientId: string,
+      organizationId: string,
+    ) => Promise<string>,
   ) {}
   async send(notification: Notification): Promise<void> {
     validate(notification);
     await this.transport.send({
-      to: await this.resolveRecipient(notification.recipientId),
+      organizationId: notification.organizationId,
+      to: await this.resolveRecipient(notification.recipientId, notification.organizationId),
       subject: notification.subject,
       text: notification.body,
     });
@@ -174,7 +179,7 @@ export class FetchNotificationWebhookTransport implements NotificationWebhookTra
     this.timeoutMs = options.timeoutMs ?? 10_000;
     this.maxRequestBytes = options.maxRequestBytes ?? 1_000_000;
     this.maxResponseBytes = options.maxResponseBytes ?? 64_000;
-    if (!Number.isInteger(this.timeoutMs) || this.timeoutMs < 1 || this.timeoutMs > 120_000)
+    if (!Number.isInteger(this.timeoutMs) || this.timeoutMs < 1 || this.timeoutMs > 86_400_000)
       throw new ValidationError('Notification HTTP timeout is invalid');
     if (
       !Number.isInteger(this.maxRequestBytes) ||

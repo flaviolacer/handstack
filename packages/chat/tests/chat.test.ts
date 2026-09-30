@@ -31,6 +31,201 @@ function attachmentOptions() {
 }
 
 describe('chat persistence', () => {
+  it('redacts email, CPF and phone values before persistence and model execution', async () => {
+    const adapter = createDatabaseAdapter(
+      defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),
+    );
+    await adapter.initialize();
+    try {
+      const chat = new ChatService(adapter, () => new Date(), {
+        redactPii: true,
+        storePrompts: true,
+        storeResponses: true,
+      });
+      const conversation = await chat.createConversation({
+        organizationId,
+        title: 'PII redaction',
+        createdBy: 'privacy-owner',
+      });
+      const originalPrompt =
+        'Email person@example.com, CPF 123.456.789-09, phone +55 11 91234-5678';
+      const prompt = await chat.appendMessage({
+        organizationId,
+        conversationId: conversation.id,
+        branchId: conversation.activeBranchId,
+        role: 'user',
+        createdBy: 'privacy-owner',
+        parts: [
+          {
+            id: 'pii-prompt',
+            type: 'text',
+            text: originalPrompt,
+            uri: 'mailto:person@example.com',
+            data: { contact: { email: 'person@example.com' } },
+          },
+        ],
+      });
+      expect(prompt.parts).toEqual([
+        {
+          id: 'pii-prompt',
+          type: 'text',
+          text: 'Email [REDACTED_EMAIL], CPF [REDACTED_CPF], phone [REDACTED_PHONE]',
+          uri: 'mailto:[REDACTED_EMAIL]',
+          data: { contact: { email: '[REDACTED_EMAIL]' } },
+        },
+      ]);
+      const executionHistory = await chat.historyForExecution(
+        organizationId,
+        conversation.id,
+        conversation.activeBranchId,
+      );
+      expect(executionHistory[0]?.parts[0]?.text).toBe(
+        'Email [REDACTED_EMAIL], CPF [REDACTED_CPF], phone [REDACTED_PHONE]',
+      );
+
+      const response = await chat.startStream({
+        organizationId,
+        conversationId: conversation.id,
+        branchId: conversation.activeBranchId,
+        createdBy: 'privacy-owner',
+        modelDefinitionId: 'model-private',
+        providerId: 'provider-private',
+        idempotencyKey: 'pii-response-stream',
+      });
+      const delta = await chat.appendStreamEvent({
+        organizationId,
+        messageId: response.id,
+        type: 'DELTA',
+        idempotencyKey: 'pii-response-delta',
+        part: { id: 'pii-response', type: 'text', text: 'Contact other@example.com' },
+      });
+      expect(delta.part?.text).toBe('Contact [REDACTED_EMAIL]');
+    } finally {
+      await adapter.close();
+    }
+  });
+
+  it('omits prompt and response content when privacy storage is disabled', async () => {
+    const adapter = createDatabaseAdapter(
+      defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),
+    );
+    await adapter.initialize();
+    try {
+      const chat = new ChatService(adapter, () => new Date(), {
+        storePrompts: false,
+        storeResponses: false,
+      });
+      const conversation = await chat.createConversation({
+        organizationId,
+        title: 'Private prompt and response',
+        createdBy: 'privacy-owner',
+      });
+      const prompt = await chat.appendMessage({
+        organizationId,
+        conversationId: conversation.id,
+        branchId: conversation.activeBranchId,
+        role: 'user',
+        createdBy: 'privacy-owner',
+        parts: [{ id: 'prompt', type: 'text', text: 'private prompt text' }],
+      });
+      expect(prompt.parts).toEqual([{ id: 'prompt', type: 'text' }]);
+      expect(
+        (await chat.history(organizationId, conversation.id, conversation.activeBranchId))[0]
+          ?.parts,
+      ).toEqual([{ id: 'prompt', type: 'text' }]);
+      expect(
+        (
+          await chat.historyForExecution(
+            organizationId,
+            conversation.id,
+            conversation.activeBranchId,
+          )
+        )[0]?.parts,
+      ).toEqual([{ id: 'prompt', type: 'text', text: 'private prompt text' }]);
+
+      const response = await chat.startStream({
+        organizationId,
+        conversationId: conversation.id,
+        branchId: conversation.activeBranchId,
+        createdBy: 'privacy-owner',
+        modelDefinitionId: 'model-private',
+        providerId: 'provider-private',
+        idempotencyKey: 'privacy-response-stream',
+      });
+      const delta = await chat.appendStreamEvent({
+        organizationId,
+        messageId: response.id,
+        type: 'DELTA',
+        idempotencyKey: 'privacy-response-delta',
+        part: { id: 'response', type: 'text', text: 'private response text' },
+      });
+      expect(delta.part).toEqual({ id: 'response', type: 'text' });
+      const persisted = await chat.getMessage(organizationId, response.id);
+      expect(persisted.parts).toContainEqual({ id: 'response', type: 'text' });
+      expect(
+        JSON.stringify(
+          await chat.history(organizationId, conversation.id, conversation.activeBranchId),
+        ),
+      ).not.toContain('private prompt text');
+      expect(JSON.stringify(persisted)).not.toContain('private response text');
+    } finally {
+      await adapter.close();
+    }
+  });
+
+  it('omits tool-call and tool-result payloads when privacy storage is disabled', async () => {
+    const adapter = createDatabaseAdapter(
+      defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),
+    );
+    await adapter.initialize();
+    try {
+      const chat = new ChatService(adapter, () => new Date(), { storeToolPayloads: false });
+      const conversation = await chat.createConversation({
+        organizationId,
+        title: 'Private tool payloads',
+        createdBy: 'privacy-owner',
+      });
+      const message = await chat.startStream({
+        organizationId,
+        conversationId: conversation.id,
+        branchId: conversation.activeBranchId,
+        createdBy: 'privacy-owner',
+        modelDefinitionId: 'model-private',
+        providerId: 'provider-private',
+        idempotencyKey: 'privacy-tool-stream',
+      });
+      const payload = { arguments: { accountNumber: 'sensitive-value' } };
+      const event = await chat.appendStreamEvent({
+        organizationId,
+        messageId: message.id,
+        type: 'DELTA',
+        idempotencyKey: 'privacy-tool-call',
+        part: { id: 'call-1', type: 'tool_call', data: payload },
+      });
+      expect(event.part).toEqual({ id: 'call-1', type: 'tool_call' });
+      expect(JSON.stringify(await chat.getMessage(organizationId, message.id))).not.toContain(
+        'sensitive-value',
+      );
+
+      const stored = await chat.appendMessage({
+        organizationId,
+        conversationId: conversation.id,
+        branchId: conversation.activeBranchId,
+        role: 'assistant',
+        createdBy: 'privacy-owner',
+        parts: [{ id: 'result-1', type: 'tool_result', text: 'sensitive-value', data: payload }],
+      });
+      expect(stored.parts).toEqual([{ id: 'result-1', type: 'tool_result' }]);
+      expect(
+        JSON.stringify(
+          await chat.history(organizationId, conversation.id, conversation.activeBranchId),
+        ),
+      ).not.toContain('sensitive-value');
+    } finally {
+      await adapter.close();
+    }
+  });
+
   it('paginates visible conversations with an opaque validated cursor', async () => {
     const adapter = createDatabaseAdapter(
       defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),
@@ -347,6 +542,105 @@ describe('chat persistence', () => {
     }
   });
 
+  it('projects terminal assistant usage without exposing message content', async () => {
+    const adapter = createDatabaseAdapter(
+      defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),
+    );
+    await adapter.initialize();
+    try {
+      const chat = new ChatService(adapter);
+      const conversation = await chat.createConversation({
+        organizationId,
+        title: 'Usage projection',
+        createdBy: 'owner',
+      });
+      const completed = await chat.startStream({
+        organizationId,
+        conversationId: conversation.id,
+        branchId: conversation.activeBranchId,
+        createdBy: 'owner',
+        modelDefinitionId: 'model-1',
+        providerId: 'provider-1',
+        idempotencyKey: 'usage-start',
+      });
+      await chat.appendStreamEvent({
+        organizationId,
+        messageId: completed.id,
+        type: 'USAGE',
+        idempotencyKey: 'usage-metadata',
+        inputTokens: 10,
+        outputTokens: 5,
+        costUsd: 0.25,
+        latencyMs: 120,
+      });
+      await chat.appendStreamEvent({
+        organizationId,
+        messageId: completed.id,
+        type: 'DELTA',
+        idempotencyKey: 'usage-delta',
+        part: { id: 'secret-answer', type: 'text', text: 'private answer' },
+      });
+      await chat.appendStreamEvent({
+        organizationId,
+        messageId: completed.id,
+        type: 'COMPLETED',
+        idempotencyKey: 'usage-complete',
+      });
+
+      const failed = await chat.startStream({
+        organizationId,
+        conversationId: conversation.id,
+        branchId: conversation.activeBranchId,
+        createdBy: 'owner',
+        modelDefinitionId: 'model-2',
+        providerId: 'provider-2',
+        idempotencyKey: 'usage-failed-start',
+      });
+      await chat.appendStreamEvent({
+        organizationId,
+        messageId: failed.id,
+        type: 'FAILED',
+        idempotencyKey: 'usage-failed',
+        errorCode: 'PROVIDER_TIMEOUT',
+      });
+
+      await chat.appendMessage({
+        organizationId,
+        conversationId: conversation.id,
+        branchId: conversation.activeBranchId,
+        role: 'user',
+        createdBy: 'owner',
+        parts: [{ id: 'user-content', type: 'text', text: 'private prompt' }],
+      });
+
+      const usage = await chat.listUsage(organizationId);
+      expect(usage).toHaveLength(2);
+      expect(usage).toContainEqual({
+        id: completed.id,
+        organizationId,
+        principalId: 'owner',
+        scopeType: 'USER',
+        scopeKey: 'owner',
+        provider: 'provider-1',
+        model: 'model-1',
+        inputTokens: 10,
+        outputTokens: 5,
+        costUsd: 0.25,
+        latencyMs: 120,
+        outcome: 'SUCCESS',
+      });
+      expect(usage.find((record) => record.id === failed.id)).toMatchObject({
+        outcome: 'ERROR',
+        inputTokens: 0,
+        outputTokens: 0,
+      });
+      expect(JSON.stringify(usage)).not.toContain('private answer');
+      expect(JSON.stringify(usage)).not.toContain('private prompt');
+    } finally {
+      await adapter.close();
+    }
+  });
+
   it('edits, regenerates and retries through immutable replacement branches', async () => {
     const adapter = createDatabaseAdapter(
       defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),
@@ -641,6 +935,35 @@ describe('chat persistence', () => {
       ).resolves.toMatchObject({ status: 'DELETED', version: 2 });
       expect(support.objects.size).toBe(0);
       await expect(chat.getAttachment(organizationId, attachment.id)).rejects.toThrow(/not found/);
+    } finally {
+      await adapter.close();
+    }
+  });
+
+  it('records retention deletion as its actual system actor instead of impersonating the owner', async () => {
+    const adapter = createDatabaseAdapter(
+      defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),
+    );
+    await adapter.initialize();
+    try {
+      const chat = new ChatService(adapter);
+      const conversation = await chat.createConversation({
+        organizationId,
+        title: 'Expired conversation',
+        createdBy: 'conversation-owner',
+      });
+      await expect(
+        chat.deleteConversationForRetention({
+          organizationId,
+          conversationId: conversation.id,
+          actorId: 'system:privacy-retention-scheduler',
+        }),
+      ).resolves.toMatchObject({ status: 'DELETED' });
+      const audit = await chat.listAuditEvents(organizationId);
+      expect(audit.at(-1)).toMatchObject({
+        actorId: 'system:privacy-retention-scheduler',
+        operation: 'CONVERSATION_DELETED',
+      });
     } finally {
       await adapter.close();
     }

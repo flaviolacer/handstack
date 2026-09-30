@@ -7,7 +7,7 @@ permissions: [mcp.use, capability.execute]
 features: [mcp, capabilities, agents]
 deploymentProfiles: [compact, distributed]
 introducedIn: 0.8.0
-lastReviewedAt: 2026-09-09
+lastReviewedAt: 2026-09-28
 owner: platform-team
 tags: [mcp, tools, agents]
 ---
@@ -30,6 +30,13 @@ headers customizados; segredos ficam apenas em memória de runtime e nunca são 
 2. Execute `tools/list` via `discover` e revise os schemas retornados.
 3. Materialize as tools descobertas com `registerCapabilities`; elas são capabilities somente AGENT.
 4. Inclua os nomes na allowlist da AgentVersion e execute pelo AgentHarness.
+
+Se o servidor remoto reiniciar ou o processo stdio ficar indisponível, chame `reconnect` com a
+organização e o identificador do servidor. A operação fecha o transporte atual sem repetir uma
+chamada de tool potencialmente não idempotente; a próxima descoberta ou chamada cria um transporte
+novo, preservando o servidor registrado e o cache de descoberta.
+
+A operação equivalente na CLI é `handstack mcp reconnect --server <server-id>`.
 
 ## Verify
 

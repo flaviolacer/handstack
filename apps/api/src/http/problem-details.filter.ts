@@ -1,6 +1,8 @@
 import { Catch, type ArgumentsHost, type ExceptionFilter } from '@nestjs/common';
 import { toProblemDetails } from '@handstack/shared';
+import { RateLimitError } from '@handstack/shared';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { requestTraceContext } from '../auth/authentication-context.js';
 
 @Catch()
 export class ProblemDetailsFilter implements ExceptionFilter {
@@ -8,15 +10,15 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     const http = host.switchToHttp();
     const request = http.getRequest<FastifyRequest>();
     const response = http.getResponse<FastifyReply>();
-    const requestId = String(request.headers['x-request-id'] ?? request.id);
-    const traceId = String(request.headers['x-trace-id'] ?? requestId);
+    const { requestId, traceId } = requestTraceContext(request);
     const problem = toProblemDetails(exception, { instance: request.url, requestId, traceId });
 
-    void response
+    const reply = response
       .header('content-type', 'application/problem+json')
       .header('x-request-id', requestId)
-      .header('x-trace-id', traceId)
-      .status(problem.status)
-      .send(problem);
+      .header('x-trace-id', traceId);
+    if (exception instanceof RateLimitError && exception.retryAfterSeconds !== undefined)
+      reply.header('retry-after', String(exception.retryAfterSeconds));
+    void reply.status(problem.status).send(problem);
   }
 }

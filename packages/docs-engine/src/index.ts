@@ -49,6 +49,14 @@ export interface DocumentationSearchResult {
 }
 
 export function findWorkspaceRoot(start = dirname(fileURLToPath(import.meta.url))): string {
+  let runtimeRoot = resolve(/* turbopackIgnore: true */ process.cwd());
+  for (;;) {
+    if (existsSync(join(runtimeRoot, 'docs', 'content'))) return runtimeRoot;
+    const parent = dirname(runtimeRoot);
+    if (parent === runtimeRoot) break;
+    runtimeRoot = parent;
+  }
+
   let current = resolve(start);
   for (;;) {
     if (existsSync(join(current, 'package-lock.json'))) return current;
@@ -142,7 +150,7 @@ const requirementSchema = z.object({
   normativeStatement: z.string().min(1),
   rationale: z.string().min(1),
   owner: z.string().min(1),
-  status: z.enum(['planned', 'in-progress', 'implemented', 'verified']),
+  status: z.enum(['planned', 'in-progress', 'implemented', 'partial', 'verified']),
   risk: z.enum(['low', 'medium', 'high', 'critical']),
   affectedModules: z.array(z.string()).min(1),
   publicContracts: z.array(z.string()),
@@ -185,8 +193,13 @@ export function validateGovernance(
   const errors: string[] = [];
   const catalogPath = join(workspaceRoot, 'docs', 'requirements', 'catalog.yaml');
   const helpPath = join(workspaceRoot, 'docs', 'contextual-help.yaml');
+  const traceabilityPath = join(workspaceRoot, 'docs', 'requirements', 'traceability.md');
   const catalog = requirementCatalogSchema.parse(parse(readFileSync(catalogPath, 'utf8')));
   const contextualHelp = contextualHelpSchema.parse(parse(readFileSync(helpPath, 'utf8')));
+  const traceability = readFileSync(traceabilityPath, 'utf8');
+  const traceabilityIds = [
+    ...traceability.matchAll(/^\|\s*(HS-(?:CORE|SEC|DATA|AI|API|OPS|UX|DOC)-\d{3})\s*\|/gmu),
+  ].flatMap((match) => (match[1] === undefined ? [] : [match[1]]));
   const articleIdsByLocale = new Map(
     supportedLocales.map(
       (locale) =>
@@ -228,9 +241,24 @@ export function validateGovernance(
     }
   }
 
+  const catalogIdSet = new Set(catalog.requirements.map(({ id }) => id));
+  for (const id of catalogIdSet) {
+    const occurrences = traceabilityIds.filter((candidate) => candidate === id).length;
+    if (occurrences !== 1)
+      errors.push(
+        `${id} must occur exactly once in requirements traceability (found ${String(occurrences)})`,
+      );
+  }
+  for (const id of traceabilityIds) {
+    if (!catalogIdSet.has(id)) errors.push(`Traceability references unknown requirement: ${id}`);
+  }
+
   for (const target of contextualHelp.targets) {
     if (!existsSync(join(workspaceRoot, target.surface))) {
       errors.push(`Contextual help surface does not exist: ${target.surface}`);
+    }
+    if (!webRouteExists(workspaceRoot, target.route)) {
+      errors.push(`Contextual help route does not exist: ${target.route}`);
     }
     if (!allArticleIds.has(target.articleId)) {
       errors.push(`Contextual help article does not exist: ${target.articleId}`);
@@ -337,4 +365,26 @@ function validateOperationalTemplate(article: DocumentationArticle, errors: stri
       errors.push(`${article.locale}:${article.metadata.id} missing heading: ${heading}`);
     }
   }
+}
+
+function webRouteExists(workspaceRoot: string, route: string): boolean {
+  const appRoot = join(workspaceRoot, 'apps', 'web', 'app');
+  const segments = route.split('/').filter(Boolean);
+  return findWebRoutePage(appRoot, segments, 0);
+}
+
+function findWebRoutePage(directory: string, segments: readonly string[], index: number): boolean {
+  if (index === segments.length) {
+    return ['page.tsx', 'page.ts', 'page.jsx', 'page.js'].some((file) =>
+      existsSync(join(directory, file)),
+    );
+  }
+
+  const segment = segments[index];
+  if (segment === undefined) return false;
+  const candidates = [segment, `[${segment}]`, `[...${segment}]`, `[[...${segment}]]`];
+  return candidates.some((candidate) => {
+    const nextDirectory = join(directory, candidate);
+    return existsSync(nextDirectory) && findWebRoutePage(nextDirectory, segments, index + 1);
+  });
 }

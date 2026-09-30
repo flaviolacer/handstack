@@ -6,6 +6,7 @@ import {
   type TenantEntity,
 } from '@handstack/domain';
 import { ValidationError } from '@handstack/shared';
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 export type DataSourceType =
   | 'FILE'
@@ -37,6 +38,7 @@ export interface SyncCursor {
 export const knowledgeDocumentIndexRepository = repositoryName('knowledge-document-index');
 export const knowledgeSyncCursorRepository = repositoryName('knowledge-sync-cursors');
 export const knowledgeReindexJobRepository = repositoryName('knowledge-reindex-jobs');
+export const knowledgeDocumentVersionsRepository = repositoryName('knowledge-document-versions');
 
 export interface KnowledgeCitation {
   readonly chunkId: string;
@@ -71,6 +73,8 @@ export interface Document extends TenantEntity {
   readonly knowledgeBaseId: string;
   readonly sourceType: DataSourceType;
   readonly sourceLocator: string;
+  /** Vault reference only; connector credentials are never stored inline. */
+  readonly credentialReference?: string;
   readonly title: string;
   readonly contentDigest: string;
   readonly version: number;
@@ -83,6 +87,15 @@ export interface Document extends TenantEntity {
   readonly lastVerifiedAt: Date;
   readonly retentionPolicy: KnowledgeRetentionPolicy;
   readonly deletionStatus: DeletionStatus;
+}
+
+export interface DocumentVersion extends TenantEntity {
+  readonly organizationId: string;
+  readonly documentId: string;
+  readonly documentVersion: number;
+  readonly sourceVersion: string;
+  readonly contentDigest: string;
+  readonly createdBy?: string;
 }
 
 export interface Chunk extends TenantEntity {
@@ -122,6 +135,268 @@ export interface Embedding extends TenantEntity {
 }
 
 export type DataClassification = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED';
+
+export interface KnowledgeSourceFetchResult {
+  readonly content: string;
+  readonly sourceVersion?: string;
+}
+
+export type KnowledgeSourceUrlGuard = (url: string) => Promise<void>;
+export type KnowledgeSourceFetcher = (
+  url: string,
+  init: {
+    readonly signal: AbortSignal;
+    readonly redirect: 'error';
+    readonly headers: Record<string, string>;
+  },
+) => Promise<{ readonly ok: boolean; readonly status: number; text(): Promise<string> }>;
+
+/** Public HTTP connector used by the API after applying its SSRF policy. */
+export class HttpKnowledgeSourceConnector {
+  constructor(
+    private readonly guard: KnowledgeSourceUrlGuard,
+    private readonly fetcher: KnowledgeSourceFetcher = (url, init) => {
+      return fetch(url, init);
+    },
+    private readonly timeoutMs = 10_000,
+    private readonly maxBytes = 10_000_000,
+  ) {}
+
+  async fetch(locator: string): Promise<KnowledgeSourceFetchResult> {
+    return this.fetchWithHeaders(locator, { accept: 'text/plain,text/html,application/json' });
+  }
+
+  async fetchWithHeaders(
+    locator: string,
+    headers: Record<string, string>,
+  ): Promise<KnowledgeSourceFetchResult> {
+    await this.guard(locator);
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      controller.abort();
+    }, this.timeoutMs);
+    try {
+      const response = await this.fetcher(locator, {
+        signal: controller.signal,
+        redirect: 'error',
+        headers,
+      });
+      if (!response.ok)
+        throw new Error(`Knowledge connector returned HTTP ${String(response.status)}`);
+      const content = await response.text();
+      if (content.length > this.maxBytes)
+        throw new Error('Knowledge source exceeds the connector size limit');
+      return { content };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+
+export type KnowledgeCredentialResolver = (
+  organizationId: string,
+  reference: string,
+  connectorId: string,
+) => Promise<string | undefined>;
+
+export interface AuthenticatedKnowledgeSourceInput {
+  readonly organizationId: string;
+  readonly locator: string;
+  readonly credentialReference: string;
+}
+
+/** Bearer connector base for SaaS sources whose token is held by the tenant secret vault. */
+export class BearerKnowledgeSourceConnector {
+  constructor(
+    private readonly connectorId: string,
+    private readonly endpoint: (locator: string) => string,
+    private readonly guard: KnowledgeSourceUrlGuard,
+    private readonly credentials: KnowledgeCredentialResolver,
+    private readonly fetcher = new HttpKnowledgeSourceConnector(guard),
+    private readonly transform: (content: string) => string = (content) => content,
+  ) {}
+
+  async fetch(input: AuthenticatedKnowledgeSourceInput): Promise<KnowledgeSourceFetchResult> {
+    const token = await this.credentials(
+      input.organizationId,
+      input.credentialReference,
+      this.connectorId,
+    );
+    if (token === undefined || token.trim() === '')
+      throw new ValidationError(`${this.connectorId} credential reference could not be resolved`);
+    const url = this.endpoint(input.locator);
+    const result = await this.fetcher.fetchWithHeaders(url, {
+      accept: 'text/plain,application/json',
+      authorization: `Bearer ${token}`,
+    });
+    return { ...result, content: this.transform(result.content) };
+  }
+}
+
+export function googleDriveFileUrl(locator: string): string {
+  const match = /^(?:drive:\/\/|https:\/\/drive\.google\.com\/file\/d\/)([A-Za-z0-9_-]+)/u.exec(
+    locator,
+  );
+  if (match?.[1] === undefined)
+    throw new ValidationError('Google Drive locator must contain a file id');
+  return `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(match[1])}?alt=media`;
+}
+
+export function sharePointItemUrl(locator: string): string {
+  const match = /^sharepoint:\/\/([^/]+)\/([^/]+)$/u.exec(locator);
+  if (match?.[1] === undefined || match[2] === undefined)
+    throw new ValidationError('SharePoint locator must be sharepoint://driveId/itemId');
+  return `https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(match[1])}/items/${encodeURIComponent(match[2])}/content`;
+}
+
+export function notionPageUrl(locator: string): string {
+  const match = /^notion:\/\/([A-Za-z0-9-]+)$/u.exec(locator);
+  if (match?.[1] === undefined) throw new ValidationError('Notion locator must contain a page id');
+  return `https://api.notion.com/v1/blocks/${encodeURIComponent(match[1])}/children?page_size=100`;
+}
+
+export function confluencePageUrl(locator: string): string {
+  const match = /^confluence:\/\/([^/]+)\/([^/]+)$/u.exec(locator);
+  if (match?.[1] === undefined || match[2] === undefined)
+    throw new ValidationError('Confluence locator must be confluence://host/pageId');
+  return `https://${match[1]}/wiki/rest/api/content/${encodeURIComponent(match[2])}?expand=body.storage,version`;
+}
+
+export interface S3KnowledgeCredential {
+  readonly region: string;
+  readonly accessKeyId: string;
+  readonly secretAccessKey: string;
+  readonly sessionToken?: string;
+  readonly endpoint?: string;
+}
+
+export type S3KnowledgeCredentialResolver = (
+  organizationId: string,
+  reference: string,
+) => Promise<string | undefined>;
+
+export function parseS3KnowledgeLocator(locator: string): {
+  readonly bucket: string;
+  readonly key: string;
+} {
+  const match = /^s3:\/\/([^/]+)\/(.+)$/u.exec(locator);
+  if (match?.[1] === undefined || match[2] === undefined || match[2].includes('..'))
+    throw new ValidationError('S3 locator must be s3://bucket/key without traversal');
+  return { bucket: match[1], key: match[2] };
+}
+
+/** S3 Knowledge connector. Credentials are resolved by the API vault boundary, never stored in a document. */
+export class S3KnowledgeSourceConnector {
+  constructor(
+    private readonly credentials: S3KnowledgeCredentialResolver,
+    private readonly clientFactory: (credential: S3KnowledgeCredential) => S3Client = (
+      credential,
+    ) =>
+      new S3Client({
+        region: credential.region,
+        credentials: {
+          accessKeyId: credential.accessKeyId,
+          secretAccessKey: credential.secretAccessKey,
+          ...(credential.sessionToken === undefined
+            ? {}
+            : { sessionToken: credential.sessionToken }),
+        },
+        ...(credential.endpoint === undefined ? {} : { endpoint: credential.endpoint }),
+      }),
+    private readonly maxBytes = 10_000_000,
+  ) {}
+
+  async fetch(input: AuthenticatedKnowledgeSourceInput): Promise<KnowledgeSourceFetchResult> {
+    const raw = await this.credentials(input.organizationId, input.credentialReference);
+    if (raw === undefined || raw.trim() === '')
+      throw new ValidationError('knowledge-s3 credential reference could not be resolved');
+    let credential: S3KnowledgeCredential;
+    try {
+      credential = JSON.parse(raw) as S3KnowledgeCredential;
+    } catch {
+      throw new ValidationError('knowledge-s3 credential must be JSON');
+    }
+    if (!credential.region || !credential.accessKeyId || !credential.secretAccessKey)
+      throw new ValidationError('knowledge-s3 credential is incomplete');
+    const { bucket, key } = parseS3KnowledgeLocator(input.locator);
+    const response = await this.clientFactory(credential).send(
+      new GetObjectCommand({ Bucket: bucket, Key: key }),
+    );
+    const content = response.Body === undefined ? '' : await response.Body.transformToString();
+    if (content.length > this.maxBytes)
+      throw new Error('Knowledge source exceeds the connector size limit');
+    return { content, ...(response.ETag === undefined ? {} : { sourceVersion: response.ETag }) };
+  }
+}
+
+/** Converts the Confluence storage response to indexable text without retaining markup. */
+export function extractConfluenceText(content: string): string {
+  try {
+    const value = (JSON.parse(content) as { body?: { storage?: { value?: unknown } } }).body
+      ?.storage?.value;
+    if (typeof value !== 'string') return content;
+    return value
+      .replace(/<[^>]*>/gu, ' ')
+      .replace(/\s+/gu, ' ')
+      .trim();
+  } catch {
+    return content;
+  }
+}
+
+/** Extracts plain_text values from Notion's nested block response. */
+export function extractNotionText(content: string): string {
+  try {
+    const values: string[] = [];
+    const visit = (value: unknown): void => {
+      if (Array.isArray(value)) {
+        value.forEach(visit);
+        return;
+      }
+      if (value === null || typeof value !== 'object') return;
+      const record = value as Record<string, unknown>;
+      if (typeof record.plain_text === 'string') values.push(record.plain_text);
+      Object.values(record).forEach(visit);
+    };
+    visit(JSON.parse(content));
+    return values.join(' ').replace(/\s+/gu, ' ').trim() || content;
+  } catch {
+    return content;
+  }
+}
+
+/** Public GitHub connector. Private repositories require a future credential-aware plugin. */
+export class GitHubKnowledgeSourceConnector extends HttpKnowledgeSourceConnector {
+  override async fetch(locator: string): Promise<KnowledgeSourceFetchResult> {
+    return super.fetch(normalizeGitHubLocator(locator));
+  }
+}
+
+export function normalizeGitHubLocator(locator: string): string {
+  let url: URL;
+  try {
+    url = new URL(locator);
+  } catch {
+    throw new ValidationError('GitHub source URL is invalid');
+  }
+  if (url.protocol !== 'https:' || url.hostname.toLowerCase() !== 'github.com') {
+    if (url.protocol === 'https:' && url.hostname.toLowerCase() === 'raw.githubusercontent.com')
+      return url.toString();
+    throw new ValidationError('GitHub source must use github.com or raw.githubusercontent.com');
+  }
+  const parts = url.pathname.split('/').filter(Boolean);
+  if (parts.length < 5 || parts[2] !== 'blob')
+    throw new ValidationError('GitHub source must point to a blob URL');
+  const [owner, repository, , reference, ...path] = parts;
+  if (
+    owner === undefined ||
+    repository === undefined ||
+    reference === undefined ||
+    path.length === 0
+  )
+    throw new ValidationError('GitHub source path is incomplete');
+  return `https://raw.githubusercontent.com/${owner}/${repository}/${reference}/${path.join('/')}`;
+}
 
 export interface IngestionPolicyInput {
   readonly organizationId: string;
@@ -191,7 +466,12 @@ export interface DataSource {
 }
 
 export interface EmbeddingProvider {
-  embed(text: string, model: string, signal?: AbortSignal): Promise<readonly number[]>;
+  embed(
+    text: string,
+    model: string,
+    signal?: AbortSignal,
+    organizationId?: string,
+  ): Promise<readonly number[]>;
 }
 
 export interface KnowledgeDocumentIndex {
@@ -208,6 +488,7 @@ export interface KnowledgeDocumentIndex {
     readonly contentDigest: string;
     readonly chunks: readonly Chunk[];
   }): Promise<void>;
+  deleteBySubject?(organizationId: string, subjectId: string): Promise<number>;
 }
 
 interface KnowledgeDocumentIndexRecord extends TenantEntity {
@@ -287,6 +568,24 @@ export class RepositoryKnowledgeDocumentIndex implements KnowledgeDocumentIndex 
     };
     if (existing === undefined) await this.repository.insert(record);
     else await this.repository.update(record, existing.version);
+  }
+
+  async deleteBySubject(organizationId: string, subjectId: string): Promise<number> {
+    const page = await this.repository.list(organizationId, { limit: 200 });
+    let removed = 0;
+    for (const record of page.items) {
+      if (
+        !record.chunks.some(
+          (chunk) =>
+            chunk.sourceAcl.some((entry) => entry.principalId === subjectId) ||
+            chunk.metadata.subjectId === subjectId,
+        )
+      )
+        continue;
+      await this.repository.delete(organizationId, record.id, record.version);
+      removed += 1;
+    }
+    return removed;
   }
 }
 
@@ -442,6 +741,24 @@ export class InMemoryKnowledgeDocumentIndex implements KnowledgeDocumentIndex {
     );
     return Promise.resolve();
   }
+
+  deleteBySubject(organizationId: string, subjectId: string): Promise<number> {
+    let removed = 0;
+    for (const [key, chunks] of this.values) {
+      if (
+        !key.startsWith(`${organizationId}:`) ||
+        !chunks.some(
+          (chunk) =>
+            chunk.sourceAcl.some((entry) => entry.principalId === subjectId) ||
+            chunk.metadata.subjectId === subjectId,
+        )
+      )
+        continue;
+      this.values.delete(key);
+      removed += 1;
+    }
+    return Promise.resolve(removed);
+  }
 }
 
 export interface VectorMatch {
@@ -458,6 +775,7 @@ export interface VectorStore {
     readonly metadata: Readonly<Record<string, string>>;
   }): Promise<void>;
   delete(organizationId: string, ids: readonly string[]): Promise<void>;
+  deleteBySubject?(organizationId: string, subjectId: string): Promise<number>;
   deleteByDocument?(organizationId: string, documentId: string): Promise<void>;
   updateByDocument?(input: {
     readonly organizationId: string;
@@ -477,6 +795,25 @@ export interface VectorStore {
     readonly filter?: Readonly<Record<string, string>>;
   }): Promise<readonly VectorMatch[]>;
 }
+
+export type {
+  PgVectorQueryable,
+  VectorStoreAdapterKind,
+  VectorStoreProvider,
+  VectorStoreProviderFactory,
+  VectorHttpResponse,
+  VectorHttpTransport,
+} from './vector-adapters.js';
+export {
+  ChromaVectorStore,
+  FailClosedVectorStoreProvider,
+  InMemoryVectorStoreProviderFactory,
+  MongoAtlasVectorStore,
+  PgVectorStore,
+  PineconeVectorStore,
+  QdrantVectorStore,
+  WeaviateVectorStore,
+} from './vector-adapters.js';
 
 export class InMemoryVectorStore implements VectorStore {
   private readonly values = new Map<
@@ -731,7 +1068,12 @@ export class KnowledgeReindexService {
     for (const match of matches) {
       if (match.metadata.embeddingModel === input.embeddingModel) continue;
       const text = match.metadata.quote ?? '';
-      const vector = await this.embeddings.embed(text, input.embeddingModel, input.signal);
+      const vector = await this.embeddings.embed(
+        text,
+        input.embeddingModel,
+        input.signal,
+        input.organizationId,
+      );
       await this.vectors.upsert({
         organizationId: input.organizationId,
         id: match.id,
@@ -788,12 +1130,24 @@ export class KnowledgeReindexJobService {
     });
   }
 
+  get(organizationId: string, jobId: string): Promise<KnowledgeReindexJob | undefined> {
+    return this.jobs.get(organizationId, jobId);
+  }
+
   async cancel(organizationId: string, jobId: string): Promise<KnowledgeReindexJob> {
     const job = await this.jobs.get(organizationId, jobId);
     if (job === undefined) throw new ValidationError('Reindex job was not found');
     if (job.status === 'SUCCEEDED' || job.status === 'FAILED' || job.status === 'CANCELLED')
       return job;
-    return this.jobs.save({ ...job, cancelRequested: true, updatedAt: this.now() }, job.version);
+    return this.jobs.save(
+      {
+        ...job,
+        cancelRequested: true,
+        ...(job.status === 'PENDING' ? { status: 'CANCELLED' as const } : {}),
+        updatedAt: this.now(),
+      },
+      job.version,
+    );
   }
 
   async run(
@@ -833,6 +1187,7 @@ export class KnowledgeReindexJobService {
             match.metadata.quote ?? '',
             job.embeddingModel,
             signal,
+            organizationId,
           );
           await this.vectors.upsert({
             organizationId,

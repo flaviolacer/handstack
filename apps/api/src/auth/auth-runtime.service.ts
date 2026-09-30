@@ -6,8 +6,11 @@ import { DatabaseService } from '../database/database.service.js';
 const developmentAccessSecret = 'handstack-development-access-secret-change-me';
 const developmentTokenPepper = 'handstack-development-token-pepper-change-me';
 
-function authenticationSecret(name: string, developmentValue: string): string {
-  const value = process.env[name];
+function authenticationSecret(
+  name: string,
+  value: string | undefined,
+  developmentValue: string,
+): string {
   if (value !== undefined) return value;
   if (process.env.NODE_ENV === 'production') {
     throw new Error(`${name} is required in production`);
@@ -25,9 +28,14 @@ export class AuthRuntimeService {
     this.authentication = new AuthenticationService(this.storage, {
       accessTokenSecret: authenticationSecret(
         'HANDSTACK_ACCESS_TOKEN_SECRET',
+        database.config.security.accessTokenSecret,
         developmentAccessSecret,
       ),
-      tokenPepper: authenticationSecret('HANDSTACK_TOKEN_PEPPER', developmentTokenPepper),
+      tokenPepper: authenticationSecret(
+        'HANDSTACK_TOKEN_PEPPER',
+        database.config.security.tokenPepper,
+        developmentTokenPepper,
+      ),
     });
   }
 }

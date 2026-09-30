@@ -14,10 +14,22 @@ export type WorkflowNodeKind =
 export type WorkflowExecutionStatus =
   'RUNNING' | 'WAITING_APPROVAL' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'TIMED_OUT';
 
+/** Diagnostic provenance propagated from the trigger into every workflow node. */
+export interface WorkflowExecutionContext {
+  readonly requestId?: string;
+  readonly traceId?: string;
+  readonly source?: string;
+}
+
 export interface WorkflowNode {
   readonly id: string;
   readonly kind: WorkflowNodeKind;
   readonly config: Readonly<Record<string, unknown>>;
+  /** Optional compensating action recorded with the node definition. */
+  readonly compensation?: {
+    readonly kind: string;
+    readonly config: Readonly<Record<string, unknown>>;
+  };
 }
 
 export interface WorkflowEdge {
@@ -30,10 +42,60 @@ export interface Workflow extends TenantEntity {
   readonly organizationId: string;
   readonly name: string;
   readonly trigger: WorkflowTrigger;
+  /** Trigger metadata is persisted so event and schedule dispatch can be resumed safely. */
+  readonly triggerConfig?: {
+    readonly eventName?: string;
+    readonly intervalSeconds?: number;
+  };
   readonly nodes: readonly WorkflowNode[];
   readonly edges: readonly WorkflowEdge[];
   readonly published: boolean;
 }
+
+/** Immutable version record for a workflow definition. */
+export interface WorkflowVersion extends TenantEntity {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly versionNumber: number;
+  readonly name: string;
+  readonly trigger: WorkflowTrigger;
+  readonly triggerConfig?: Workflow['triggerConfig'];
+  readonly nodes: readonly WorkflowNode[];
+  readonly edges: readonly WorkflowEdge[];
+  readonly published: boolean;
+}
+
+/** Normalized trigger entity used by schedulers and event dispatchers. */
+export interface WorkflowTriggerDefinition extends TenantEntity {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly trigger: WorkflowTrigger;
+  readonly configuration?: Workflow['triggerConfig'];
+  readonly enabled: boolean;
+}
+
+/** Explicit compensation metadata for a workflow node. */
+export interface WorkflowCompensation extends TenantEntity {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly workflowVersionId: string;
+  readonly nodeId: string;
+  readonly kind: string;
+  readonly config: Readonly<Record<string, unknown>>;
+}
+
+export type CompensationProvider = (
+  compensation: Pick<WorkflowCompensation, 'kind' | 'config' | 'nodeId'>,
+  input: unknown,
+  context: {
+    readonly organizationId: string;
+    readonly principalId: string;
+    readonly requestId?: string;
+    readonly traceId?: string;
+    readonly source?: string;
+    readonly signal?: AbortSignal;
+  },
+) => Promise<void>;
 
 export interface WorkflowExecution extends TenantEntity {
   readonly organizationId: string;
@@ -56,6 +118,8 @@ export interface WorkflowStepExecution extends TenantEntity {
   readonly executionId: string;
   readonly nodeId: string;
   readonly idempotencyKey: string;
+  /** Monotonic execution order, used to apply compensations deterministically. */
+  readonly sequence?: number;
   readonly status:
     'RUNNING' | 'COMPLETED' | 'WAITING_APPROVAL' | 'FAILED' | 'CANCELLED' | 'TIMED_OUT';
   readonly input: unknown;
@@ -66,6 +130,9 @@ export interface WorkflowStepExecution extends TenantEntity {
 
 export interface WorkflowStore {
   saveWorkflow(workflow: Workflow): Promise<Workflow>;
+  saveWorkflowVersion?(version: WorkflowVersion): Promise<WorkflowVersion>;
+  saveWorkflowTrigger?(trigger: WorkflowTriggerDefinition): Promise<WorkflowTriggerDefinition>;
+  saveWorkflowCompensation?(compensation: WorkflowCompensation): Promise<WorkflowCompensation>;
   listWorkflows(organizationId: string): Promise<readonly Workflow[]>;
   findWorkflow(organizationId: string, workflowId: string): Promise<Workflow | undefined>;
   saveExecution(execution: WorkflowExecution): Promise<WorkflowExecution>;
@@ -73,6 +140,7 @@ export interface WorkflowStore {
     organizationId: string,
     executionId: string,
   ): Promise<WorkflowExecution | undefined>;
+  listExecutions?(organizationId: string): Promise<readonly WorkflowExecution[]>;
   findExecutionByIdempotencyKey?(
     organizationId: string,
     idempotencyKey: string,
@@ -84,15 +152,74 @@ export interface WorkflowStore {
 /** Adapter-neutral durable store backed by the canonical tenant repository contract. */
 export class RepositoryWorkflowStore implements WorkflowStore {
   private readonly workflows: Repository<Workflow>;
+  private readonly versions: Repository<WorkflowVersion>;
+  private readonly triggers: Repository<WorkflowTriggerDefinition>;
+  private readonly compensations: Repository<WorkflowCompensation>;
   private readonly executions: Repository<WorkflowExecution>;
   private readonly steps: Repository<WorkflowStepExecution>;
   constructor(repository: <T extends TenantEntity>(name: RepositoryName) => Repository<T>) {
     this.workflows = repository<Workflow>(repositoryName('workflows'));
+    this.versions = repository<WorkflowVersion>(repositoryName('workflow-versions'));
+    this.triggers = repository<WorkflowTriggerDefinition>(repositoryName('workflow-triggers'));
+    this.compensations = repository<WorkflowCompensation>(repositoryName('workflow-compensations'));
     this.executions = repository<WorkflowExecution>(repositoryName('workflow-executions'));
     this.steps = repository<WorkflowStepExecution>(repositoryName('workflow-steps'));
   }
-  saveWorkflow(workflow: Workflow): Promise<Workflow> {
-    return this.persist(this.workflows, workflow);
+  async saveWorkflow(workflow: Workflow): Promise<Workflow> {
+    const saved = await this.persist(this.workflows, workflow);
+    const version: WorkflowVersion = {
+      id: workflowVersionId(workflow.id, workflow.version),
+      tenantId: workflow.tenantId,
+      organizationId: workflow.organizationId,
+      workflowId: workflow.id,
+      versionNumber: workflow.version,
+      name: workflow.name,
+      trigger: workflow.trigger,
+      ...(workflow.triggerConfig === undefined ? {} : { triggerConfig: workflow.triggerConfig }),
+      nodes: workflow.nodes,
+      edges: workflow.edges,
+      published: workflow.published,
+      version: 1,
+      createdAt: workflow.createdAt,
+      updatedAt: workflow.updatedAt,
+    };
+    await this.persist(this.versions, version);
+    const trigger: WorkflowTriggerDefinition = {
+      id: workflowTriggerId(workflow.id, workflow.version),
+      tenantId: workflow.tenantId,
+      organizationId: workflow.organizationId,
+      workflowId: workflow.id,
+      trigger: workflow.trigger,
+      ...(workflow.triggerConfig === undefined ? {} : { configuration: workflow.triggerConfig }),
+      enabled: workflow.published,
+      version: 1,
+      createdAt: workflow.createdAt,
+      updatedAt: workflow.updatedAt,
+    };
+    await this.persist(this.triggers, trigger);
+    await Promise.all(
+      workflow.nodes
+        .filter((node) => node.compensation !== undefined)
+        .map((node) => {
+          const compensation = node.compensation;
+          if (compensation === undefined) return Promise.resolve();
+          const entity: WorkflowCompensation = {
+            id: workflowCompensationId(workflow.id, workflow.version, node.id),
+            tenantId: workflow.tenantId,
+            organizationId: workflow.organizationId,
+            workflowId: workflow.id,
+            workflowVersionId: version.id,
+            nodeId: node.id,
+            kind: compensation.kind,
+            config: compensation.config,
+            version: 1,
+            createdAt: workflow.createdAt,
+            updatedAt: workflow.updatedAt,
+          };
+          return this.persist(this.compensations, entity).then(() => undefined);
+        }),
+    );
+    return saved;
   }
   findWorkflow(organizationId: string, workflowId: string): Promise<Workflow | undefined> {
     return this.workflows.findById(organizationId, workflowId);
@@ -120,6 +247,21 @@ export class RepositoryWorkflowStore implements WorkflowStore {
     executionId: string,
   ): Promise<WorkflowExecution | undefined> {
     return this.executions.findById(organizationId, executionId);
+  }
+  async listExecutions(organizationId: string): Promise<readonly WorkflowExecution[]> {
+    const items: WorkflowExecution[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await this.executions.list(organizationId, {
+        limit: 200,
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+      items.push(...page.items);
+      if (page.nextCursor !== undefined && page.nextCursor === cursor)
+        throw new ValidationError('Workflow repository cursor repeated');
+      cursor = page.nextCursor;
+    } while (cursor !== undefined);
+    return items;
   }
   async findExecutionByIdempotencyKey(
     organizationId: string,
@@ -168,12 +310,27 @@ export class RepositoryWorkflowStore implements WorkflowStore {
   }
 }
 
+function workflowVersionId(workflowId: string, version: number): string {
+  return `${workflowId}:v${String(version)}`;
+}
+
+function workflowTriggerId(workflowId: string, version: number): string {
+  return `${workflowId}:trigger:v${String(version)}`;
+}
+
+function workflowCompensationId(workflowId: string, version: number, nodeId: string): string {
+  return `${workflowId}:compensation:v${String(version)}:${nodeId}`;
+}
+
 export type WorkflowNodeExecutor = (
   node: WorkflowNode,
   input: unknown,
   context: {
     readonly organizationId: string;
     readonly principalId: string;
+    readonly requestId?: string;
+    readonly traceId?: string;
+    readonly source?: string;
     readonly signal?: AbortSignal;
   },
 ) => Promise<unknown>;
@@ -190,6 +347,7 @@ export class WorkflowRuntime {
   constructor(
     private readonly executeNode: WorkflowNodeExecutor,
     private readonly store?: WorkflowStore,
+    private readonly compensate?: CompensationProvider,
   ) {}
 
   register(workflow: Workflow): void {
@@ -211,6 +369,7 @@ export class WorkflowRuntime {
     readonly trigger: WorkflowTrigger;
     readonly payload: unknown;
     readonly idempotencyKey?: string;
+    readonly context?: WorkflowExecutionContext;
     readonly signal?: AbortSignal;
   }): Promise<WorkflowExecution> {
     const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey);
@@ -235,6 +394,7 @@ export class WorkflowRuntime {
       readonly trigger: WorkflowTrigger;
       readonly payload: unknown;
       readonly idempotencyKey?: string;
+      readonly context?: WorkflowExecutionContext;
       readonly signal?: AbortSignal;
     },
     normalizedIdempotencyKey: string | undefined,
@@ -272,7 +432,14 @@ export class WorkflowRuntime {
     };
     this.executions.set(this.key(input.organizationId, execution.id), execution);
     await this.persistExecution(execution);
-    return this.run(execution, workflow, input.signal, undefined, DEFAULT_WORKFLOW_INPUT);
+    return this.run(
+      execution,
+      workflow,
+      input.signal,
+      undefined,
+      DEFAULT_WORKFLOW_INPUT,
+      input.context,
+    );
   }
 
   async resume(
@@ -367,12 +534,23 @@ export class WorkflowRuntime {
     return this.executions.get(this.key(organizationId, executionId));
   }
 
+  async listExecutions(organizationId: string): Promise<readonly WorkflowExecution[]> {
+    const durable = (await this.store?.listExecutions?.(organizationId)) ?? [];
+    const inMemory = [...this.executions.values()].filter(
+      (execution) => execution.organizationId === organizationId,
+    );
+    const byId = new Map(durable.map((execution) => [execution.id, execution]));
+    for (const execution of inMemory) byId.set(execution.id, execution);
+    return [...byId.values()];
+  }
+
   private async run(
     execution: WorkflowExecution,
     workflow: Workflow,
     signal: AbortSignal | undefined,
     startNodeId: string | undefined,
     initialValue: unknown,
+    contextMetadata?: WorkflowExecutionContext,
   ): Promise<WorkflowExecution> {
     let current = startNodeId ?? workflow.nodes[0]?.id;
     let value = initialValue === DEFAULT_WORKFLOW_INPUT ? execution.input : initialValue;
@@ -412,6 +590,11 @@ export class WorkflowRuntime {
           executionId: execution.id,
           nodeId: node.id,
           idempotencyKey: stepIdempotencyKey,
+          sequence:
+            (this.store === undefined
+              ? this.listSteps(execution.organizationId, execution.id)
+              : await this.store.listSteps(execution.organizationId, execution.id)
+            ).length + 1,
           status: 'RUNNING',
           input: value,
           version: 1,
@@ -455,6 +638,11 @@ export class WorkflowRuntime {
         value = await this.executeNodeWithRetry(node, value, {
           organizationId: execution.organizationId,
           principalId: execution.principalId,
+          ...(contextMetadata?.requestId === undefined
+            ? {}
+            : { requestId: contextMetadata.requestId }),
+          ...(contextMetadata?.traceId === undefined ? {} : { traceId: contextMetadata.traceId }),
+          ...(contextMetadata?.source === undefined ? {} : { source: contextMetadata.source }),
           ...(signal === undefined ? {} : { signal }),
         });
         assertOutputWithinLimit(node, value);
@@ -501,6 +689,47 @@ export class WorkflowRuntime {
         this.steps.set(this.key(execution.organizationId, failedStep.id), failedStep);
         await this.persistStep(failedStep);
       }
+      let compensationFailed = false;
+      if (this.compensate !== undefined && signal?.aborted !== true) {
+        const completed = (
+          this.store === undefined
+            ? this.listSteps(execution.organizationId, execution.id)
+            : await this.store.listSteps(execution.organizationId, execution.id)
+        )
+          .filter((step) => step.status === 'COMPLETED')
+          .sort(
+            (left, right) =>
+              (right.sequence ?? 0) - (left.sequence ?? 0) ||
+              (right.completedAt?.getTime() ?? 0) - (left.completedAt?.getTime() ?? 0) ||
+              right.startedAt.getTime() - left.startedAt.getTime(),
+          );
+        for (const step of completed) {
+          const node = workflow.nodes.find((candidate) => candidate.id === step.nodeId);
+          if (node?.compensation === undefined) continue;
+          try {
+            await this.compensate(
+              { nodeId: node.id, kind: node.compensation.kind, config: node.compensation.config },
+              step.output,
+              {
+                organizationId: execution.organizationId,
+                principalId: execution.principalId,
+                ...(contextMetadata?.requestId === undefined
+                  ? {}
+                  : { requestId: contextMetadata.requestId }),
+                ...(contextMetadata?.traceId === undefined
+                  ? {}
+                  : { traceId: contextMetadata.traceId }),
+                ...(contextMetadata?.source === undefined
+                  ? {}
+                  : { source: contextMetadata.source }),
+                ...(signal === undefined ? {} : { signal }),
+              },
+            );
+          } catch {
+            compensationFailed = true;
+          }
+        }
+      }
       const failed = {
         ...currentExecution,
         status: timedOut
@@ -508,17 +737,19 @@ export class WorkflowRuntime {
           : signal?.aborted === true
             ? ('CANCELLED' as const)
             : ('FAILED' as const),
-        error: timedOut
-          ? 'workflow_step_timeout'
-          : error instanceof WorkflowOutputLimitError
-            ? 'workflow_output_too_large'
-            : error instanceof WorkflowOutputSerializationError
-              ? 'workflow_output_invalid'
-              : signal?.aborted === true
-                ? 'workflow_execution_cancelled'
-                : error instanceof Error
-                  ? error.message
-                  : String(error),
+        error: compensationFailed
+          ? 'workflow_compensation_failed'
+          : timedOut
+            ? 'workflow_step_timeout'
+            : error instanceof WorkflowOutputLimitError
+              ? 'workflow_output_too_large'
+              : error instanceof WorkflowOutputSerializationError
+                ? 'workflow_output_invalid'
+                : signal?.aborted === true
+                  ? 'workflow_execution_cancelled'
+                  : error instanceof Error
+                    ? error.message
+                    : String(error),
         updatedAt: new Date(),
       };
       this.executions.set(this.key(execution.organizationId, execution.id), failed);
@@ -533,6 +764,9 @@ export class WorkflowRuntime {
     context: {
       readonly organizationId: string;
       readonly principalId: string;
+      readonly requestId?: string;
+      readonly traceId?: string;
+      readonly source?: string;
       readonly signal?: AbortSignal;
     },
   ): Promise<unknown> {
@@ -564,6 +798,9 @@ export class WorkflowRuntime {
     context: {
       readonly organizationId: string;
       readonly principalId: string;
+      readonly requestId?: string;
+      readonly traceId?: string;
+      readonly source?: string;
       readonly signal?: AbortSignal;
     },
   ): Promise<unknown> {
@@ -623,6 +860,10 @@ function validateWorkflow(workflow: Workflow): void {
     workflow.nodes.length === 0
   )
     throw new ValidationError('Workflow organization and nodes are required');
+  if (workflow.trigger === 'event' && workflow.triggerConfig?.eventName === undefined)
+    throw new ValidationError('Event workflows require triggerConfig.eventName');
+  if (workflow.trigger === 'schedule' && workflow.triggerConfig?.intervalSeconds === undefined)
+    throw new ValidationError('Scheduled workflows require triggerConfig.intervalSeconds');
   const ids = new Set(workflow.nodes.map((node) => node.id));
   if (
     workflow.nodes.some((node) => node.id === '') ||

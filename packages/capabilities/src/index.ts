@@ -22,6 +22,8 @@ export interface Capability extends TenantEntity {
   readonly version: number;
   readonly ownerId: string;
   readonly metadata: Record<string, string>;
+  /** Explicit publication state for external channels such as MCP. */
+  readonly published?: boolean;
 }
 
 export interface CapabilityExecutionContext {
@@ -31,6 +33,11 @@ export interface CapabilityExecutionContext {
   readonly channel: CapabilityChannel;
   readonly signal?: AbortSignal;
   readonly requestId?: string;
+  /** Data governance metadata used to authorize external destinations. */
+  readonly dataClassification?: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED';
+  readonly providerId?: string;
+  readonly destinationRegion?: string;
+  readonly externalProvider?: boolean;
 }
 
 export type CapabilityHandler = (
@@ -50,6 +57,7 @@ export interface CapabilityRegistry {
   list(organizationId: string, channel?: CapabilityChannel): Promise<readonly Capability[]>;
   get(organizationId: string, slug: string): Promise<RegisteredCapability | undefined>;
   publish(organizationId: string, slug: string): Promise<Capability>;
+  registerDescriptor(input: Omit<Capability, keyof TenantEntity>): Promise<Capability>;
 }
 
 const capabilitiesRepository = repositoryName('capabilities');
@@ -66,6 +74,12 @@ export class PersistentCapabilityRegistry implements CapabilityRegistry {
   async register(
     input: Omit<Capability, keyof TenantEntity> & { handler: CapabilityHandler },
   ): Promise<Capability> {
+    const capability = await this.registerDescriptor({ ...input, published: true });
+    this.handlers.set(`${input.organizationId}:${capability.slug}`, input.handler);
+    return capability;
+  }
+
+  async registerDescriptor(input: Omit<Capability, keyof TenantEntity>): Promise<Capability> {
     if (input.organizationId === '' || input.slug.trim() === '')
       throw new ValidationError('Capability organization and slug are required');
     if (input.timeoutMs <= 0 || !Number.isInteger(input.timeoutMs))
@@ -85,10 +99,9 @@ export class PersistentCapabilityRegistry implements CapabilityRegistry {
       slug,
       requiredPermissions: [...new Set(input.requiredPermissions)].sort(),
       allowedChannels: [...new Set(input.allowedChannels)],
+      published: input.published ?? false,
     };
-    const inserted = await this.repository.insert(capability);
-    this.handlers.set(`${input.organizationId}:${slug}`, input.handler);
-    return inserted;
+    return this.repository.insert(capability);
   }
 
   async list(organizationId: string, channel?: CapabilityChannel) {
@@ -112,7 +125,13 @@ export class PersistentCapabilityRegistry implements CapabilityRegistry {
     const page = await this.repository.list(organizationId, { limit: 100 });
     const capability = page.items.find((item) => item.slug === slug.trim().toLowerCase());
     if (capability === undefined) throw new ValidationError('Capability not found');
-    return capability;
+    const published: Capability = {
+      ...capability,
+      published: true,
+      version: capability.version + 1,
+      updatedAt: new Date(),
+    };
+    return this.repository.update(published, capability.version);
   }
 }
 
@@ -137,11 +156,21 @@ export class InMemoryCapabilityRegistry implements CapabilityRegistry {
       slug: input.slug.trim().toLowerCase(),
       requiredPermissions: [...new Set(input.requiredPermissions)].sort(),
       allowedChannels: [...new Set(input.allowedChannels)],
+      published: input.published ?? true,
     };
     const key = `${input.organizationId}:${capability.slug}`;
     if (this.entries.has(key)) throw new ValidationError('Capability slug already exists');
     this.entries.set(key, { capability, handler: input.handler });
     return Promise.resolve(capability);
+  }
+
+  registerDescriptor(input: Omit<Capability, keyof TenantEntity>): Promise<Capability> {
+    return this.register({
+      ...input,
+      published: false,
+      handler: () =>
+        Promise.reject(new ValidationError('Capability handler is not loaded in this runtime')),
+    });
   }
 
   list(organizationId: string, channel?: CapabilityChannel) {
@@ -163,7 +192,14 @@ export class InMemoryCapabilityRegistry implements CapabilityRegistry {
   async publish(organizationId: string, slug: string) {
     const entry = await this.get(organizationId, slug);
     if (entry === undefined) throw new ValidationError('Capability not found');
-    return entry.capability;
+    const published: Capability = {
+      ...entry.capability,
+      published: true,
+      version: entry.capability.version + 1,
+      updatedAt: new Date(),
+    };
+    this.entries.set(`${organizationId}:${published.slug}`, { ...entry, capability: published });
+    return published;
   }
 }
 
@@ -175,6 +211,8 @@ export interface CapabilityExecutionHooks {
     context: CapabilityExecutionContext,
   ): Promise<() => Promise<void>>;
   rateLimit?(capability: Capability, context: CapabilityExecutionContext): Promise<void>;
+  /** Optional platform-wide timeout ceiling applied in addition to each capability's timeout. */
+  executionTimeoutMs?(): number;
   approval?(capability: Capability, context: CapabilityExecutionContext): Promise<void>;
   audit?(event: {
     organizationId: string;
@@ -244,9 +282,16 @@ export class CapabilityExecutionEngine {
           : await this.hooks.reserveBudget(capability, context);
       if (this.hooks.rateLimit !== undefined) await this.hooks.rateLimit(capability, context);
       if (this.hooks.approval !== undefined) await this.hooks.approval(capability, context);
+      const configuredTimeoutMs = this.hooks.executionTimeoutMs?.();
+      if (
+        configuredTimeoutMs !== undefined &&
+        (!Number.isSafeInteger(configuredTimeoutMs) || configuredTimeoutMs < 1)
+      )
+        throw new ValidationError('Platform capability timeout must be a positive integer');
+      const timeoutMs = Math.min(capability.timeoutMs, configuredTimeoutMs ?? capability.timeoutMs);
       const result = await this.withTimeout(
-        entry.handler(guarded, context),
-        capability.timeoutMs,
+        (signal) => entry.handler(guarded, { ...context, signal }),
+        timeoutMs,
         context.signal,
       );
       this.hooks.observe?.({
@@ -281,27 +326,45 @@ export class CapabilityExecutionEngine {
     }
   }
 
-  private withTimeout<T>(promise: Promise<T>, timeoutMs: number, signal?: AbortSignal): Promise<T> {
+  private withTimeout<T>(
+    execute: (signal: AbortSignal) => Promise<T>,
+    timeoutMs: number,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    if (signal?.aborted === true) return Promise.reject(new Error('Capability execution aborted'));
+    const controller = new AbortController();
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
+        controller.abort(new Error('Capability execution timed out'));
+        cleanup();
         reject(new Error('Capability execution timed out'));
       }, timeoutMs);
-      const abort = () => {
+      const cleanup = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', forwardAbort);
+      };
+      const forwardAbort = () => {
+        controller.abort(signal?.reason);
+        cleanup();
         reject(new Error('Capability execution aborted'));
       };
-      signal?.addEventListener('abort', abort, { once: true });
-      promise.then(
-        (value) => {
-          clearTimeout(timer);
-          signal?.removeEventListener('abort', abort);
-          resolve(value);
-        },
-        (error: unknown) => {
-          clearTimeout(timer);
-          signal?.removeEventListener('abort', abort);
-          reject(error instanceof Error ? error : new Error(String(error)));
-        },
-      );
+      signal?.addEventListener('abort', forwardAbort, { once: true });
+      if (signal?.aborted === true) {
+        forwardAbort();
+        return;
+      }
+      void Promise.resolve()
+        .then(() => execute(controller.signal))
+        .then(
+          (value) => {
+            cleanup();
+            resolve(value);
+          },
+          (error: unknown) => {
+            cleanup();
+            reject(error instanceof Error ? error : new Error(String(error)));
+          },
+        );
     });
   }
 }

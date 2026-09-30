@@ -73,9 +73,11 @@ export const regenerateMessageSchema = z
 export const executeChatSchema = z
   .object({
     model: z.string().min(1).max(200),
+    agentId: z.string().min(1).max(200).optional(),
     dataClassification: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']),
     parentMessageId: z.string().min(1).max(200).optional(),
     traceId: z.string().min(1).max(200).optional(),
+    knowledgeBaseId: z.string().min(1).max(200).optional(),
   })
   .strict();
 

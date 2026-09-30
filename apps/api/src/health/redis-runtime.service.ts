@@ -1,7 +1,12 @@
 import { Injectable, type OnModuleDestroy } from '@nestjs/common';
-import { configFromEnvironment, type HandStackConfig } from '@handstack/config';
+import {
+  configLayerFromEnvironment,
+  resolveConfigLayers,
+  type HandStackConfig,
+} from '@handstack/config';
 import { connect, type Socket } from 'node:net';
 import { connect as connectTls, type TLSSocket } from 'node:tls';
+import { loadConfigFile } from '../database/config-file.js';
 
 export type RedisStatus = 'up' | 'down' | 'not-configured';
 
@@ -22,7 +27,11 @@ export class TcpRedisProbe implements RedisProbe {
   ) {}
 
   async ping(): Promise<void> {
-    const parsed = new URL(this.url.replace(/^redis\+/, 'redis:'));
+    const parsed = new URL(
+      this.url
+        .replace(/^redis\+(?:sentinel|cluster):\/\//u, 'redis://')
+        .replace(/^redis\+/, 'redis:'),
+    );
     if (parsed.protocol !== 'redis:' && parsed.protocol !== 'rediss:')
       throw new Error(`Unsupported Redis URL scheme: ${parsed.protocol}`);
     const port = parsed.port === '' ? 6379 : Number(parsed.port);
@@ -77,7 +86,7 @@ export class RedisRuntimeService implements OnModuleDestroy {
   private lastStatus: RedisStatus;
 
   constructor() {
-    this.config = configFromEnvironment(process.env);
+    this.config = resolveConfigLayers(configLayerFromEnvironment(process.env), loadConfigFile());
     this.probe =
       this.config.queue.redisUrl === undefined
         ? undefined

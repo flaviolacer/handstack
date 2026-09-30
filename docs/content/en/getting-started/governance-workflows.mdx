@@ -27,10 +27,20 @@ approvers approve the same request.
 
 1. Evaluate resource/action with `PolicyEngine` and explicit attributes.
 2. Start a manual, API, webhook, schedule or event workflow.
+   Published event workflows restore their subscriptions on startup, then enqueue a tenant-scoped,
+   idempotent execution when the configured domain event is received (including through Redis
+   Streams in distributed deployments). The internal `operation.created` bookkeeping event is
+   intentionally excluded to prevent recursive workflow creation.
 3. Persist the execution and approval id when a human node pauses it.
 4. Approve and resume using the same organization and execution id.
 5. Read `GET /api/v1/organizations/{organizationId}/workflows/{workflowId}/executions/{executionId}/steps`
    to inspect the tenant-scoped checkpoint history after a restart or failure.
+
+The execution endpoint returns `202 Accepted` with a durable `Operation`. In the distributed
+deployment profile, the `workflow-executions` BullMQ worker calls the API's internal execution
+endpoint; configure the same random `HANDSTACK_INTERNAL_SERVICE_TOKEN` (at least 32 characters)
+for the API and worker through the deployment secret manager. Do not reuse the development fallback
+in production. The worker queue and internal route are separate from the public OpenAPI surface.
 
 ## Verify
 

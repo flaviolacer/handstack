@@ -29,7 +29,16 @@ Copy `.env.example` only for local overrides. Telemetry remains disabled unless 
 
 Contributions are licensed under Apache License 2.0 and must follow the Code of Conduct.
 
-# Política do supervisor
+## Pull requests
 
-O HandStack Autopilot usa `npm` por padrão e `yarn` somente quando `yarn.lock` existir. O gerenciador legado
-do lockfile não deve ser executado pelo supervisor ou pelo agente.
+Use the pull request template and describe the user-visible impact, affected requirements, validation,
+and rollout or rollback considerations. Keep each pull request focused enough to review safely.
+
+Maintainers may request changes to preserve security boundaries, documentation parity, API compatibility,
+or requirements traceability. Passing CI is necessary but does not replace review of behavior and risk.
+
+## Issue reports
+
+Use the repository issue forms for bugs and feature requests. Usage questions belong in Discussions when
+that feature is enabled. Never disclose credentials, personal data, or vulnerability details publicly;
+see [SECURITY.md](./SECURITY.md) for responsible disclosure.

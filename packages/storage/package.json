@@ -10,10 +10,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint src tests",
-    "test": "vitest run",
+    "test": "vitest run --config vitest.config.ts",
+    "test:object-storage": "vitest run --config vitest.object-storage.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1132.0",
+    "@aws-sdk/s3-request-presigner": "3.1132.0",
+    "@azure/storage-blob": "12.33.0",
     "@handstack/shared": "file:../shared"
   }
 }

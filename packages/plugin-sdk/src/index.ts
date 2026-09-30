@@ -22,6 +22,7 @@ export type PluginType =
   | 'webhook-delivery'
   | 'incident-management'
   | 'workflow-node'
+  | 'compensation'
   | 'rag-policy'
   | 'knowledge'
   | 'storage'
@@ -153,7 +154,7 @@ export interface PluginToolRegistration {
 export interface ProviderRegistration {
   readonly providerId: string;
   readonly displayName: string;
-  readonly kind: 'model' | 'embedding' | 'storage' | 'notification' | 'other';
+  readonly kind: 'model' | 'embedding' | 'vector' | 'storage' | 'notification' | 'other';
   readonly capabilities: readonly string[];
   readonly configurationSchema: Readonly<Record<string, unknown>>;
 }
@@ -229,6 +230,8 @@ export class PluginUiRegistry {
 export interface PluginRegistrationContext {
   readonly pluginName: string;
   readonly mode: PluginMode;
+  /** Secrets are resolved by the host; plugins never receive the secret store. */
+  readonly secrets: { get(reference: string): Promise<string | undefined> };
   readonly tools: { register(input: PluginToolRegistration): void };
   readonly providers: { register(input: ProviderRegistration): void };
   readonly capabilities: { register(input: CapabilityRegistration): Promise<unknown> };
@@ -270,6 +273,7 @@ export interface PluginRecord {
 
 export interface PluginHostOptions {
   readonly approve: (manifest: PluginManifest) => Promise<readonly PluginPermission[]>;
+  readonly resolveSecret?: (reference: string, pluginName: string) => Promise<string | undefined>;
   readonly registerCapabilities?: PluginRegistrationContext['capabilities'];
   readonly registerIdentityProvider?: (input: IdentityProviderRegistration) => void;
   readonly registerUiExtension?: (input: PluginUiExtension) => void;
@@ -278,12 +282,14 @@ export interface PluginHostOptions {
   readonly isolatedRpc?: (
     plugin: PluginDefinition,
     context: PluginRegistrationContext,
+    sourceBytes: Uint8Array,
   ) => Promise<void>;
 }
 
 export class PluginHost {
   private readonly records = new Map<string, PluginRecord>();
   private readonly definitions = new Map<string, PluginDefinition>();
+  private readonly sources = new Map<string, Uint8Array>();
 
   constructor(private readonly options: PluginHostOptions) {}
 
@@ -307,6 +313,12 @@ export class PluginHost {
     };
     this.records.set(manifest.name, record);
     this.definitions.set(manifest.name, definition);
+    this.sources.set(
+      manifest.name,
+      typeof sourceBytes === 'string'
+        ? new TextEncoder().encode(sourceBytes)
+        : new Uint8Array(sourceBytes),
+    );
     await definition.onInstall?.();
     return record;
   }
@@ -320,7 +332,10 @@ export class PluginHost {
     if (record.mode === 'isolated') {
       if (this.options.isolatedRpc === undefined)
         throw new ValidationError('isolated plugin runner is unavailable');
-      await this.options.isolatedRpc(definition, context);
+      const sourceBytes = this.sources.get(name);
+      if (sourceBytes === undefined)
+        throw new ValidationError('isolated plugin artifact is unavailable');
+      await this.options.isolatedRpc(definition, context, new Uint8Array(sourceBytes));
     } else {
       await definition.setup(context);
     }
@@ -343,6 +358,7 @@ export class PluginHost {
     const definition = this.definitions.get(name);
     await definition?.onUninstall?.();
     this.definitions.delete(name);
+    this.sources.delete(name);
     this.records.delete(name);
   }
 
@@ -357,6 +373,17 @@ export class PluginHost {
     return {
       pluginName: record.manifest.name,
       mode: record.mode,
+      secrets: {
+        get: (reference) => {
+          if (!record.approvedPermissions.includes('secrets'))
+            return Promise.reject(new ValidationError('Plugin secrets permission is required'));
+          if (reference.trim() === '')
+            return Promise.reject(new ValidationError('Secret reference is required'));
+          if (this.options.resolveSecret === undefined)
+            return Promise.reject(new ValidationError('Plugin secret resolver is unavailable'));
+          return this.options.resolveSecret(reference, record.manifest.name);
+        },
+      },
       tools: {
         register: this.options.registerTool ?? (() => undefined),
       },

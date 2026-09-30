@@ -12,6 +12,36 @@ data:
   HANDSTACK_DEPLOYMENT_PROFILE: distributed
   HANDSTACK_API_PORT: '3001'
   HANDSTACK_DATABASE_ADAPTER: postgresql
+  HANDSTACK_REDIS_TOPOLOGY: standalone
+  HANDSTACK_REDIS_STREAM_PENDING_CLAIM_IDLE_MS: '30000'
+  HANDSTACK_PRIVACY_RETENTION_ENABLED: 'false'
+  HANDSTACK_PRIVACY_RETENTION_INTERVAL_MS: '86400000'
+  HANDSTACK_AUDIT_INTEGRITY_ENABLED: 'false'
+  HANDSTACK_AUDIT_INTEGRITY_INTERVAL_MS: '86400000'
+  HANDSTACK_AUDIT_INTEGRITY_ORGANIZATIONS: ''
+  HANDSTACK_KNOWLEDGE_SYNC_ENABLED: 'false'
+  HANDSTACK_KNOWLEDGE_SYNC_INTERVAL_MS: '300000'
+  HANDSTACK_KNOWLEDGE_SYNC_ORGANIZATIONS: ''
+  HANDSTACK_PLUGIN_TRUSTED_PUBLISHERS_JSON: '{}'
+  HANDSTACK_REDIS_URL: redis://handstack-redis:6379
+  HANDSTACK_API_URL: http://handstack-api:3001
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: handstack-secrets
+  namespace: handstack
+type: Opaque
+stringData:
+  # Replace these values through the deployment secret manager before applying.
+  HANDSTACK_DATABASE_URL: CHANGE_ME
+  HANDSTACK_ACCESS_TOKEN_SECRET: CHANGE_ME
+  HANDSTACK_TOKEN_PEPPER: CHANGE_ME
+  HANDSTACK_MASTER_KEY: CHANGE_ME_64_HEX_CHARACTERS
+  HANDSTACK_WEBHOOK_MASTER_KEY: CHANGE_ME
+  HANDSTACK_INTERNAL_SERVICE_TOKEN: CHANGE_ME_USE_AT_LEAST_32_RANDOM_CHARACTERS
+  HANDSTACK_WORKER_ORGANIZATION_ID: CHANGE_ME
+  HANDSTACK_WORKER_HANDLER_MODULE: CHANGE_ME
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -34,7 +64,9 @@ spec:
         - name: api
           image: ghcr.io/handstack/api:latest
           ports: [{ containerPort: 3001 }]
-          envFrom: [{ configMapRef: { name: handstack-config } }]
+          envFrom:
+            - configMapRef: { name: handstack-config }
+            - secretRef: { name: handstack-secrets }
           readinessProbe: { httpGet: { path: /health/ready, port: 3001 }, periodSeconds: 10 }
           livenessProbe: { httpGet: { path: /health/live, port: 3001 }, periodSeconds: 20 }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: '1', memory: 1Gi } }
@@ -74,6 +106,171 @@ spec:
 ---
 apiVersion: apps/v1
 kind: Deployment
+metadata: { name: worker-workflows, namespace: handstack }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: worker-workflows } }
+  template:
+    metadata: { labels: { app: worker-workflows } }
+    spec:
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app: worker-workflows } }
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:latest
+          args: ['workflow-executions']
+          envFrom:
+            - configMapRef: { name: handstack-config }
+            - secretRef: { name: handstack-secrets }
+          readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
+          livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: worker-workflows, namespace: handstack }
+spec:
+  scaleTargetRef: { name: worker-workflows }
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  triggers:
+    [
+      {
+        type: redis,
+        metadata:
+          { addressFromEnv: HANDSTACK_REDIS_URL, listName: workflow-executions, listLength: '20' },
+      },
+    ]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: worker-documents, namespace: handstack }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: worker-documents } }
+  template:
+    metadata: { labels: { app: worker-documents } }
+    spec:
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app: worker-documents } }
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:latest
+          args: ['documents']
+          envFrom:
+            - configMapRef: { name: handstack-config }
+            - secretRef: { name: handstack-secrets }
+          readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
+          livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: worker-indexing, namespace: handstack }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: worker-indexing } }
+  template:
+    metadata: { labels: { app: worker-indexing } }
+    spec:
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app: worker-indexing } }
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:latest
+          args: ['indexing']
+          envFrom:
+            - configMapRef: { name: handstack-config }
+            - secretRef: { name: handstack-secrets }
+          readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
+          livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: worker-billing, namespace: handstack }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: worker-billing } }
+  template:
+    metadata: { labels: { app: worker-billing } }
+    spec:
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app: worker-billing } }
+      containers:
+        - name: worker
+          image: ghcr.io/handstack/worker:latest
+          args: ['billing']
+          envFrom:
+            - configMapRef: { name: handstack-config }
+            - secretRef: { name: handstack-secrets }
+          readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
+          livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: worker-documents, namespace: handstack }
+spec:
+  scaleTargetRef: { name: worker-documents }
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  triggers:
+    [
+      {
+        type: redis,
+        metadata: { addressFromEnv: HANDSTACK_REDIS_URL, listName: documents, listLength: '20' },
+      },
+    ]
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: worker-indexing, namespace: handstack }
+spec:
+  scaleTargetRef: { name: worker-indexing }
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  triggers:
+    [
+      {
+        type: redis,
+        metadata: { addressFromEnv: HANDSTACK_REDIS_URL, listName: indexing, listLength: '20' },
+      },
+    ]
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: worker-billing, namespace: handstack }
+spec:
+  scaleTargetRef: { name: worker-billing }
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  triggers:
+    [
+      {
+        type: redis,
+        metadata: { addressFromEnv: HANDSTACK_REDIS_URL, listName: billing, listLength: '20' },
+      },
+    ]
+---
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: handstack-mcp
   namespace: handstack
@@ -94,7 +291,9 @@ spec:
           image: ghcr.io/handstack/api:latest
           args: ['mcp-server']
           ports: [{ containerPort: 3001 }]
-          envFrom: [{ configMapRef: { name: handstack-config } }]
+          envFrom:
+            - configMapRef: { name: handstack-config }
+            - secretRef: { name: handstack-secrets }
           readinessProbe: { httpGet: { path: /health/ready, port: 3001 }, periodSeconds: 10 }
           livenessProbe: { httpGet: { path: /health/live, port: 3001 }, periodSeconds: 20 }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: '1', memory: 1Gi } }
@@ -168,6 +367,9 @@ spec:
         - name: worker
           image: ghcr.io/handstack/worker:latest
           args: ['agents']
+          envFrom:
+            - configMapRef: { name: handstack-config }
+            - secretRef: { name: handstack-secrets }
           readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
           livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
           resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }
@@ -181,7 +383,12 @@ spec:
   minReplicaCount: 1
   maxReplicaCount: 20
   triggers:
-    [{ type: redis, metadata: { addressFromEnv: REDIS_URL, listName: agents, listLength: '20' } }]
+    [
+      {
+        type: redis,
+        metadata: { addressFromEnv: HANDSTACK_REDIS_URL, listName: agents, listLength: '20' },
+      },
+    ]
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -194,7 +401,7 @@ spec:
     [
       {
         type: redis,
-        metadata: { addressFromEnv: REDIS_URL, listName: embeddings, listLength: '20' },
+        metadata: { addressFromEnv: HANDSTACK_REDIS_URL, listName: embeddings, listLength: '20' },
       },
     ]
 ---
@@ -206,7 +413,12 @@ spec:
   minReplicaCount: 1
   maxReplicaCount: 20
   triggers:
-    [{ type: redis, metadata: { addressFromEnv: REDIS_URL, listName: plugins, listLength: '20' } }]
+    [
+      {
+        type: redis,
+        metadata: { addressFromEnv: HANDSTACK_REDIS_URL, listName: plugins, listLength: '20' },
+      },
+    ]
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -216,7 +428,12 @@ spec:
   minReplicaCount: 1
   maxReplicaCount: 20
   triggers:
-    [{ type: redis, metadata: { addressFromEnv: REDIS_URL, listName: webhooks, listLength: '20' } }]
+    [
+      {
+        type: redis,
+        metadata: { addressFromEnv: HANDSTACK_REDIS_URL, listName: webhooks, listLength: '20' },
+      },
+    ]
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -226,7 +443,12 @@ spec:
   minReplicaCount: 1
   maxReplicaCount: 20
   triggers:
-    [{ type: redis, metadata: { addressFromEnv: REDIS_URL, listName: audit, listLength: '20' } }]
+    [
+      {
+        type: redis,
+        metadata: { addressFromEnv: HANDSTACK_REDIS_URL, listName: audit, listLength: '20' },
+      },
+    ]
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -236,7 +458,12 @@ spec:
   minReplicaCount: 1
   maxReplicaCount: 20
   triggers:
-    [{ type: redis, metadata: { addressFromEnv: REDIS_URL, listName: cleanup, listLength: '20' } }]
+    [
+      {
+        type: redis,
+        metadata: { addressFromEnv: HANDSTACK_REDIS_URL, listName: cleanup, listLength: '20' },
+      },
+    ]
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -300,7 +527,10 @@ spec:
       containers:
         - name: worker
           image: ghcr.io/handstack/worker:latest
-          args: ['knowledge']
+          args: ['embeddings']
+          envFrom:
+            - configMapRef: { name: handstack-config }
+            - secretRef: { name: handstack-secrets }
           readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
           livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
           resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }
@@ -327,7 +557,10 @@ spec:
       containers:
         - name: worker
           image: ghcr.io/handstack/worker:latest
-          args: ['integrations']
+          args: ['plugins']
+          envFrom:
+            - configMapRef: { name: handstack-config }
+            - secretRef: { name: handstack-secrets }
           readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
           livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
           resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }
@@ -355,6 +588,9 @@ spec:
         - name: worker
           image: ghcr.io/handstack/worker:latest
           args: ['webhooks']
+          envFrom:
+            - configMapRef: { name: handstack-config }
+            - secretRef: { name: handstack-secrets }
           readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
           livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
           resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }
@@ -381,7 +617,10 @@ spec:
       containers:
         - name: worker
           image: ghcr.io/handstack/worker:latest
-          args: ['audit-billing']
+          args: ['audit']
+          envFrom:
+            - configMapRef: { name: handstack-config }
+            - secretRef: { name: handstack-secrets }
           readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
           livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
           resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }
@@ -408,7 +647,10 @@ spec:
       containers:
         - name: worker
           image: ghcr.io/handstack/worker:latest
-          args: ['maintenance']
+          args: ['cleanup']
+          envFrom:
+            - configMapRef: { name: handstack-config }
+            - secretRef: { name: handstack-secrets }
           readinessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 10 }
           livenessProbe: { exec: { command: ['sh', '-c', 'kill -0 1'] }, periodSeconds: 20 }
           resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: '1', memory: 512Mi } }

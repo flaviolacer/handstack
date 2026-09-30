@@ -99,6 +99,33 @@ describe('capability execution', () => {
       'execute:error:true',
     ]);
   });
+
+  it('applies the platform tool timeout ceiling and aborts the running handler', async () => {
+    const registry = new InMemoryCapabilityRegistry();
+    let handlerSignal: AbortSignal | undefined;
+    await registry.register({
+      ...base,
+      handler: (_input, context) =>
+        new Promise((_resolve, reject) => {
+          handlerSignal = context.signal;
+          context.signal?.addEventListener(
+            'abort',
+            () => {
+              reject(new Error('handler observed cancellation'));
+            },
+            { once: true },
+          );
+        }),
+    });
+    const engine = new CapabilityExecutionEngine(registry, {
+      authorize: () => Promise.resolve(),
+      executionTimeoutMs: () => 10,
+    });
+    await expect(
+      engine.execute('echo', {}, { organizationId: 'org', principalId: 'user', channel: 'API' }),
+    ).rejects.toThrow('Capability execution timed out');
+    expect(handlerSignal?.aborted).toBe(true);
+  });
 });
 
 describe('persistent capability registry', () => {
@@ -116,6 +143,21 @@ describe('persistent capability registry', () => {
       await expect(registry.get('org', 'echo')).resolves.toMatchObject({
         capability: { slug: 'echo' },
       });
+    } finally {
+      await adapter.close();
+    }
+  });
+
+  it('persists administrative descriptors without creating an executable handler', async () => {
+    const adapter = createDatabaseAdapter(
+      defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),
+    );
+    await adapter.initialize();
+    try {
+      const registry = new PersistentCapabilityRegistry(adapter);
+      await registry.registerDescriptor({ ...base, slug: 'managed' });
+      await expect(registry.list('org', 'API')).resolves.toHaveLength(1);
+      await expect(registry.get('org', 'managed')).rejects.toThrow('handler is not loaded');
     } finally {
       await adapter.close();
     }

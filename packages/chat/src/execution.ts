@@ -20,6 +20,7 @@ export interface ExecuteConversationInput {
   readonly parentMessageId?: string;
   readonly pendingMessageId?: string;
   readonly tools?: readonly ToolDefinition[];
+  readonly contextMessages?: readonly ChatMessage[];
   readonly traceId?: string;
 }
 
@@ -50,7 +51,11 @@ export class ChatExecutionService {
 
   async start(input: ExecuteConversationInput): Promise<ChatExecutionHandle> {
     const history = (
-      await this.chat.history(input.organizationId, input.conversationId, input.branchId)
+      await this.chat.historyForExecution(
+        input.organizationId,
+        input.conversationId,
+        input.branchId,
+      )
     ).filter((message) => message.id !== input.pendingMessageId);
     const route = await this.runtime.resolveRoute({
       organizationId: input.organizationId,
@@ -78,7 +83,7 @@ export class ChatExecutionService {
           organizationId: input.organizationId,
           model: input.model,
           dataClassification: input.dataClassification,
-          messages: this.toModelMessages(history),
+          messages: [...(input.contextMessages ?? []), ...this.toModelMessages(history)],
           signal,
           ...(input.tools === undefined ? {} : { tools: input.tools }),
         })) {

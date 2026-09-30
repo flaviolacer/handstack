@@ -16,8 +16,7 @@ import { DatabaseService } from '../database/database.service.js';
 
 const developmentScimPepper = 'handstack-development-scim-token-pepper';
 
-function scimPepper(): string {
-  const value = process.env.HANDSTACK_SCIM_TOKEN_PEPPER;
+function scimPepper(value?: string): string {
   if (value !== undefined) return value;
   if (process.env.NODE_ENV === 'production') {
     throw new Error('HANDSTACK_SCIM_TOKEN_PEPPER is required in production');
@@ -62,7 +61,7 @@ export class ScimRuntimeService {
       database === undefined
         ? new InMemoryScimCredentialStore()
         : new RepositoryScimCredentialStore((name) => database.adapter.repository(name)),
-      scimPepper(),
+      scimPepper(database?.config.security.scimTokenPepper),
     );
     this.provisioning = provisioning;
     this.credentials = credentials;

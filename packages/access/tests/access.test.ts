@@ -38,7 +38,10 @@ describe('temporary access and notifications', () => {
     });
     expect(() => access.approve('org-2', request.id, 'admin')).toThrow('not found');
     const grant = access.approve('org-1', request.id, 'admin');
-    access.revoke('org-1', grant.id);
+    expect(() => access.revoke('org-1', grant.id, 'wrong-request')).toThrow(
+      'does not belong to access request',
+    );
+    expect(access.revoke('org-1', grant.id, request.id).requestId).toBe(request.id);
     expect(access.active('org-1', 'user', 'db')).toHaveLength(0);
   });
   it('persists durable requests and grants through an async store', async () => {

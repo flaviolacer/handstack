@@ -4,17 +4,18 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev --port 3000",
-    "lint": "eslint app",
-    "start": "next start --port 3000",
+    "dev": "node scripts/next-with-config.mjs dev",
+    "lint": "eslint app scripts",
+    "start": "node scripts/next-with-config.mjs start",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:update": "playwright test --update-snapshots",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@handstack/config": "file:../../packages/config",
     "@handstack/docs-engine": "file:../../packages/docs-engine",
-    "next": "^15.5.2",
+    "next": "^16.3.5",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0"

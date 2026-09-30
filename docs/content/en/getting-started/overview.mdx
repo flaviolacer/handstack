@@ -45,6 +45,21 @@ Use this procedure to install dependencies and verify the repository foundation.
 
 Start the API and request `/health/live`. A successful response contains `status: "ok"`. `/health/ready` additionally reports configured dependency checks.
 
+For Git-backed configuration, use `handstack config sync --repo <path> --ref <ref> -f <manifest.yaml>`.
+Before applying a local configuration, run `handstack config validate` to parse the effective
+configuration and print a non-sensitive preflight summary; database URLs and secret references are
+never included in that output.
+The command reads the manifest from the selected Git ref and applies it through the authenticated
+Configuration as Code API. This is an explicit sync operation; continuous reconciliation and
+automatic rollback are not provided by this command.
+The `apply`, `export`, `admin`, `audit`, and `backup/restore` commands use the same typed layer for
+`HANDSTACK_API_URL`, `HANDSTACK_ORGANIZATION_ID`, `HANDSTACK_ACCESS_TOKEN`, and
+`HANDSTACK_PORTABLE_SIGNING_KEY`; keep these values in the environment or a secret manager and
+never pass them as command arguments.
+
+To refresh the local code graph used during audits, run `npm run graphify`. It writes
+`graphify-out/graph.json` while excluding dependencies and build outputs.
+
 ## Troubleshooting
 
 - If Node reports an unsupported engine, install Node.js 22 or 24 LTS and reinstall dependencies.

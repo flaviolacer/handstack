@@ -118,6 +118,23 @@ export class InMemoryPolicyEngine implements PolicyEngine {
   }
 }
 
+/** Policy engine backed by a tenant-scoped loader (database, cache, or GitOps store). */
+export class PersistentPolicyEngine implements PolicyEngine {
+  constructor(
+    private readonly load: (organizationId: string) => Promise<readonly AuthorizationPolicy[]>,
+  ) {}
+
+  async authorize(input: AuthorizationRequest): Promise<AuthorizationDecision> {
+    if (input.organizationId.trim() === '' || input.principalId.trim() === '') {
+      return { allowed: false, reason: 'invalid authorization scope' };
+    }
+    const policies = await this.load(input.organizationId);
+    return new InMemoryPolicyEngine(
+      policies.filter((policy) => policy.organizationId === input.organizationId),
+    ).authorize(input);
+  }
+}
+
 export function parsePermission(value: string): { resource: string; action: string } {
   const separator = value.lastIndexOf('.');
   if (separator <= 0 || separator === value.length - 1) {

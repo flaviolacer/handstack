@@ -7,6 +7,7 @@ import { AccessTokenGuard } from '../auth/access-token.guard.js';
 import { AuthRuntimeService } from '../auth/auth-runtime.service.js';
 import {
   requireAuthentication,
+  requestTraceContext,
   type AuthenticatedRequest,
 } from '../auth/authentication-context.js';
 import { NotificationRuntimeService } from './notification-runtime.service.js';
@@ -14,7 +15,7 @@ import { NotificationRuntimeService } from './notification-runtime.service.js';
 const sendSchema = z.object({
   id: z.string().trim().min(1).max(200),
   recipientId: z.string().trim().min(1).max(200),
-  channel: z.literal('IN_APP'),
+  channel: z.enum(['IN_APP', 'EMAIL', 'WEBHOOK', 'SLACK', 'TEAMS', 'DISCORD']),
   subject: z.string().max(500),
   body: z.string().max(1_000_000),
   metadata: z.record(z.string(), z.string()).optional(),
@@ -45,7 +46,7 @@ export class NotificationController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Send a tenant in-app notification' })
+  @ApiOperation({ summary: 'Send a tenant-scoped notification' })
   async send(
     @Param('organizationId') organizationId: string,
     @Req() request: AuthenticatedRequest,
@@ -56,12 +57,22 @@ export class NotificationController {
     if (!parsed.success)
       throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid notification');
     const { metadata, ...content } = parsed.data;
-    await this.runtime.send({
-      organizationId,
-      createdAt: new Date(),
-      ...content,
-      ...(metadata === undefined ? {} : { metadata }),
-    });
+    const auth = requireAuthentication(request);
+    const trace = requestTraceContext(request);
+    await this.runtime.send(
+      {
+        organizationId,
+        createdAt: new Date(),
+        ...content,
+        ...(metadata === undefined ? {} : { metadata }),
+      },
+      {
+        requestId: trace.requestId,
+        traceId: trace.traceId,
+        principalId: auth.subject,
+        source: 'API',
+      },
+    );
     return { id: parsed.data.id, organizationId, queued: true };
   }
 

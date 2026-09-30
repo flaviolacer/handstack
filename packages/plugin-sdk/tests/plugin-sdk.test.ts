@@ -6,6 +6,7 @@ import {
   PluginUiRegistry,
   definePlugin,
   checksum,
+  validateProviderRegistration,
   type PluginDefinition,
 } from '../src/index.js';
 
@@ -26,6 +27,45 @@ const definition: PluginDefinition = definePlugin({
 });
 
 describe('Plugin SDK', () => {
+  it('brokers tenant-scoped secrets only to plugins with the secrets permission', async () => {
+    let resolved: string | undefined;
+    const host = new PluginHost({
+      approve: () => Promise.resolve(['secrets']),
+      resolveSecret: (reference, pluginName) => {
+        expect(reference).toBe('secret://provider/token');
+        expect(pluginName).toBe('@handstack/secret-plugin');
+        return Promise.resolve('resolved-value');
+      },
+    });
+    const secretDefinition = definePlugin({
+      ...definition,
+      manifest: {
+        ...definition.manifest,
+        name: '@handstack/secret-plugin',
+        handstack: { ...definition.manifest.handstack, permissions: ['secrets'] },
+      },
+      setup: async ({ secrets }) => {
+        resolved = await secrets.get('secret://provider/token');
+      },
+    });
+    await host.install(secretDefinition, 'secret-plugin');
+    await host.enable('@handstack/secret-plugin');
+    expect(resolved).toBe('resolved-value');
+
+    const deniedHost = new PluginHost({ approve: () => Promise.resolve([]) });
+    const deniedDefinition = definePlugin({
+      ...secretDefinition,
+      manifest: { ...secretDefinition.manifest, name: '@handstack/denied-secret-plugin' },
+      setup: async ({ secrets }) => {
+        await secrets.get('secret://provider/token');
+      },
+    });
+    await deniedHost.install(deniedDefinition, 'denied-secret-plugin');
+    await expect(deniedHost.enable('@handstack/denied-secret-plugin')).rejects.toThrow(
+      /secrets permission/,
+    );
+  });
+
   it('stores identity configuration by organization and rejects inline secrets', () => {
     const store = new InMemoryIdentityProviderConfigurationStore();
     store.set({
@@ -72,6 +112,19 @@ describe('Plugin SDK', () => {
         permissions: [],
       });
     }).toThrow(/capabilities/);
+  });
+
+  it('accepts vector providers as a governed extension point', () => {
+    const registration = {
+      providerId: 'qdrant',
+      displayName: 'Qdrant Vector Store',
+      kind: 'vector' as const,
+      capabilities: ['vector.upsert', 'vector.search'],
+      configurationSchema: { type: 'object' },
+    };
+    expect(() => {
+      validateProviderRegistration(registration);
+    }).not.toThrow();
   });
 
   it('forwards identity registration through the host boundary', async () => {
@@ -352,5 +405,28 @@ describe('Plugin SDK', () => {
     await expect(host.enable('@handstack/unapproved')).rejects.toThrow(/isolated/);
     const denied = new PluginHost({ approve: () => Promise.resolve(['secrets']) });
     await expect(denied.install(unapproved, 'x')).resolves.toBeDefined();
+  });
+
+  it('passes the verified source artifact to an isolated RPC boundary', async () => {
+    let received = '';
+    const isolated: PluginDefinition = {
+      ...definition,
+      manifest: {
+        ...definition.manifest,
+        name: '@handstack/isolated-source',
+        handstack: { ...definition.manifest.handstack, mode: 'isolated' },
+      },
+    };
+    const host = new PluginHost({
+      approve: () => Promise.resolve([]),
+      isolatedRpc: (_plugin, context, sourceBytes) => {
+        received = new TextDecoder().decode(sourceBytes);
+        expect(context.mode).toBe('isolated');
+        return Promise.resolve();
+      },
+    });
+    await host.install(isolated, 'verified-source');
+    await host.enable(isolated.manifest.name);
+    expect(received).toBe('verified-source');
   });
 });

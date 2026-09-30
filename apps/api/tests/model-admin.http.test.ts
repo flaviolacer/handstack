@@ -3,7 +3,10 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AuthRuntimeService } from '../src/auth/auth-runtime.service.js';
 import { createApplication } from '../src/main.js';
+import { AuditRuntimeService } from '../src/audit/audit-runtime.service.js';
 import { ModelAdminRuntimeService } from '../src/models/model-admin-runtime.service.js';
+import { AgentRuntimeService } from '../src/agents/agent-runtime.service.js';
+import { WorkflowRuntimeService } from '../src/workflows/workflow-runtime.service.js';
 
 const organizationId = 'model-admin-organization';
 const password = 'model admin password long enough';
@@ -85,6 +88,12 @@ describe('model administration HTTP contract', () => {
     );
     expect(document.paths).toHaveProperty('/api/v1/organizations/{organizationId}/evaluation-runs');
     expect(document.paths).toHaveProperty(
+      '/api/v1/organizations/{organizationId}/red-team-campaigns',
+    );
+    expect(document.paths).toHaveProperty(
+      '/api/v1/organizations/{organizationId}/red-team-campaigns/{campaignId}/execute',
+    );
+    expect(document.paths).toHaveProperty(
       '/api/v1/organizations/{organizationId}/models/{modelId}/evaluation-gates',
     );
     expect(document.paths).toHaveProperty(
@@ -100,6 +109,47 @@ describe('model administration HTTP contract', () => {
     );
     expect(JSON.stringify(document.paths)).toContain('dataClassificationAllowed');
     expect(JSON.stringify(document.paths)).toContain('hasSecret');
+  });
+
+  it('registers and lists a versioned red-team campaign with all required vectors', async () => {
+    const headers = { authorization: `Bearer ${adminToken}` };
+    const vectors = [
+      'jailbreak',
+      'indirect_prompt_injection',
+      'data_exfiltration',
+      'cross_tenant_access',
+      'unsafe_tool_use',
+      'excessive_agency',
+      'denial_of_wallet',
+      'rag_poisoning',
+    ];
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${organizationId}/red-team-campaigns`,
+      headers,
+      payload: {
+        targetKind: 'MODEL',
+        targetId: 'model-candidate',
+        campaignVersion: 'campaign-v1',
+        scenarios: vectors.map((vector) => ({
+          id: `scenario-${vector}`,
+          vector,
+          input: {
+            prompt: `attack-${vector}`,
+            expected: { mustNotContain: ['unauthorized-secret'] },
+          },
+        })),
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({ status: 'DRAFT', scenarioCount: 8 });
+    const listed = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${organizationId}/red-team-campaigns`,
+      headers,
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json<{ items: unknown[] }>().items).toHaveLength(1);
   });
 
   it('requires authentication, models.manage and exact organization scope', async () => {
@@ -177,10 +227,9 @@ describe('model administration HTTP contract', () => {
     expect(JSON.stringify(providers.json())).not.toContain('secretReference');
 
     const audit = await runtime.registry.listAuditEvents(organizationId);
-    expect(audit.items.map(({ eventType }) => eventType)).toEqual([
-      'PROVIDER_REGISTERED',
-      'MODEL_REGISTERED',
-    ]);
+    expect(audit.items.map(({ eventType }) => eventType)).toEqual(
+      expect.arrayContaining(['PROVIDER_REGISTERED', 'MODEL_REGISTERED']),
+    );
   });
 
   it('rejects unknown fields and secret-like public configuration', async () => {
@@ -432,6 +481,43 @@ describe('model administration HTTP contract', () => {
         ),
       );
     });
+    const redTeamVectors = [
+      'jailbreak',
+      'indirect_prompt_injection',
+      'data_exfiltration',
+      'cross_tenant_access',
+      'unsafe_tool_use',
+      'excessive_agency',
+      'denial_of_wallet',
+      'rag_poisoning',
+    ];
+    const redTeamCampaign = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${organizationId}/red-team-campaigns`,
+      headers,
+      payload: {
+        targetKind: 'MODEL',
+        targetId: modelId,
+        campaignVersion: 'provider-backed-v1',
+        scenarios: redTeamVectors.map((vector) => ({
+          id: `provider-${vector}`,
+          vector,
+          input: {
+            prompt: `Verify safe behavior for ${vector}`,
+            expected: { mustNotContain: ['forbidden-secret-marker'] },
+          },
+        })),
+      },
+    });
+    expect(redTeamCampaign.statusCode).toBe(201);
+    const redTeamExecution = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${organizationId}/red-team-campaigns/${redTeamCampaign.json<{ id: string }>().id}/execute`,
+      headers,
+    });
+    expect(redTeamExecution.statusCode).toBe(201);
+    expect(redTeamExecution.json()).toMatchObject({ status: 'PASSED', scenarioCount: 8 });
+    expect(JSON.stringify(redTeamExecution.json())).not.toContain('approved');
     const runResponse = await app.inject({
       method: 'POST',
       url: `/api/v1/organizations/${organizationId}/evaluation-runs`,
@@ -480,6 +566,41 @@ describe('model administration HTTP contract', () => {
     });
     expect(publishResponse.statusCode).toBe(201);
     expect(publishResponse.json()).toMatchObject({ lifecycle: 'PUBLISHED' });
+
+    const failingRedTeamCampaign = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${organizationId}/red-team-campaigns`,
+      headers,
+      payload: {
+        targetKind: 'MODEL',
+        targetId: modelId,
+        campaignVersion: 'failing-oracle-v1',
+        scenarios: redTeamVectors.map((vector) => ({
+          id: `failing-${vector}`,
+          vector,
+          input: {
+            prompt: `Verify failing oracle for ${vector}`,
+            expected: { mustContain: ['never-present-marker'] },
+          },
+        })),
+      },
+    });
+    expect(failingRedTeamCampaign.statusCode).toBe(201);
+    const failedExecution = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${organizationId}/red-team-campaigns/${failingRedTeamCampaign.json<{ id: string }>().id}/execute`,
+      headers,
+    });
+    expect(failedExecution.statusCode).toBe(201);
+    const failedCampaign = failedExecution.json<{
+      status: string;
+      scenarioCount: number;
+      findings: { severity: string }[];
+    }>();
+    expect(failedCampaign.status).toBe('FAILED');
+    expect(failedCampaign.scenarioCount).toBe(8);
+    expect(failedCampaign.findings.some(({ severity }) => severity === 'HIGH')).toBe(true);
+    expect(JSON.stringify(failedExecution.json())).not.toContain('approved');
 
     const promoteNative = async (
       adapter: 'anthropic' | 'gemini',
@@ -574,6 +695,21 @@ describe('model administration HTTP contract', () => {
       '{"answer":"approved"}',
       '{"answer":"approved"}',
     ]);
+    const secretAccesses = await app
+      .get(AuditRuntimeService)
+      .query(organizationId, 'SECRET_ACCESSED');
+    expect(secretAccesses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          resourceType: 'secret-provider',
+          resourceId: 'HANDSTACK_SECRET_ANTHROPIC_TEST',
+        }),
+        expect.objectContaining({
+          resourceType: 'secret-provider',
+          resourceId: 'HANDSTACK_SECRET_GEMINI_TEST',
+        }),
+      ]),
+    );
     const forbiddenExecution = await app.inject({
       method: 'POST',
       url: `/api/v1/organizations/${organizationId}/model-responses`,
@@ -634,6 +770,33 @@ describe('model administration HTTP contract', () => {
     });
     expect(promptGate.statusCode).toBe(201);
     expect(promptGate.json()).toMatchObject({ promptVersion: { lifecycle: 'EVALUATED' } });
+    const promptRedTeamCampaign = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${organizationId}/red-team-campaigns`,
+      headers,
+      payload: {
+        targetKind: 'PROMPT',
+        targetId: promptVersionId,
+        campaignVersion: 'prompt-executor-v1',
+        scenarios: redTeamVectors.map((vector) => ({
+          id: `prompt-${vector}`,
+          vector,
+          input: {
+            prompt: `Check prompt safety for ${vector}`,
+            expected: { mustNotContain: ['prompt-private-output-marker'] },
+          },
+        })),
+      },
+    });
+    expect(promptRedTeamCampaign.statusCode).toBe(201);
+    const promptRedTeamExecution = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${organizationId}/red-team-campaigns/${promptRedTeamCampaign.json<{ id: string }>().id}/execute`,
+      headers,
+    });
+    expect(promptRedTeamExecution.statusCode).toBe(201);
+    expect(promptRedTeamExecution.json()).toMatchObject({ status: 'PASSED', scenarioCount: 8 });
+    expect(JSON.stringify(promptRedTeamExecution.json())).not.toContain('{"answer":"approved"}');
     for (const action of ['approve', 'publish']) {
       const promotion = await app.inject({
         method: 'POST',
@@ -698,5 +861,101 @@ describe('model administration HTTP contract', () => {
     });
     expect(response.statusCode).toBe(400);
     expect(JSON.stringify(response.json())).not.toContain('sensitive');
+  });
+
+  it('executes red-team campaigns through the published Agent and manual Workflow runtimes', async () => {
+    const vectors = [
+      'jailbreak',
+      'indirect_prompt_injection',
+      'data_exfiltration',
+      'cross_tenant_access',
+      'unsafe_tool_use',
+      'excessive_agency',
+      'denial_of_wallet',
+      'rag_poisoning',
+    ] as const;
+    const models = runtime.execution;
+    const chat = vi.spyOn(models, 'chat').mockResolvedValue({
+      content: 'agent-safe-marker raw-agent-private-response',
+      finishReason: 'stop',
+      usage: { inputTokens: 1, outputTokens: 1 },
+    });
+
+    const agents = app.get(AgentRuntimeService);
+    const agent = await agents.create({
+      organizationId,
+      slug: 'redteam-agent',
+      name: 'Red-team agent',
+    });
+    const agentDraft = await agents.createVersion({
+      organizationId,
+      agentId: agent.id,
+      model: 'redteam-model',
+      systemPrompt: 'Answer safely.',
+      configuration: { publishChannels: ['REST_API'] },
+    });
+    await agents.publish(organizationId, agent.id, agentDraft.id);
+
+    const workflows = app.get(WorkflowRuntimeService);
+    const workflow = await workflows.create({
+      organizationId,
+      name: 'Red-team manual flow',
+      trigger: 'manual',
+      nodes: [{ id: 'generate', kind: 'LLM', config: { model: 'redteam-model' } }],
+      edges: [],
+    });
+    await workflows.publish(organizationId, workflow.id);
+
+    const registerAndExecute = async (
+      targetKind: 'AGENT' | 'WORKFLOW',
+      targetId: string,
+      requireOutput: (vector: (typeof vectors)[number]) => string,
+    ) => {
+      const now = new Date();
+      const campaign = await runtime.redTeam.register({
+        id: `${targetKind.toLowerCase()}-red-team-campaign`,
+        tenantId: organizationId,
+        organizationId,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+        targetKind,
+        targetId,
+        campaignVersion: 'executor-v1',
+        status: 'DRAFT',
+        findings: [],
+        scenarios: vectors.map((vector) => {
+          const requiredOutput = requireOutput(vector);
+          return {
+            id: `${targetKind.toLowerCase()}-${vector}`,
+            vector,
+            input: {
+              prompt: `red-team ${vector} workflow marker`,
+              expected: { mustContain: [requiredOutput] },
+            },
+          };
+        }),
+      });
+      return runtime.redTeam.execute(organizationId, campaign.id);
+    };
+
+    const agentCampaign = await registerAndExecute('AGENT', agent.id, () => 'agent-safe-marker');
+    expect(agentCampaign.status).toBe('PASSED');
+    expect(JSON.stringify(agentCampaign)).not.toContain('raw-agent-private-response');
+    expect(agentCampaign.findings).toHaveLength(vectors.length);
+
+    chat.mockResolvedValue({
+      content: 'workflow-safe-marker raw-workflow-private-response',
+      finishReason: 'stop',
+      usage: { inputTokens: 1, outputTokens: 1 },
+    });
+    const workflowCampaign = await registerAndExecute(
+      'WORKFLOW',
+      workflow.id,
+      () => 'workflow-safe-marker',
+    );
+    expect(workflowCampaign.status).toBe('PASSED');
+    expect(JSON.stringify(workflowCampaign)).not.toContain('raw-workflow-private-response');
+    expect(workflowCampaign.findings).toHaveLength(vectors.length);
   });
 });

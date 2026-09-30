@@ -14,6 +14,7 @@ import type {
   EvaluationRunResult,
   ModelAuditEvent,
   ModelAuditEventType,
+  ModelApproval,
   ModelDefinition,
   Prompt,
   PromptEvaluationGate,
@@ -24,6 +25,7 @@ import type {
 const providerRepository = repositoryName('model-providers');
 const modelRepository = repositoryName('model-definitions');
 const gateRepository = repositoryName('model-evaluation-gates');
+const approvalRepository = repositoryName('model-approvals');
 const promptRepository = repositoryName('prompts');
 const promptVersionRepository = repositoryName('prompt-versions');
 const promptGateRepository = repositoryName('prompt-evaluation-gates');
@@ -35,6 +37,7 @@ export const modelRegistrySchema = {
     providers: providerRepository,
     models: modelRepository,
     gates: gateRepository,
+    approvals: approvalRepository,
     prompts: promptRepository,
     promptVersions: promptVersionRepository,
     promptGates: promptGateRepository,
@@ -46,6 +49,13 @@ const directTelemetry: AiGovernanceTelemetry = {
   measure: (_operation, work) => work(),
   measureStream: (_operation, work) => work(),
 };
+
+export type ModelPublicationTarget = 'MODEL' | 'PROMPT';
+export type ModelPublicationGate = (
+  organizationId: string,
+  targetKind: ModelPublicationTarget,
+  targetId: string,
+) => Promise<void>;
 
 async function all<
   T extends { id: string; tenantId: string; version: number; createdAt: Date; updatedAt: Date },
@@ -74,6 +84,7 @@ export class ModelRegistry {
     private readonly evaluationProvider?: EvaluationProvider,
     private readonly telemetry: AiGovernanceTelemetry = directTelemetry,
     private readonly now: () => Date = () => new Date(),
+    private readonly publicationGate?: ModelPublicationGate,
   ) {
     this.providers = adapter.repository(providerRepository);
     this.models = adapter.repository(modelRepository);
@@ -271,7 +282,11 @@ export class ModelRegistry {
     });
   }
 
-  async approve(organizationId: string, modelId: string): Promise<ModelDefinition> {
+  async approve(
+    organizationId: string,
+    modelId: string,
+    approval: Partial<Pick<ModelApproval, 'approvedBy' | 'justification' | 'expiresAt'>> = {},
+  ): Promise<ModelDefinition> {
     return this.telemetry.measure('model.approve', () =>
       this.adapter.run(async (context) => {
         const models = context.repository<ModelDefinition>(modelRepository);
@@ -284,6 +299,24 @@ export class ModelRegistry {
           { ...model, version: model.version + 1, updatedAt, lifecycle: 'APPROVED' },
           model.version,
         );
+        const approvedAt = updatedAt;
+        await context.repository<ModelApproval>(approvalRepository).insert({
+          id: uuidV7(approvedAt.getTime()),
+          tenantId: organizationId,
+          organizationId,
+          version: 1,
+          createdAt: approvedAt,
+          updatedAt: approvedAt,
+          modelDefinitionId: model.id,
+          gateId: model.approvedGateId,
+          approvedBy: approval.approvedBy ?? 'system',
+          approvedAt,
+          ...(approval.expiresAt === undefined ? {} : { expiresAt: approval.expiresAt }),
+          ...(approval.justification === undefined
+            ? {}
+            : { justification: approval.justification }),
+          override: false,
+        });
         await this.appendAudit(
           context,
           organizationId,
@@ -308,17 +341,37 @@ export class ModelRegistry {
         const models = context.repository<ModelDefinition>(modelRepository);
         const model = await models.findById(organizationId, modelId);
         if (model === undefined) throw new Error('Model not found');
-        if (model.lifecycle !== 'APPROVED' || model.approvedGateId === undefined)
+        if (model.lifecycle !== 'APPROVED')
           throw new Error('Approved evaluation gate is required for publication');
-        const gate = await context
-          .repository<EvaluationGate>(gateRepository)
-          .findById(organizationId, model.approvedGateId);
+        await this.publicationGate?.(organizationId, 'MODEL', modelId);
+        const approvals = await all(
+          context.repository<ModelApproval>(approvalRepository),
+          organizationId,
+        );
+        const approval =
+          approvals.find((item) => item.modelDefinitionId === model.id && item.override) ??
+          approvals.find(
+            (item) => item.modelDefinitionId === model.id && item.gateId === model.approvedGateId,
+          );
+        const override =
+          approval?.override &&
+          (approval.expiresAt === undefined || dateTime(approval.expiresAt) > this.now().getTime());
+        const gate =
+          model.approvedGateId === undefined
+            ? undefined
+            : await context
+                .repository<EvaluationGate>(gateRepository)
+                .findById(organizationId, model.approvedGateId);
         if (
-          gate === undefined ||
-          !gate.passed ||
-          gate.suiteVersion !== model.evaluationSuiteVersion
+          !override &&
+          (gate === undefined ||
+            !gate.passed ||
+            gate.suiteVersion !== model.evaluationSuiteVersion ||
+            approval === undefined ||
+            (approval.expiresAt !== undefined &&
+              dateTime(approval.expiresAt) <= this.now().getTime()))
         )
-          throw new Error('Evaluation gate is stale or failed');
+          throw new Error('Evaluation gate is stale or failed (model approval missing or expired)');
         const updatedAt = this.now();
         const updated = await models.update(
           { ...model, version: model.version + 1, updatedAt, lifecycle: 'PUBLISHED' },
@@ -331,10 +384,65 @@ export class ModelRegistry {
           'model',
           model.id,
           {
-            gateId: model.approvedGateId,
+            ...(model.approvedGateId === undefined ? {} : { gateId: model.approvedGateId }),
             from: model.lifecycle,
             to: 'PUBLISHED',
           },
+          updatedAt,
+        );
+        return updated;
+      }),
+    );
+  }
+
+  async overrideApproval(
+    organizationId: string,
+    modelId: string,
+    input: { approvedBy: string; justification: string; expiresAt: Date },
+  ): Promise<ModelDefinition> {
+    return this.telemetry.measure('model.approve', () =>
+      this.adapter.run(async (context) => {
+        if (input.approvedBy.trim() === '' || input.justification.trim() === '')
+          throw new Error('Override approver and justification are required');
+        if (input.expiresAt.getTime() <= this.now().getTime())
+          throw new Error('Override expiration must be in the future');
+        const models = context.repository<ModelDefinition>(modelRepository);
+        const model = await models.findById(organizationId, modelId);
+        if (model === undefined) throw new Error('Model not found');
+        if (model.lifecycle === 'PUBLISHED' || model.lifecycle === 'RETIRED')
+          throw new Error('Published or retired models cannot receive an override');
+        const updatedAt = this.now();
+        const updated = await models.update(
+          {
+            ...model,
+            version: model.version + 1,
+            updatedAt,
+            lifecycle: 'APPROVED',
+          },
+          model.version,
+        );
+        await context.repository<ModelApproval>(approvalRepository).insert({
+          id: uuidV7(updatedAt.getTime()),
+          tenantId: organizationId,
+          organizationId,
+          version: 1,
+          createdAt: updatedAt,
+          updatedAt,
+          modelDefinitionId: model.id,
+          gateId: `override:${model.id}`,
+          approvedBy: input.approvedBy,
+          approvedAt: updatedAt,
+          expiresAt: input.expiresAt,
+          justification: input.justification,
+          override: true,
+        });
+        await this.appendAudit(
+          context,
+          organizationId,
+          'MODEL_APPROVAL_OVERRIDDEN',
+          'model',
+          model.id,
+          { from: model.lifecycle, to: 'APPROVED', override: true },
           updatedAt,
         );
         return updated;
@@ -441,18 +549,30 @@ export class ModelRegistry {
       this.adapter.run(async (context) => {
         const versions = context.repository<PromptVersion>(promptVersionRepository);
         const current = await versions.findById(organizationId, promptVersionId);
-        if (current?.lifecycle !== 'APPROVED' || current.approvedGateId === undefined)
+        if (current?.lifecycle !== 'APPROVED')
           throw new Error('Approved prompt evaluation gate is required for publication');
+        await this.publicationGate?.(organizationId, 'PROMPT', promptVersionId);
+        const approvals = await all(
+          context.repository<ModelApproval>(approvalRepository),
+          organizationId,
+        );
+        const approval = approvals.find(
+          (item) => item.promptVersionId === current.id && item.override,
+        );
         const gate = await context
           .repository<PromptEvaluationGate>(promptGateRepository)
-          .findById(organizationId, current.approvedGateId);
+          .findById(organizationId, current.approvedGateId ?? '');
+        const override =
+          approval?.override &&
+          (approval.expiresAt === undefined || dateTime(approval.expiresAt) > this.now().getTime());
         if (
-          gate === undefined ||
-          !gate.passed ||
-          gate.promptVersionId !== current.id ||
-          gate.promptContentDigest !== current.contentDigest ||
-          gate.modelDefinitionId !== current.modelDefinitionId ||
-          gate.suiteVersion !== current.evaluationSuiteVersion
+          !override &&
+          (gate === undefined ||
+            !gate.passed ||
+            gate.promptVersionId !== current.id ||
+            gate.promptContentDigest !== current.contentDigest ||
+            gate.modelDefinitionId !== current.modelDefinitionId ||
+            gate.suiteVersion !== current.evaluationSuiteVersion)
         )
           throw new Error('Prompt evaluation gate is stale or failed');
         const updatedAt = this.now();
@@ -466,7 +586,62 @@ export class ModelRegistry {
           'PROMPT_PUBLISHED',
           'prompt_version',
           current.id,
-          { promptId: current.promptId, gateId: gate.id, versionLabel: current.versionLabel },
+          {
+            promptId: current.promptId,
+            gateId: gate?.id ?? approval?.gateId ?? 'unknown',
+            versionLabel: current.versionLabel,
+          },
+          updatedAt,
+        );
+        return updated;
+      }),
+    );
+  }
+
+  async overridePromptApproval(
+    organizationId: string,
+    promptVersionId: string,
+    input: { approvedBy: string; justification: string; expiresAt: Date },
+  ): Promise<PromptVersion> {
+    return this.telemetry.measure('prompt.approve', () =>
+      this.adapter.run(async (context) => {
+        if (input.approvedBy.trim() === '' || input.justification.trim() === '')
+          throw new Error('Override approver and justification are required');
+        if (input.expiresAt.getTime() <= this.now().getTime())
+          throw new Error('Override expiration must be in the future');
+        const versions = context.repository<PromptVersion>(promptVersionRepository);
+        const current = await versions.findById(organizationId, promptVersionId);
+        if (current === undefined) throw new Error('Prompt version not found');
+        if (current.lifecycle === 'PUBLISHED' || current.lifecycle === 'RETIRED')
+          throw new Error('Published or retired prompt versions cannot receive an override');
+        const updatedAt = this.now();
+        const updated = await versions.update(
+          { ...current, version: current.version + 1, updatedAt, lifecycle: 'APPROVED' },
+          current.version,
+        );
+        await context.repository<ModelApproval>(approvalRepository).insert({
+          id: uuidV7(updatedAt.getTime()),
+          tenantId: organizationId,
+          organizationId,
+          version: 1,
+          createdAt: updatedAt,
+          updatedAt,
+          modelDefinitionId: current.modelDefinitionId,
+          promptVersionId: current.id,
+          gateId: `prompt-override:${current.id}`,
+          approvedBy: input.approvedBy,
+          approvedAt: updatedAt,
+          expiresAt: input.expiresAt,
+          justification: input.justification,
+          override: true,
+        });
+        await this.appendAudit(
+          context,
+          organizationId,
+          'PROMPT_APPROVAL_OVERRIDDEN',
+          'prompt_version',
+          current.id,
+          { promptId: current.promptId, override: true, to: 'APPROVED' },
           updatedAt,
         );
         return updated;
@@ -596,4 +771,8 @@ export class ModelRegistry {
     if (organizationId.length === 0 || entity.tenantId !== organizationId)
       throw new Error('Invalid organization scope');
   }
+}
+
+function dateTime(value: Date | string): number {
+  return value instanceof Date ? value.getTime() : Date.parse(value);
 }

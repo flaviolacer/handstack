@@ -21,7 +21,10 @@ import { GatewayRuntimeService } from './gateway/gateway-runtime.service.js';
 import { OpenAiCompatibleController } from './gateway/openai-compatible.controller.js';
 import { BudgetController } from './budgets/budget.controller.js';
 import { BudgetRuntimeService } from './budgets/budget-runtime.service.js';
-import { CapabilityController } from './capabilities/capability.controller.js';
+import {
+  CapabilityController,
+  PublicCapabilityController,
+} from './capabilities/capability.controller.js';
 import { CapabilityRuntimeService } from './capabilities/capability-runtime.service.js';
 import { McpController } from './mcp/mcp.controller.js';
 import { PluginRegistryController } from './plugins/plugin-registry.controller.js';
@@ -31,7 +34,7 @@ import {
   OperationsController,
 } from './operations/operations.controller.js';
 import { OperationsRuntimeService } from './operations/operations-runtime.service.js';
-import { AgentController } from './agents/agent.controller.js';
+import { AgentController, PublicAgentController } from './agents/agent.controller.js';
 import { AgentRuntimeService } from './agents/agent-runtime.service.js';
 import { WorkflowController } from './workflows/workflow.controller.js';
 import { WorkflowRuntimeService } from './workflows/workflow-runtime.service.js';
@@ -40,6 +43,7 @@ import { AccessRuntimeService } from './access/access-runtime.service.js';
 import { WebhookRuntimeService } from './webhooks/webhook-runtime.service.js';
 import { WebhookController } from './webhooks/webhook.controller.js';
 import { AuditRuntimeService } from './audit/audit-runtime.service.js';
+import { AuditIntegritySchedulerService } from './audit/audit-integrity-scheduler.service.js';
 import { NotificationRuntimeService } from './notifications/notification-runtime.service.js';
 import { NotificationController } from './notifications/notification.controller.js';
 import { RedisRuntimeService } from './health/redis-runtime.service.js';
@@ -52,6 +56,32 @@ import { ScimController } from './scim/scim.controller.js';
 import { ScimAdminController } from './scim/scim-admin.controller.js';
 import { ScimAuthGuard } from './scim/scim-auth.guard.js';
 import { ScimRuntimeService } from './scim/scim-runtime.service.js';
+import { SettingsController } from './settings/settings.controller.js';
+import { SettingsRuntimeService } from './settings/settings-runtime.service.js';
+import { DirectoryController } from './access/directory.controller.js';
+import { KnowledgeController } from './knowledge/knowledge.controller.js';
+import { KnowledgeWorkerController } from './knowledge/knowledge-worker.controller.js';
+import { KnowledgeRuntimeService } from './knowledge/knowledge-runtime.service.js';
+import { KnowledgeSyncSchedulerService } from './knowledge/knowledge-sync-scheduler.service.js';
+import { RoutingController } from './models/routing.controller.js';
+import { RoutingRuntimeService } from './models/routing-runtime.service.js';
+import { ServiceAccountController } from './auth/service-account.controller.js';
+import { ServiceAccountRuntimeService } from './auth/service-account-runtime.service.js';
+import { McpRuntimeService } from './mcp/mcp-runtime.service.js';
+import { PluginAdminController } from './plugins/plugin-admin.controller.js';
+import { PluginAdminRuntimeService } from './plugins/plugin-admin.runtime.js';
+import { SecretController } from './secrets/secret.controller.js';
+import { SecretRuntimeService } from './secrets/secret-runtime.service.js';
+import { WorkflowSchedulerService } from './workflows/workflow-scheduler.service.js';
+import { WorkflowWorkerController } from './workflows/workflow-worker.controller.js';
+import { PolicyController } from './policy/policy.controller.js';
+import { PolicyRuntimeService } from './policy/policy-runtime.service.js';
+import { DatabaseSettingsController } from './database/database-settings.controller.js';
+import { PrivacyController } from './privacy/privacy.controller.js';
+import { PrivacyRuntimeService } from './privacy/privacy-runtime.service.js';
+import { PrivacyRetentionSchedulerService } from './privacy/privacy-retention-scheduler.service.js';
+import { EventBusRuntimeService } from './core/event-bus-runtime.service.js';
+import { ChatRateLimitService } from './chat/chat-rate-limit.service.js';
 
 @Module({
   controllers: [
@@ -66,12 +96,16 @@ import { ScimRuntimeService } from './scim/scim-runtime.service.js';
     OpenAiCompatibleController,
     BudgetController,
     CapabilityController,
+    PublicCapabilityController,
     McpController,
+    PluginAdminController,
     PluginRegistryController,
     OperationsController,
     AsyncOperationsController,
     AgentController,
+    PublicAgentController,
     WorkflowController,
+    WorkflowWorkerController,
     AccessController,
     WebhookController,
     NotificationController,
@@ -80,12 +114,23 @@ import { ScimRuntimeService } from './scim/scim-runtime.service.js';
     IncidentStatusController,
     ScimController,
     ScimAdminController,
+    SettingsController,
+    DirectoryController,
+    KnowledgeController,
+    KnowledgeWorkerController,
+    RoutingController,
+    ServiceAccountController,
+    SecretController,
+    PolicyController,
+    DatabaseSettingsController,
+    PrivacyController,
   ],
   providers: [
     AccessTokenGuard,
     AuthRuntimeService,
     BuiltinMalwareScanner,
     ChatRuntimeService,
+    ChatRateLimitService,
     DatabaseService,
     HealthService,
     IdentityAdminTelemetryInterceptor,
@@ -102,12 +147,26 @@ import { ScimRuntimeService } from './scim/scim-runtime.service.js';
     AccessRuntimeService,
     WebhookRuntimeService,
     AuditRuntimeService,
+    AuditIntegritySchedulerService,
     NotificationRuntimeService,
     RedisRuntimeService,
     ApiMetrics,
     IncidentRuntimeService,
     ScimAuthGuard,
     ScimRuntimeService,
+    SettingsRuntimeService,
+    KnowledgeRuntimeService,
+    KnowledgeSyncSchedulerService,
+    RoutingRuntimeService,
+    ServiceAccountRuntimeService,
+    McpRuntimeService,
+    PluginAdminRuntimeService,
+    SecretRuntimeService,
+    WorkflowSchedulerService,
+    PolicyRuntimeService,
+    PrivacyRuntimeService,
+    PrivacyRetentionSchedulerService,
+    EventBusRuntimeService,
     { provide: APP_INTERCEPTOR, useClass: ApiMetricsInterceptor },
   ],
 })

@@ -1,17 +1,13 @@
 import Link from 'next/link';
+import { DashboardClient } from './dashboard-client';
+import { AdminNavigation } from './admin-navigation';
 
 export default function HomePage() {
   return (
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">HandStack</div>
-        <nav className="nav" aria-label="Primary navigation">
-          <Link href="/">Dashboard</Link>
-          <Link href="/chat">Chat</Link>
-          <Link href="/operations/dead-letters">Operations</Link>
-          <Link href="/settings/identity-providers">Settings</Link>
-          <Link href="/help">Help Center</Link>
-        </nav>
+        <AdminNavigation current="/" />
       </aside>
       <main className="main">
         <section className="hero">
@@ -35,6 +31,7 @@ export default function HomePage() {
               <p>Browse packaged, offline guidance.</p>
             </Link>
           </div>
+          <DashboardClient />
         </section>
       </main>
     </div>

@@ -1,5 +1,7 @@
+import { createCipheriv, createHash, randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { Page, Repository, RepositoryName, TenantEntity } from '@handstack/domain';
+import { MasterKey } from '@handstack/core';
 import {
   InMemoryWebhookDeliveryStore,
   InMemoryWebhookSecretProvider,
@@ -305,14 +307,91 @@ describe('WebhookDispatcher', () => {
       if (name.length === 0) throw new Error('repository required');
       return repository as unknown as Repository<T>;
     };
-    const first = new RepositoryWebhookSecretProvider(factory, 'master-key-for-tests');
+    const masterKey = MasterKey.decode('a'.repeat(64));
+    const first = new RepositoryWebhookSecretProvider(factory, masterKey);
     await first.put('org', '1234567890123456', '11111111-1111-4111-8111-111111111111');
-    const second = new RepositoryWebhookSecretProvider(factory, 'master-key-for-tests');
+    expect(rows.get('org')?.currentCiphertext).toMatch(/^hs-aes256gcm-v1\./u);
+    const second = new RepositoryWebhookSecretProvider(factory, masterKey);
     await expect(second.get('org')).resolves.toMatchObject({
       current: '1234567890123456',
       keyId: '11111111-1111-4111-8111-111111111111',
     });
     expect(rows.get('org')?.currentCiphertext).not.toContain('1234567890123456');
+  });
+
+  it('migrates legacy webhook ciphertext to HANDSTACK_MASTER_KEY on read', async () => {
+    const rows = new Map<string, WebhookSecretEntity>();
+    const now = new Date();
+    const legacyMasterKey = 'legacy-webhook-master-key-for-tests';
+    rows.set('org', {
+      id: 'org',
+      tenantId: 'org',
+      currentCiphertext: encryptLegacyWebhookSecret('current-signing-secret', legacyMasterKey),
+      currentKeyId: 'current-key',
+      previousCiphertext: encryptLegacyWebhookSecret('previous-signing-secret', legacyMasterKey),
+      previousKeyId: 'previous-key',
+      previousExpiresAt: new Date(now.getTime() + 60_000),
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const repository: Repository<WebhookSecretEntity> = {
+      findById: async (_tenant, id) => await Promise.resolve(rows.get(id)),
+      list: async (tenant) =>
+        await Promise.resolve({
+          items: [...rows.values()].filter((item) => item.tenantId === tenant),
+        }),
+      insert: async (entity) => {
+        rows.set(entity.id, entity);
+        return await Promise.resolve(entity);
+      },
+      update: async (entity) => {
+        rows.set(entity.id, entity);
+        return await Promise.resolve(entity);
+      },
+      delete: async () => await Promise.resolve(true),
+    };
+    const factory = <T extends TenantEntity>(name: RepositoryName): Repository<T> => {
+      if (name.length === 0) throw new Error('repository required');
+      return repository as unknown as Repository<T>;
+    };
+    const masterKey = MasterKey.decode('b'.repeat(64));
+    const accesses: { organizationId: string; keyId: string }[] = [];
+    const migrating = new RepositoryWebhookSecretProvider(
+      factory,
+      masterKey,
+      legacyMasterKey,
+      (access) => {
+        accesses.push(access);
+        return Promise.resolve();
+      },
+    );
+
+    await expect(migrating.get('org')).resolves.toMatchObject({
+      current: 'current-signing-secret',
+      previous: { secret: 'previous-signing-secret', keyId: 'previous-key' },
+    });
+    expect(accesses).toEqual([
+      { organizationId: 'org', keyId: 'current-key' },
+      { organizationId: 'org', keyId: 'previous-key' },
+    ]);
+    const migrated = rows.get('org');
+    expect(migrated?.version).toBe(2);
+    expect(migrated?.currentCiphertext).toMatch(/^hs-aes256gcm-v1\./u);
+    expect(migrated?.previousCiphertext).toMatch(/^hs-aes256gcm-v1\./u);
+    expect(migrated?.currentCiphertext).not.toContain('current-signing-secret');
+    await expect(
+      new RepositoryWebhookSecretProvider(factory, masterKey).get('org'),
+    ).resolves.toMatchObject({
+      current: 'current-signing-secret',
+      previous: { secret: 'previous-signing-secret' },
+    });
+    const current = rows.get('org');
+    if (current === undefined) throw new Error('Expected migrated webhook secret');
+    rows.set('org', { ...current, previousExpiresAt: new Date(Date.now() - 1) });
+    await migrating.get('org');
+    expect(rows.get('org')).not.toHaveProperty('previousCiphertext');
+    expect(rows.get('org')).not.toHaveProperty('previousKeyId');
   });
 
   it('persists tenant endpoint configuration independently from secrets', async () => {
@@ -482,6 +561,44 @@ describe('WebhookDispatcher', () => {
     expect(events).toEqual(['webhook.attempt', 'webhook.failed', 'webhook.dead_lettered']);
   });
 
+  it('propagates bounded execution context only to audit events', async () => {
+    const auditEvents: unknown[] = [];
+    const dispatcher = new WebhookDispatcher({
+      secret: '1234567890123456',
+      retryBaseMs: 0,
+      maxAttempts: 1,
+      audit: {
+        record: async (event) => {
+          auditEvents.push(event);
+          await Promise.resolve();
+        },
+      },
+      transport: { send: () => Promise.resolve() },
+    });
+    await dispatcher.dispatch({
+      id: 'audit-context',
+      organizationId: 'org',
+      event: 'user.created',
+      payload: { secret: 'must-not-be-in-audit-context' },
+      endpoint: 'https://example.test/hook',
+      context: {
+        requestId: 'request-webhook',
+        traceId: 'trace-webhook',
+        principalId: 'principal-webhook',
+        source: 'API',
+      },
+    });
+    expect(auditEvents[0]).toMatchObject({
+      context: {
+        requestId: 'request-webhook',
+        traceId: 'trace-webhook',
+        principalId: 'principal-webhook',
+        source: 'API',
+      },
+    });
+    expect(JSON.stringify(auditEvents)).not.toContain('must-not-be-in-audit-context');
+  });
+
   it('accepts the previous signing key only during rotation overlap', () => {
     const body = '{"id":"rotation"}';
     const signature = signWebhookBody(body, '1234567890123456');
@@ -503,3 +620,11 @@ describe('WebhookDispatcher', () => {
     ).toBeUndefined();
   });
 });
+
+function encryptLegacyWebhookSecret(secret: string, masterKey: string): string {
+  const key = createHash('sha256').update(masterKey).digest();
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const ciphertext = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()]);
+  return [iv, cipher.getAuthTag(), ciphertext].map((part) => part.toString('base64url')).join('.');
+}

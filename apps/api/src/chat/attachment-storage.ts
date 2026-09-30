@@ -1,8 +1,9 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, resolve, sep } from 'node:path';
 import type { AttachmentStorage, MalwareScanner } from '@handstack/chat';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { DatabaseService } from '../database/database.service.js';
 
 interface DownloadClaim {
   readonly key: string;
@@ -18,13 +19,11 @@ export class LocalAttachmentStorage implements AttachmentStorage {
   private readonly root: string;
   private readonly signingSecret: string;
 
-  constructor() {
-    const configured =
-      process.env.HANDSTACK_ATTACHMENT_STORAGE_PATH ?? '.handstack-data/attachments';
-    this.root = resolve(configured);
+  constructor(@Inject(DatabaseService) database: DatabaseService) {
+    this.root = resolve(database.config.attachments.storagePath);
     this.signingSecret =
-      process.env.HANDSTACK_ATTACHMENT_SIGNING_SECRET ??
-      process.env.HANDSTACK_ACCESS_TOKEN_SECRET ??
+      database.config.security.attachmentSigningSecret ??
+      database.config.security.accessTokenSecret ??
       '';
   }
 
@@ -32,6 +31,21 @@ export class LocalAttachmentStorage implements AttachmentStorage {
     const target = this.target(key);
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, content, { flag: 'wx' });
+  }
+
+  /** Readiness probe for the configured object/attachment storage root. */
+  async health(): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    try {
+      await access(this.root);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  isConfigured(): boolean {
+    return this.signingSecret.length >= 32;
   }
 
   async delete(key: string): Promise<void> {

@@ -7,7 +7,7 @@ permissions: [mcp.use, capability.execute]
 features: [mcp, capabilities, agents]
 deploymentProfiles: [compact, distributed]
 introducedIn: 0.8.0
-lastReviewedAt: 2026-09-09
+lastReviewedAt: 2026-09-28
 owner: platform-team
 tags: [mcp, tools, agents]
 ---
@@ -31,6 +31,13 @@ and are never returned by the registry.
 2. Call `tools/list` through `discover` and review the returned schemas.
 3. Materialize the discovered tools with `registerCapabilities`; they are AGENT-only capabilities.
 4. Include the capability names in the AgentVersion allowlist and run through AgentHarness.
+
+If the remote server restarts or its stdio process becomes unusable, call `reconnect` with the
+organization and server identifiers. This closes the current transport without retrying the
+possibly non-idempotent tool call; the next discovery or call creates a fresh transport while
+preserving the registered server and discovery cache.
+
+The equivalent CLI operation is `handstack mcp reconnect --server <server-id>`.
 
 ## Verify
 

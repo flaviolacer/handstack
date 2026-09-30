@@ -124,13 +124,19 @@ spec:
         - name: worker
           image: {{ $root.Values.images.worker.repository }}:{{ $root.Values.images.worker.tag }}
           imagePullPolicy: {{ $root.Values.images.worker.pullPolicy }}
-          args: [{{ $name | quote }}]
+          args: [{{ required (printf "workers.%s.queue is required" $name) $cfg.queue | quote }}]
           securityContext:
             {{- toYaml $root.Values.containerSecurityContext | nindent 12 }}
           envFrom:
             - configMapRef: { name: {{ include "handstack.fullname" $root }}-config }
           env:
             {{- include "handstack.env" $root | nindent 12 }}
+            - name: HANDSTACK_WORKER_ORGANIZATION_ID
+              value: {{ required "workerOrganizationId is required for worker deployments" $root.Values.workerOrganizationId | quote }}
+            - name: HANDSTACK_WORKER_HANDLER_MODULE
+              value: {{ required "workerHandlerModule is required for worker deployments" $root.Values.workerHandlerModule | quote }}
+            - name: HANDSTACK_API_URL
+              value: http://{{ include "handstack.fullname" $root }}-api:{{ $root.Values.api.port }}
           livenessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 20 }
           readinessProbe: { exec: { command: ["sh", "-c", "kill -0 1"] }, periodSeconds: 10 }
           resources:

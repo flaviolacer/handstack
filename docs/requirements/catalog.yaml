@@ -1,4 +1,8 @@
 version: 1
+# `verified` below is scoped to the individual catalog acceptance criteria. It
+# does not claim that the complete v1 specification, including Milestone 18
+# production certification, has been delivered.
+scopeStatus: partial
 requirements:
   - id: HS-AI-014
     title: Governed multimodal chat workspace
@@ -12,6 +16,7 @@ requirements:
       - packages/chat/src/execution.ts
       - apps/api/src/chat/chat.controller.ts
       - apps/api/src/chat/chat-runtime.service.ts
+      - apps/api/src/chat/chat-rate-limit.service.ts
       - apps/web/app/chat/chat-api.ts
       - apps/web/app/chat/chat-client.tsx
       - apps/web/app/chat/page.tsx
@@ -38,6 +43,7 @@ requirements:
     testPaths:
       - packages/chat/tests/chat.test.ts
       - apps/api/tests/chat.http.test.ts
+      - apps/api/tests/chat-rate-limit.test.ts
       - apps/web/tests/chat-api.test.ts
       - apps/web/tests/routes.test.tsx
       - apps/web/tests/chat-client.test.tsx
@@ -132,13 +138,13 @@ requirements:
     owner: core-team
     status: verified
     risk: high
-    affectedModules: [packages/config/src/index.ts, handstack.config.ts]
+    affectedModules: [packages/config/src/index.ts, handstack.config.ts, apps/worker/src/main.ts]
     publicContracts: [HandStackConfig, defineConfig, configFromEnvironment]
     dataEntities: []
     securityPrivacyImpact: Configuration schema rejects unknown fields and telemetry is opt-in.
-    acceptanceCriteria: SQLite compact defaults validate, MongoDB can be selected alone, and invalid adapters or ports fail startup parsing.
+    acceptanceCriteria: SQLite compact defaults validate, MongoDB can be selected alone, invalid adapters or ports fail startup parsing, and worker timeout defaults follow the configured timeout for their queue unless an explicit worker timeout overrides it.
     testIds: [HS-T-M0-CONFIG-001, HS-T-M0-CONFIG-002, HS-T-M0-CONFIG-003]
-    testPaths: [packages/config/tests/config.test.ts]
+    testPaths: [packages/config/tests/config.test.ts, apps/worker/tests/main.test.ts]
     documentationArticleIds: [getting-started/overview]
     introducedVersion: 0.1.0
   - id: HS-DOC-001
@@ -500,7 +506,9 @@ requirements:
     securityPrivacyImpact: Administrative writes are organization-scoped and serializable; authorization defaults to deny, validates the principal in the same organization, and resolves only tenant-local grants.
     acceptanceCriteria: An admin workflow creates a user and group, adds the user to the group, observes access denied before a permission grant, grants a dynamic role, observes access allowed afterward, and remains denied from another organization.
     testIds: [HS-T-M2-ADMIN-FLOW-001, HS-T-M2-USERNAME-UNIQUE-001, HS-T-M2-RBAC-TENANT-001]
-    testPaths: [packages/identity-service/tests/administration.test.ts]
+    testPaths:
+      - packages/identity-service/tests/administration.test.ts
+      - apps/api/tests/directory.http.test.ts
     documentationArticleIds: [getting-started/overview]
     introducedVersion: 0.2.0
   - id: HS-SEC-002
@@ -847,6 +855,7 @@ requirements:
     affectedModules:
       - packages/capabilities/src/index.ts
       - apps/api/src/capabilities/capability.controller.ts
+      - apps/api/src/capabilities/capability-runtime.service.ts
     publicContracts: [Capability, CapabilityRegistry, CapabilityExecutionEngine]
     dataEntities: [Capability]
     securityPrivacyImpact: capability.execute and exact organization binding protect invocation; disallowed channels fail closed.
@@ -1059,6 +1068,7 @@ requirements:
       - packages/models/src/index.ts
       - packages/model-runtime/src/index.ts
       - packages/model-provider-bootstrap/src/index.ts
+      - apps/api/src/models/model-admin-runtime.service.ts
     publicContracts: [ProviderDefinition, ProviderFactoryContext, createOfficialProviderFactories]
     dataEntities: [ProviderDefinition, ModelDefinition]
     securityPrivacyImpact: Provider configuration contains public strings only; secret values remain behind the tenant resolver and are not fetched during factory construction; Bedrock registry secrets are rejected; adapter URL validation remains authoritative.
@@ -1263,14 +1273,17 @@ requirements:
     risk: high
     affectedModules:
       - packages/mcp-client/src/index.ts
+      - apps/api/src/mcp/mcp-runtime.service.ts
       - packages/capabilities/src/index.ts
       - packages/agents/src/index.ts
     publicContracts: [McpClientRegistry, McpServerConfig, McpTool]
     dataEntities: [McpServerConfig, McpTool]
     securityPrivacyImpact: Server credentials remain runtime-only; organization mismatch, missing discovery and missing permissions fail closed before external traffic.
-    acceptanceCriteria: An authenticated server can be discovered and called; stdio and HTTP transports use JSON-RPC; tools materialize as AGENT capabilities and AgentHarness invokes them through CapabilityExecutionEngine; unauthorized and cross-tenant calls fail.
+    acceptanceCriteria: An authenticated server can be discovered and called; stdio and HTTP transports use JSON-RPC; tools materialize as AGENT capabilities and AgentHarness invokes them through CapabilityExecutionEngine; unauthorized and cross-tenant calls fail. The HTTP interoperability test uses a real McpServer over loopback HTTP, confirms unpublished tools are hidden, discovery is persisted and restored, and invocation reaches the governed engine with the remote principal context.
     testIds: [HS-T-M9-MCP-CLIENT-001]
-    testPaths: [packages/mcp-client/tests/mcp-client.test.ts]
+    testPaths:
+      - packages/mcp-client/tests/mcp-client.test.ts
+      - apps/api/tests/mcp.http.test.ts
     documentationArticleIds: [getting-started/mcp-client]
     introducedVersion: 0.8.0
   - id: HS-API-008
@@ -1288,7 +1301,7 @@ requirements:
     securityPrivacyImpact: Access tokens establish the tenant principal; cross-organization routes and unavailable channels fail closed; external errors are sanitized.
     acceptanceCriteria: Authenticated initialize, tools/list, resources/list, prompts/list and tools/call operations are served; only MCP capabilities appear; unauthorized, unknown methods and cross-tenant requests produce JSON-RPC errors; calls use the common execution engine.
     testIds: [HS-T-M10-MCP-SERVER-001]
-    testPaths: [packages/mcp-server/tests/mcp-server.test.ts, apps/api/tests/health.http.test.ts]
+    testPaths: [packages/mcp-server/tests/mcp-server.test.ts, apps/api/tests/mcp.http.test.ts]
     documentationArticleIds: [getting-started/mcp-server]
     introducedVersion: 0.9.0
   - id: HS-CORE-005
@@ -1304,7 +1317,8 @@ requirements:
     securityPrivacyImpact: Permissions are allowlisted and approved; source checksum is recorded; isolated mode fails closed without an RPC runner; manifests cannot carry secrets.
     acceptanceCriteria: Valid manifests install with checksum, lifecycle hooks run, duplicate installs fail, unapproved permission escalation fails and isolated plugins never execute in-process.
     testIds: [HS-T-M11-PLUGIN-001]
-    testPaths: [packages/plugin-sdk/tests/plugin-sdk.test.ts]
+    testPaths:
+      [packages/plugin-sdk/tests/plugin-sdk.test.ts, apps/api/tests/plugin-admin.runtime.test.ts]
     documentationArticleIds: [getting-started/plugins]
     introducedVersion: 0.10.0
   - id: HS-CORE-008
@@ -1571,7 +1585,15 @@ requirements:
     owner: ai-platform-team
     status: verified
     risk: high
-    affectedModules: [packages/knowledge/src/index.ts]
+    affectedModules:
+      - packages/knowledge/src/index.ts
+      - apps/api/src/knowledge/knowledge-runtime.service.ts
+      - apps/api/src/knowledge/knowledge.controller.ts
+      - apps/api/src/knowledge/knowledge-worker.controller.ts
+      - apps/api/src/knowledge/knowledge-sync-scheduler.service.ts
+      - apps/api/src/secrets/secret-runtime.service.ts
+      - apps/api/src/audit/audit-runtime.service.ts
+      - apps/worker/src/domain-handlers.ts
     publicContracts:
       [
         KnowledgeBase,
@@ -1585,9 +1607,20 @@ requirements:
       ]
     dataEntities: [KnowledgeBase, Document, Chunk, Embedding, DataSource]
     securityPrivacyImpact: Organization ids are required and applied to vector keys and filters; source credentials are not stored by the contracts.
-    acceptanceCriteria: Character/token/paragraph chunking rejects invalid overlap, ingestion embeds/upserts chunks, search returns only the requested organization and knowledge base, and any VectorStore implementation can be substituted.
-    testIds: [HS-T-M12-KNOWLEDGE-001]
-    testPaths: [packages/knowledge/tests/knowledge.test.ts]
+    acceptanceCriteria: Character/token/paragraph chunking rejects invalid overlap, ingestion embeds/upserts chunks, search returns only the requested organization and knowledge base, any VectorStore implementation can be substituted, durable reindex jobs preserve tenant scope, resume by cursor, and publish a knowledge-base embedding model only after successful completion; S3 source synchronization accepts only a credential reference, resolves it through the tenant-scoped vault boundary, indexes fetched content and records secret access without exposing plaintext metadata; concurrent sync scheduler instances coordinate through a persistent tenant-scoped compare-and-swap lease and release ownership for the next instance.
+    testIds: [HS-T-M12-KNOWLEDGE-001, HS-T-M12-REINDEX-001]
+    testPaths:
+      [
+        packages/knowledge/tests/knowledge.test.ts,
+        packages/knowledge/tests/source-connectors.test.ts,
+        packages/knowledge/tests/s3-source.integration.test.ts,
+        apps/api/tests/knowledge-sync.integration.test.ts,
+        apps/api/tests/knowledge-scheduler.test.ts,
+        apps/api/tests/knowledge-s3.integration.test.ts,
+        apps/api/tests/knowledge-reindex.http.test.ts,
+        apps/api/tests/knowledge-reindex.distributed.integration.test.ts,
+        apps/worker/tests/domain-handlers.test.ts,
+      ]
     documentationArticleIds: [getting-started/knowledge]
     introducedVersion: 0.11.0
   - id: HS-API-009
@@ -1604,7 +1637,7 @@ requirements:
     securityPrivacyImpact: Source locators are validated, checksums are compared on install, and registry reads do not execute plugin code or reveal secrets.
     acceptanceCriteria: Official/community entries publish and list, installed entries are tracked, newer semver entries appear in updates, checksum mismatches fail, and GET registry APIs expose catalog/lookup operations.
     testIds: [HS-T-M13-PLUGIN-REGISTRY-001]
-    testPaths: [packages/plugins/tests/plugins.test.ts]
+    testPaths: [packages/plugins/tests/plugins.test.ts, apps/api/tests/plugin-registry.http.test.ts]
     documentationArticleIds: [getting-started/plugins]
     introducedVersion: 0.12.0
   - id: HS-SEC-011
@@ -1680,7 +1713,14 @@ requirements:
     owner: security-platform-team
     status: verified
     risk: critical
-    affectedModules: [packages/privacy/src/index.ts]
+    affectedModules:
+      - packages/privacy/src/index.ts
+      - packages/chat/src/index.ts
+      - apps/api/src/privacy/privacy-runtime.service.ts
+      - apps/api/src/privacy/privacy.controller.ts
+      - apps/api/src/privacy/privacy-retention-scheduler.service.ts
+      - packages/budgets/src/index.ts
+      - apps/web/app/privacy/retention-client.tsx
     publicContracts:
       [
         PrivacyPolicyProvider,
@@ -1690,9 +1730,15 @@ requirements:
       ]
     dataEntities: [RetentionPolicy, LegalHold, DataSubjectRequest, LifecyclePlan]
     securityPrivacyImpact: Tenant mismatch is rejected, legal holds block deletion, requests require approval and residency decisions deny unknown regions.
-    acceptanceCriteria: Lifecycle plans honor retention and legal hold, subject requests are approved before execution, residency denies unregistered regions and all contracts preserve organization scope.
+    acceptanceCriteria: Lifecycle plans honor retention and legal hold, subject requests are approved before execution, residency denies unregistered regions and all contracts preserve organization scope. The tenant-scoped conversation retention run honors organization overrides and child-resource holds, removes conversation data through the Chat cascade, persists per-resource evidence and a completed deletion-job record, and records the actual initiating principal/system actor. Usage retention applies the organization/global usage period to tenant-scoped usage records, honors legal holds, deletes by compare-and-swap version, persists per-record evidence and a completed deletion-job record, and exposes an authenticated run endpoint. Attachment retention applies the organization/global attachment period, deletes expired local blobs, marks metadata deleted with compare-and-swap, honors legal holds and records per-resource evidence. Opt-in scheduled runs use durable tenant leases.
     testIds: [HS-T-M20-PRIVACY-001]
-    testPaths: [packages/privacy/tests/privacy.test.ts]
+    testPaths:
+      - packages/privacy/tests/privacy.test.ts
+      - packages/chat/tests/chat.test.ts
+      - apps/api/tests/settings.http.test.ts
+      - apps/api/tests/privacy-retention-scheduler.test.ts
+      - apps/web/tests/privacy-retention.test.tsx
+      - apps/api/tests/capability.http.test.ts
     documentationArticleIds: [getting-started/privacy-lifecycle]
     introducedVersion: 0.17.0
   - id: HS-OPS-004
@@ -1728,13 +1774,16 @@ requirements:
     owner: platform-team
     status: verified
     risk: critical
-    affectedModules: [packages/jobs/src/index.ts]
+    affectedModules: [packages/jobs/src/index.ts, apps/worker/src/main.ts]
     publicContracts: [InMemoryJobQueue, Job, JobContext, BackpressureError]
     dataEntities: [Job]
     securityPrivacyImpact: Queue payloads are bounded and cancellation/retry states are explicit; idempotency prevents duplicate processing.
-    acceptanceCriteria: All official queue names are available, capacity rejects with retry-after, duplicate keys are stable, failures retry then DLQ, and cancellation/timeout do not consume jobs silently.
-    testIds: [HS-T-M22-JOBS-001]
-    testPaths: [packages/jobs/tests/jobs.test.ts]
+    acceptanceCriteria: All official queue names are available, capacity rejects with retry-after, duplicate keys are stable, failures retry then DLQ, and cancellation/timeout do not consume jobs silently; the distributed BullMQ worker enforces its execution timeout, aborts the handler signal and dead-letters the timed-out job.
+    testIds: [HS-T-M22-JOBS-001, HS-T-M22-BULLMQ-TIMEOUT-001]
+    testPaths:
+      - packages/jobs/tests/jobs.test.ts
+      - packages/jobs/tests/resilience.test.ts
+      - apps/worker/tests/redis.integration.test.ts
     documentationArticleIds: [getting-started/jobs]
     introducedVersion: 0.19.0
   - id: HS-OPS-006
@@ -1750,7 +1799,12 @@ requirements:
     securityPrivacyImpact: Secrets are externalized; replicas share only authenticated database/Redis/object-storage state and probes prevent unhealthy pods receiving traffic.
     acceptanceCriteria: Manifest contains Web/API/MCP and six worker classes, bounded HPAs cover synchronous workloads, KEDA hooks cover worker backlog, every deployment has resources/probes/graceful termination, and PDB/network policy/topology defaults plus documentation are present.
     testIds: [HS-T-M23-DEPLOY-001]
-    testPaths: [deploy/kubernetes/README.md]
+    testPaths:
+      [
+        deploy/kubernetes/README.md,
+        scripts/validate_kubernetes_manifest.mjs,
+        scripts/validate_helm_chart.mjs,
+      ]
     documentationArticleIds: [getting-started/distributed-deployment]
     introducedVersion: 0.20.0
   - id: HS-API-010
@@ -1823,7 +1877,9 @@ requirements:
     securityPrivacyImpact: Bearer authentication, organization matching and agents.read/manage permissions precede every operation; prompts remain tenant-scoped.
     acceptanceCriteria: Agent listing, creation, version creation and publication reject cross-tenant or unauthorized requests, validate limits and deprecate prior published versions.
     testIds: [HS-T-M28-AGENTS-001]
-    testPaths: [apps/api/tests/agent-runtime.test.ts]
+    testPaths:
+      - apps/api/tests/agent-runtime.test.ts
+      - apps/api/tests/agent.persistence.test.ts
     documentationArticleIds: [getting-started/agents]
     introducedVersion: 0.24.0
   - id: HS-API-012
@@ -1837,12 +1893,13 @@ requirements:
       [
         apps/api/src/workflows/workflow.controller.ts,
         apps/api/src/workflows/workflow-runtime.service.ts,
+        apps/api/src/core/event-bus-runtime.service.ts,
         packages/workflows/src/index.ts,
       ]
     publicContracts: [WorkflowController, WorkflowRuntimeService, WorkflowRuntime]
     dataEntities: [Workflow, WorkflowExecution, WorkflowStepExecution]
     securityPrivacyImpact: Bearer authentication, organization matching and workflows.read/manage/run permissions precede every operation; execution and approval lookups are tenant keyed.
-    acceptanceCriteria: Workflow listing, draft creation, publication, execution, execution lookup and approval resume validate schemas, reject cross-tenant/unauthorized requests and retain durable runtime state behind a replaceable repository boundary.
+    acceptanceCriteria: Workflow listing, draft creation, publication, execution, execution lookup and approval resume validate schemas, reject cross-tenant/unauthorized requests and retain durable runtime state behind a replaceable repository boundary. Published event-triggered workflows subscribe to matching tenant-scoped domain events, enqueue idempotently and preserve validated execution provenance.
     testIds: [HS-T-M29-WORKFLOWS-001]
     testPaths: [apps/api/tests/workflow-runtime.test.ts, packages/workflows/tests/workflows.test.ts]
     documentationArticleIds: [getting-started/governance-workflows]
@@ -1963,7 +2020,12 @@ requirements:
     status: verified
     risk: high
     affectedModules:
-      [packages/notifications/src/index.ts, apps/api/src/notifications/notification.controller.ts]
+      [
+        packages/notifications/src/index.ts,
+        apps/api/src/notifications/notification.controller.ts,
+        apps/api/src/notifications/notification-runtime.service.ts,
+        apps/api/src/secrets/secret-runtime.service.ts,
+      ]
     publicContracts:
       [
         NotificationProvider,
@@ -1976,9 +2038,13 @@ requirements:
       ]
     dataEntities: [Notification]
     securityPrivacyImpact: Notifications are tenant scoped and idempotently appended; SMTP and webhook transports receive bounded payloads and timeout limits; plugin channels remain behind the NotificationProvider boundary.
-    acceptanceCriteria: In-app notifications append and list by recipient, SMTP and webhook providers delegate to replaceable transports, cross-tenant listing fails, and duplicate notification ids are ignored.
+    acceptanceCriteria: In-app notifications append and list by recipient, SMTP and webhook providers delegate to replaceable transports, SMTP credentials resolve on demand through the tenant-scoped Secrets broker, HTTP deliveries honor the configured http timeout, cross-tenant listing fails, and duplicate notification ids are ignored.
     testIds: [HS-T-M33-NOTIFICATIONS-001]
-    testPaths: [packages/notifications/tests/notifications.test.ts]
+    testPaths:
+      [
+        packages/notifications/tests/notifications.test.ts,
+        apps/api/tests/notification-runtime.test.ts,
+      ]
     documentationArticleIds: [getting-started/notifications]
     introducedVersion: 0.31.0
   - id: HS-SEC-014
@@ -1991,6 +2057,9 @@ requirements:
     affectedModules:
       - packages/core/src/encryption.ts
       - packages/core/src/index.ts
+      - packages/webhooks/src/index.ts
+      - apps/api/src/webhooks/webhook-runtime.service.ts
+      - apps/worker/src/domain-handlers.ts
     publicContracts:
       [
         MasterKey,
@@ -2005,7 +2074,11 @@ requirements:
     securityPrivacyImpact: Ciphertext uses a fresh random 96-bit nonce and a 128-bit authentication tag; AAD binds each envelope to organizationId and pluginId; purpose keys are HKDF-derived so a compromise of one purpose does not expose the master key; failures collapse to a redacted EncryptionError without material.
     acceptanceCriteria: Sealing and opening round-trip the plaintext; the same plaintext produces distinct nonces; a wrong key, mismatched AAD, tampered ciphertext, and malformed envelope each fail with a redacted EncryptionError; hex and base64 32-byte keys decode equally; purpose derivation is deterministic and separated; the encrypted store persists only envelopes and opens them only within the sealing organization.
     testIds: [HS-T-M34-ENCRYPTION-001, HS-T-M34-ENCRYPTION-002, HS-T-M34-ENCRYPTION-003]
-    testPaths: [packages/core/tests/encryption.test.ts]
+    testPaths:
+      - packages/core/tests/encryption.test.ts
+      - packages/webhooks/tests/webhooks.test.ts
+      - apps/api/tests/webhook-runtime.test.ts
+      - apps/worker/tests/domain-handlers.test.ts
     documentationArticleIds: [getting-started/encryption-secrets]
     introducedVersion: 0.32.0
   - id: HS-SEC-015
@@ -2310,3 +2383,28 @@ requirements:
     testPaths: [packages/plugin-testkit/tests/identity.test.ts]
     documentationArticleIds: [getting-started/identity-plugin-testkit]
     introducedVersion: 0.45.0
+  - id: HS-UX-003
+    title: Tenant-scoped organization settings and branding administration
+    normativeStatement: The Web application MUST expose an authenticated organization settings surface that persists tenant-scoped locale, timezone, and white-label branding values without leaking data across organizations.
+    rationale: Administrators need to manage the organization configuration described by the product specification without editing source code or deployment files.
+    owner: web-team
+    status: verified
+    risk: high
+    affectedModules:
+      [
+        apps/web/app/settings/page.tsx,
+        apps/api/src/settings/settings.controller.ts,
+        apps/api/src/settings/settings-runtime.service.ts,
+        packages/identity/src/index.ts,
+      ]
+    publicContracts:
+      ['/api/v1/organizations/{organizationId}/settings', OrganizationSettings, Branding]
+    dataEntities: [OrganizationSettings, Branding]
+    securityPrivacyImpact: Settings are tenant-bound, require a bearer session and settings.manage permission, and reject cross-organization access.
+    acceptanceCriteria: An authorized organization administrator can read and update locale, timezone, and branding values through the web surface; global runtime settings load and save through the authenticated UI; the primary database adapter cannot be changed after startup; values persist through the configured adapter; cross-tenant access and unauthorized access fail closed.
+    testIds: [HS-T-M48-SETTINGS-001]
+    testPaths:
+      - apps/api/tests/settings.http.test.ts
+      - apps/web/tests/settings.test.tsx
+    documentationArticleIds: [getting-started/overview]
+    introducedVersion: 0.46.0

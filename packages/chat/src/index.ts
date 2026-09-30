@@ -86,6 +86,22 @@ export interface Message extends TenantEntity {
   readonly createdBy: string;
 }
 
+/** Safe usage projection; message parts and prompt/response content are never exposed. */
+export interface ChatUsageRecord {
+  readonly id: string;
+  readonly organizationId: string;
+  readonly principalId: string;
+  readonly scopeType: 'USER';
+  readonly scopeKey: string;
+  readonly provider?: string;
+  readonly model?: string;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly costUsd: number;
+  readonly latencyMs?: number;
+  readonly outcome: 'SUCCESS' | 'ERROR';
+}
+
 export interface ChatStreamEvent extends TenantEntity {
   readonly organizationId: string;
   readonly conversationId: string;
@@ -197,6 +213,10 @@ export interface ChatServiceOptions {
   readonly attachmentStorage?: AttachmentStorage;
   readonly malwareScanner?: MalwareScanner;
   readonly maxAttachmentBytes?: number;
+  readonly storePrompts?: boolean | (() => boolean);
+  readonly storeResponses?: boolean | (() => boolean);
+  readonly storeToolPayloads?: boolean | (() => boolean);
+  readonly redactPii?: boolean | (() => boolean);
 }
 
 const conversations = repositoryName('conversations');
@@ -238,14 +258,56 @@ async function all<T extends TenantEntity>(repository: Repository<T>, organizati
   return items;
 }
 
+function redactPiiText(value: string): string {
+  return value
+    .replace(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, '[REDACTED_CPF]')
+    .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[REDACTED_EMAIL]')
+    .replace(
+      /(?<!\w)(?:\+\d{1,3}[\s.-]?)?(?:\(\d{2,3}\)|\d{2,3})[\s.-]?\d{4,5}[\s.-]?\d{4}(?!\w)/g,
+      '[REDACTED_PHONE]',
+    );
+}
+
+function redactPiiValue(value: unknown, depth = 0): unknown {
+  if (typeof value === 'string') return redactPiiText(value);
+  if (Array.isArray(value)) return value.map((item) => redactPiiValue(item, depth + 1));
+  if (typeof value !== 'object' || value === null || depth >= 12) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, redactPiiValue(item, depth + 1)]),
+  );
+}
+
+function redactPiiPart(part: MessagePart): MessagePart {
+  return {
+    ...part,
+    ...(part.text === undefined ? {} : { text: redactPiiText(part.text) }),
+    ...(part.uri === undefined ? {} : { uri: redactPiiText(part.uri) }),
+    ...(part.data === undefined
+      ? {}
+      : { data: redactPiiValue(part.data) as Readonly<Record<string, unknown>> }),
+  };
+}
+
 export class ChatService {
   private readonly activeStreams = new Map<string, AbortController>();
+  private readonly transientPrompts = new Map<
+    string,
+    {
+      readonly organizationId: string;
+      readonly parts: readonly MessagePart[];
+      readonly expiresAt: number;
+    }
+  >();
 
   constructor(
     private readonly adapter: DatabaseAdapter,
     private readonly now: () => Date = () => new Date(),
     private readonly options: ChatServiceOptions = {},
   ) {}
+
+  private privacySetting(value: boolean | (() => boolean) | undefined): boolean {
+    return typeof value === 'function' ? value() : (value ?? true);
+  }
 
   async createConversation(input: {
     organizationId: string;
@@ -324,17 +386,34 @@ export class ChatService {
     conversationId: string;
     actorId: string;
   }): Promise<Conversation> {
+    return this.deleteConversationInternal(input, true);
+  }
+
+  /** Deletes an expired conversation as a privacy lifecycle action, recording its system actor. */
+  async deleteConversationForRetention(input: {
+    organizationId: string;
+    conversationId: string;
+    actorId: string;
+  }): Promise<Conversation> {
+    return this.deleteConversationInternal(input, false);
+  }
+
+  private async deleteConversationInternal(
+    input: { organizationId: string; conversationId: string; actorId: string },
+    enforceOwnership: boolean,
+  ): Promise<Conversation> {
     const conversation = await this.adapter
       .repository<Conversation>(conversations)
       .findById(input.organizationId, input.conversationId);
     if (conversation === undefined || conversation.status === 'DELETED')
       throw new Error('Conversation not found');
-    await this.requireOwner(
-      this.adapter.repository<ConversationParticipant>(participants),
-      input.organizationId,
-      input.conversationId,
-      input.actorId,
-    );
+    if (enforceOwnership)
+      await this.requireOwner(
+        this.adapter.repository<ConversationParticipant>(participants),
+        input.organizationId,
+        input.conversationId,
+        input.actorId,
+      );
     const storedAttachments = (
       await all(this.adapter.repository<Attachment>(attachments), input.organizationId)
     ).filter(
@@ -349,12 +428,13 @@ export class ChatService {
       const conversation = await repository.findById(input.organizationId, input.conversationId);
       if (conversation === undefined || conversation.status === 'DELETED')
         throw new Error('Conversation not found');
-      await this.requireOwner(
-        context.repository<ConversationParticipant>(participants),
-        input.organizationId,
-        input.conversationId,
-        input.actorId,
-      );
+      if (enforceOwnership)
+        await this.requireOwner(
+          context.repository<ConversationParticipant>(participants),
+          input.organizationId,
+          input.conversationId,
+          input.actorId,
+        );
       const timestamp = this.now();
       const collections = [
         [participants, 'conversationId'],
@@ -496,6 +576,7 @@ export class ChatService {
         conversation.id,
         input.parts,
       );
+      const storedParts = input.parts.map((part) => this.storedPart(part, input.role));
       const messageItems = await all(context.repository<Message>(messages), input.organizationId);
       const history = messageItems.filter((item) => item.branchId === branch.id);
       let baseline = 0;
@@ -509,7 +590,7 @@ export class ChatService {
       const sequence =
         history.reduce((maximum, item) => Math.max(maximum, item.sequence), baseline) + 1;
       const timestamp = this.now();
-      return context.repository<Message>(messages).insert({
+      const persisted = await context.repository<Message>(messages).insert({
         id: uuidV7(timestamp.getTime()),
         tenantId: input.organizationId,
         organizationId: input.organizationId,
@@ -520,7 +601,7 @@ export class ChatService {
         branchId: branch.id,
         sequence,
         role: input.role,
-        parts: input.parts,
+        parts: storedParts,
         status: input.status ?? 'COMPLETED',
         createdBy: input.createdBy,
         ...(input.modelDefinitionId === undefined
@@ -529,6 +610,22 @@ export class ChatService {
         ...(input.providerId === undefined ? {} : { providerId: input.providerId }),
         ...(input.parentMessageId === undefined ? {} : { parentMessageId: input.parentMessageId }),
       });
+      if ((input.role === 'user' || input.role === 'system') && !this.storePromptsEnabled()) {
+        const transientParts = this.privacySetting(this.options.redactPii)
+          ? input.parts.map(redactPiiPart)
+          : input.parts;
+        this.transientPrompts.set(persisted.id, {
+          organizationId: input.organizationId,
+          parts: transientParts,
+          expiresAt: this.now().getTime() + 15 * 60_000,
+        });
+        while (this.transientPrompts.size > 512) {
+          const oldest = this.transientPrompts.keys().next().value;
+          if (oldest === undefined) break;
+          this.transientPrompts.delete(oldest);
+        }
+      }
+      return persisted;
     });
   }
 
@@ -907,8 +1004,14 @@ export class ChatService {
     latencyMs?: number;
     traceId?: string;
   }): Promise<ChatStreamEvent> {
+    const storedPart =
+      input.part === undefined ? undefined : this.storedPart(input.part, 'assistant');
+    const eventInput = {
+      ...input,
+      ...(storedPart === undefined ? {} : { part: storedPart }),
+    };
     this.assertIdempotencyKey(input.idempotencyKey);
-    this.validateStreamEvent(input);
+    this.validateStreamEvent(eventInput);
     return this.adapter.run(async (context) => {
       const repository = context.repository<ChatStreamEvent>(streamEvents);
       const existing = (await all(repository, input.organizationId)).find(
@@ -918,7 +1021,7 @@ export class ChatService {
       if (existing !== undefined) {
         if (
           existing.type !== input.type ||
-          JSON.stringify(existing.part) !== JSON.stringify(input.part) ||
+          JSON.stringify(existing.part) !== JSON.stringify(storedPart) ||
           existing.errorCode !== input.errorCode ||
           existing.inputTokens !== input.inputTokens ||
           existing.outputTokens !== input.outputTokens ||
@@ -951,7 +1054,7 @@ export class ChatService {
         sequence,
         type: input.type,
         idempotencyKey: input.idempotencyKey,
-        ...(input.part === undefined ? {} : { part: input.part }),
+        ...(storedPart === undefined ? {} : { part: storedPart }),
         ...(input.errorCode === undefined ? {} : { errorCode: input.errorCode }),
         ...(input.inputTokens === undefined ? {} : { inputTokens: input.inputTokens }),
         ...(input.outputTokens === undefined ? {} : { outputTokens: input.outputTokens }),
@@ -960,7 +1063,7 @@ export class ChatService {
       });
       let parts = message.parts;
       if (input.type === 'DELTA') {
-        const part = input.part;
+        const part = storedPart;
         if (part === undefined) throw new Error('Delta stream event requires a message part');
         parts = [...message.parts, part];
       }
@@ -984,6 +1087,32 @@ export class ChatService {
       }
       return event;
     });
+  }
+
+  private storedPart(part: MessagePart, role: MessageRole): MessagePart {
+    const promptsSetting = this.options.storePrompts;
+    const responsesSetting = this.options.storeResponses;
+    const toolPayloadsSetting = this.options.storeToolPayloads;
+    const storePrompts =
+      typeof promptsSetting === 'function' ? promptsSetting() : (promptsSetting ?? true);
+    const storeResponses =
+      typeof responsesSetting === 'function' ? responsesSetting() : (responsesSetting ?? true);
+    const storeToolPayloads =
+      typeof toolPayloadsSetting === 'function'
+        ? toolPayloadsSetting()
+        : (toolPayloadsSetting ?? true);
+    const redactPii = this.privacySetting(this.options.redactPii);
+    if ((role === 'user' || role === 'system') && !storePrompts)
+      return { id: part.id, type: part.type };
+    if (role === 'assistant' && !storeResponses) return { id: part.id, type: part.type };
+    if (!storeToolPayloads && (part.type === 'tool_call' || part.type === 'tool_result'))
+      return { id: part.id, type: part.type };
+    return redactPii ? redactPiiPart(part) : part;
+  }
+
+  private storePromptsEnabled(): boolean {
+    const setting = this.options.storePrompts;
+    return typeof setting === 'function' ? setting() : (setting ?? true);
   }
 
   async replayStream(
@@ -1080,6 +1209,20 @@ export class ChatService {
     return resolve(branch, new Set());
   }
 
+  /** Includes unpersisted prompt text only for in-process model execution. */
+  async historyForExecution(organizationId: string, conversationId: string, branchId: string) {
+    const items = await this.history(organizationId, conversationId, branchId);
+    const now = this.now().getTime();
+    for (const [id, prompt] of this.transientPrompts)
+      if (prompt.expiresAt <= now) this.transientPrompts.delete(id);
+    return items.map((message) => {
+      const prompt = this.transientPrompts.get(message.id);
+      return prompt?.organizationId === organizationId
+        ? { ...message, parts: prompt.parts }
+        : message;
+    });
+  }
+
   async historyPage(
     organizationId: string,
     conversationId: string,
@@ -1088,6 +1231,30 @@ export class ChatService {
     limit = 50,
   ): Promise<ChatPage<Message>> {
     return page(await this.history(organizationId, conversationId, branchId), cursor, limit);
+  }
+
+  async listUsage(organizationId: string): Promise<readonly ChatUsageRecord[]> {
+    const records = await all(this.adapter.repository<Message>(messages), organizationId);
+    return records
+      .filter(
+        (message) =>
+          message.role === 'assistant' &&
+          ['COMPLETED', 'FAILED', 'CANCELLED'].includes(message.status),
+      )
+      .map((message) => ({
+        id: message.id,
+        organizationId,
+        principalId: message.createdBy,
+        scopeType: 'USER' as const,
+        scopeKey: message.createdBy,
+        ...(message.providerId === undefined ? {} : { provider: message.providerId }),
+        ...(message.modelDefinitionId === undefined ? {} : { model: message.modelDefinitionId }),
+        inputTokens: message.inputTokens ?? 0,
+        outputTokens: message.outputTokens ?? 0,
+        costUsd: message.costUsd ?? 0,
+        ...(message.latencyMs === undefined ? {} : { latencyMs: message.latencyMs }),
+        outcome: message.status === 'COMPLETED' ? ('SUCCESS' as const) : ('ERROR' as const),
+      }));
   }
 
   private async requireMessage(organizationId: string, conversationId: string, messageId: string) {

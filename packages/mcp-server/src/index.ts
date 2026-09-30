@@ -44,6 +44,18 @@ export interface McpObservation {
 
 export type McpObservationSink = (observation: McpObservation) => void;
 
+export interface McpAdditionalTool {
+  readonly name: string;
+  readonly description?: string;
+  readonly inputSchema: Record<string, unknown>;
+  readonly requiredPermissions?: readonly string[];
+  readonly execute: (input: unknown, context: CapabilityExecutionContext) => Promise<unknown>;
+}
+
+export type McpAdditionalToolProvider = (
+  principal: McpServerPrincipal,
+) => Promise<readonly McpAdditionalTool[]>;
+
 export interface McpJsonRpcRequest {
   readonly jsonrpc: '2.0';
   readonly id?: string | number | null;
@@ -71,6 +83,7 @@ export class McpServer {
     private readonly resources: readonly McpResource[] = [],
     private readonly prompts: readonly McpPrompt[] = [],
     private readonly observe?: McpObservationSink,
+    private readonly additionalToolProvider?: McpAdditionalToolProvider,
   ) {}
 
   async handle(
@@ -93,6 +106,13 @@ export class McpServer {
     const id = request.id === undefined ? null : request.id;
     try {
       const principal = await this.authenticate(context);
+      if (principal === undefined) {
+        outcome = 'error';
+        return response(id, undefined, {
+          code: unauthorized,
+          message: 'MCP authentication required',
+        });
+      }
       if (request.method === 'notifications/initialized') return undefined;
       if (request.method === 'initialize') {
         return response(id, {
@@ -101,16 +121,9 @@ export class McpServer {
           serverInfo: { name: 'handstack-mcp', version: '0.0.0' },
         });
       }
-      if (principal === undefined) {
-        outcome = 'error';
-        return response(id, undefined, {
-          code: unauthorized,
-          message: 'MCP authentication required',
-        });
-      }
       switch (request.method) {
         case 'tools/list':
-          return response(id, { tools: await this.tools(principal.organizationId) });
+          return response(id, { tools: await this.tools(principal) });
         case 'resources/list':
           return response(id, { resources: this.resources });
         case 'prompts/list':
@@ -146,12 +159,27 @@ export class McpServer {
     return this.auth?.authenticate(context);
   }
 
-  private async tools(organizationId: string) {
-    return (await this.registry.list(organizationId, 'MCP')).map((capability) => ({
-      name: capability.slug,
-      description: capability.description,
-      inputSchema: capability.inputSchema,
-    }));
+  private async tools(principal: McpServerPrincipal) {
+    const permissions = new Set(principal.permissions);
+    const registered = (await this.registry.list(principal.organizationId, 'MCP'))
+      .filter((capability) => capability.published === true)
+      .filter((capability) =>
+        capability.requiredPermissions.every((permission) => permissions.has(permission)),
+      )
+      .map((capability) => ({
+        name: capability.slug,
+        description: capability.description,
+        inputSchema: capability.inputSchema,
+      }));
+    const additional = (await this.additionalToolProvider?.(principal)) ?? [];
+    return [
+      ...registered,
+      ...additional
+        .filter((tool) =>
+          (tool.requiredPermissions ?? []).every((permission) => permissions.has(permission)),
+        )
+        .map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
+    ];
   }
 
   private async call(
@@ -170,6 +198,19 @@ export class McpServer {
       ...(context.signal === undefined ? {} : { signal: context.signal }),
       ...(context.requestId === undefined ? {} : { requestId: context.requestId }),
     };
+    const additional = (await this.additionalToolProvider?.(principal)) ?? [];
+    const additionalTool = additional.find((tool) => tool.name === params.name);
+    if (additionalTool !== undefined) {
+      const permissions = new Set(principal.permissions);
+      if (
+        !(additionalTool.requiredPermissions ?? []).every((permission) =>
+          permissions.has(permission),
+        )
+      )
+        throw new ValidationError('MCP tool permission is not granted');
+      const result = await additionalTool.execute(input, executionContext);
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    }
     const result = await this.engine.execute(params.name, input, executionContext);
     return { content: [{ type: 'text', text: JSON.stringify(result) }] };
   }

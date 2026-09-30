@@ -26,8 +26,11 @@ Tenha a permissão `notifications.manage` e configure o transporte do canal de d
 
 1. Construa uma notificação com destinatário, canal, assunto e corpo.
 2. Despache pelo provedor correspondente.
-3. Para email, forneça um transporte SMTP e um resolvedor de destinatário.
-4. Para webhooks, forneça um fetcher de endpoint com tamanhos de requisição e resposta limitados.
+3. Para email, configure `HANDSTACK_SMTP_*`; `HANDSTACK_SMTP_PASSWORD_REF` é resolvido sob demanda
+   pelo broker de Secrets com escopo do tenant (referência `secret://` ou `env://` permitida). Nunca
+   inclua a senha no conteúdo da notificação ou em payload de fila.
+4. Para webhooks, forneça um fetcher de endpoint com tamanhos de requisição e resposta limitados; o
+   prazo de cancelamento usa o valor configurado em `timeouts.http`.
 
 ## Verify
 

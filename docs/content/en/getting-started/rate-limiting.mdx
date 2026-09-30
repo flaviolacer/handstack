@@ -64,3 +64,12 @@ concurrency slot becomes available again after `release`.
   every check must carry a non-empty organization id.
 - In the distributed profile, replace the in-memory store with a shared store so replicas coordinate
   on the same counters instead of enforcing independent limits.
+
+## Platform chat limit
+
+`rateLimits.chat`, configured in the config file or environment (`HANDSTACK_RATE_LIMITS_JSON`),
+limits chat execution starts per organization per minute. For example, `{"chat":120}` permits up
+to 120 starts in each UTC minute window; the next request receives HTTP `429`. When `chat` is not
+configured, the endpoint does not apply this limit. The compact profile keeps counters in-process;
+the distributed profile coordinates replicas through Redis configured by `queue.redisUrl` and fails
+closed if Redis cannot enforce the counter.

@@ -7,7 +7,7 @@ permissions: [privacy.manage, privacy.request]
 features: [privacy, retention, residency]
 deploymentProfiles: [compact, distributed]
 introducedIn: 0.17.0
-lastReviewedAt: 2026-09-09
+lastReviewedAt: 2026-09-28
 owner: security-platform-team
 tags: [privacy, retention, compliance]
 ---
@@ -31,11 +31,32 @@ operation and must not bypass an active legal hold.
 3. Process access/export/deletion requests with durable evidence.
 4. Authorize placement before writing primary, vector, object or queue data.
 
+For a capability that sends personal data to a provider, create a processing purpose and consent
+for the principal, then set the capability descriptor's `metadata.consentPurposeId`. The governed
+engine checks the latest tenant-scoped consent before execution and denies the call after withdrawal.
+
+From the `/privacy` administration screen, an administrator with `privacy.manage` can configure
+retention, create/release legal holds and run conversation retention for one organization with
+`POST /api/v1/organizations/{organizationId}/privacy/retention/run`. An organization policy for
+`conversations` overrides the global `retention.conversation` value. The operation preserves holds
+on a conversation or any child record, uses the Chat cascade to remove related records and local
+attachment blobs, and records per-conversation evidence. Scheduled execution is opt-in: set
+`HANDSTACK_PRIVACY_RETENTION_ENABLED=true` and choose `HANDSTACK_PRIVACY_RETENTION_INTERVAL_MS`
+(default 24 hours, minimum 60 seconds). Active tenants are discovered from identity storage unless
+`HANDSTACK_PRIVACY_RETENTION_ORGANIZATIONS` is set. API instances coordinate each organization
+through a persistent database lease. Enabling the scheduler runs a sweep at startup and then at each
+interval; deletion audit events identify the authenticated administrator for manual runs and the
+scheduler service for scheduled runs. Each completed run appears in deletion jobs with its evidence
+count, and the returned run ID retrieves its per-conversation evidence. These scheduler values are
+part of the typed configuration layer; run `handstack config validate` to verify the effective
+preflight without printing organization IDs or secret references.
+
 ## Verify
 
 Test tenant mismatch rejection, legal-hold blocking, approved-request gating and disallowed
-regions. Privacy settings should independently control prompt, response, tool-payload and telemetry
-storage.
+regions. Also execute a consent-bound capability once with `GRANTED` consent and once after
+withdrawal. Privacy settings should independently control prompt, response, tool-payload and
+telemetry storage.
 
 ## Troubleshooting
 

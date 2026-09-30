@@ -9,6 +9,7 @@ import {
   type Message,
   type MessagePart,
   type PublicModel,
+  type PublicAgent,
 } from './chat-api';
 
 const textOf = (message: Message) =>
@@ -29,7 +30,10 @@ export function ChatClient() {
   const [active, setActive] = useState<Conversation>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [models, setModels] = useState<PublicModel[]>([]);
+  const [agents, setAgents] = useState<PublicAgent[]>([]);
   const [model, setModel] = useState('');
+  const [agentId, setAgentId] = useState('');
+  const [knowledgeBaseId, setKnowledgeBaseId] = useState('');
   const [status, setStatus] = useState<'signed-out' | 'loading' | 'ready' | 'streaming' | 'error'>(
     'signed-out',
   );
@@ -62,11 +66,16 @@ export function ChatClient() {
     event.currentTarget.reset();
     try {
       const api = chatApi(current, baseUrl);
-      const [conversationPage, modelPage] = await Promise.all([api.conversations(), api.models()]);
+      const [conversationPage, modelPage, agentPage] = await Promise.all([
+        api.conversations(),
+        api.models(),
+        api.agents(),
+      ]);
       const available = modelPage.items.filter((item) => item.lifecycle === 'PUBLISHED');
       setConversations([...conversationPage.items]);
       setNextCursor(conversationPage.nextCursor);
       setModels(available);
+      setAgents([...agentPage.items]);
       setModel(available[0]?.id ?? '');
       setStatus('ready');
     } catch (cause) {
@@ -161,9 +170,16 @@ export function ChatClient() {
       setMessages((items) => [...items, user]);
       form.reset();
       setFiles([]);
-      const assistant = await api.execute(active.id, active.activeBranchId, model, user.id);
+      const assistant = await api.execute(
+        active.id,
+        active.activeBranchId,
+        model,
+        user.id,
+        knowledgeBaseId,
+        agentId,
+      );
       setMessages((items) => [...items, assistant]);
-      await follow(assistant, api);
+      if (agentId === '') await follow(assistant, api);
     } catch (cause) {
       if (!(cause instanceof DOMException && cause.name === 'AbortError')) fail(cause);
     }
@@ -296,6 +312,36 @@ export function ChatClient() {
                 </option>
               ))}
             </select>
+          </label>
+          <label>
+            Agent{' '}
+            <select
+              aria-label="Agent"
+              value={agentId}
+              onChange={(event) => {
+                setAgentId(event.target.value);
+              }}
+              disabled={status === 'streaming'}
+            >
+              <option value="">Direct model</option>
+              {agents.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Knowledge base{' '}
+            <input
+              aria-label="Knowledge base"
+              value={knowledgeBaseId}
+              onChange={(event) => {
+                setKnowledgeBaseId(event.target.value);
+              }}
+              placeholder="Optional ID"
+              disabled={status === 'streaming'}
+            />
           </label>
         </header>
         {error !== '' && (

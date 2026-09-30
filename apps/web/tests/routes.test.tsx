@@ -6,6 +6,7 @@ import HomePage from '../app/page.js';
 import IdentityProvidersPage from '../app/settings/identity-providers/page.js';
 import ChatPage from '../app/chat/page.js';
 import DeadLettersPage from '../app/operations/dead-letters/page.js';
+import PrivacyPage from '../app/privacy/page.js';
 
 describe('Web routes', () => {
   it('renders the workspace shell', () => {
@@ -22,6 +23,10 @@ describe('Web routes', () => {
 
   it('renders the dead-letter operations route', () => {
     expect(DeadLettersPage()).toMatchObject({ type: 'div' });
+  });
+
+  it('renders the privacy administration route with retention controls', () => {
+    expect(PrivacyPage()).toMatchObject({ type: 'div' });
   });
 
   it('renders the localized Help Center catalog', async () => {

@@ -199,9 +199,11 @@ export class InMemoryAccessService {
     });
     return grant;
   }
-  revoke(organizationId: string, grantId: string): AccessGrant {
+  revoke(organizationId: string, grantId: string, requestId?: string): AccessGrant {
     const grant = this.grants.get(this.key(organizationId, grantId));
     if (grant === undefined) throw new ValidationError('Access grant not found');
+    if (requestId !== undefined && grant.requestId !== requestId)
+      throw new ValidationError('Access grant does not belong to access request');
     const revoked = { ...grant, revokedAt: new Date() };
     this.grants.set(this.key(organizationId, grantId), revoked);
     return revoked;
@@ -210,6 +212,9 @@ export class InMemoryAccessService {
     const grant = this.grants.get(this.key(organizationId, grantId));
     if (grant === undefined) throw new ValidationError('Access grant not found');
     return grant;
+  }
+  listGrants(organizationId: string): readonly AccessGrant[] {
+    return [...this.grants.values()].filter((grant) => grant.organizationId === organizationId);
   }
   active(
     organizationId: string,
@@ -313,9 +318,11 @@ export class DurableAccessService {
     });
     return grant;
   }
-  async revoke(organizationId: string, grantId: string): Promise<AccessGrant> {
+  async revoke(organizationId: string, grantId: string, requestId?: string): Promise<AccessGrant> {
     const grant = await this.store.findGrant(organizationId, grantId);
     if (grant === undefined) throw new ValidationError('Access grant not found');
+    if (requestId !== undefined && grant.requestId !== requestId)
+      throw new ValidationError('Access grant does not belong to access request');
     const revoked = {
       ...grant,
       version: grant.version + 1,
@@ -340,6 +347,9 @@ export class DurableAccessService {
           grant.revokedAt === undefined &&
           (grant.expiresAt === undefined || grant.expiresAt > now),
       );
+  }
+  async listGrants(organizationId: string): Promise<readonly AccessGrantEntity[]> {
+    return (await this.store.listGrants(organizationId)).map(normalizeGrant);
   }
 }
 

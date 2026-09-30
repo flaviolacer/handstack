@@ -1,13 +1,14 @@
-import { scopedSecretResolver, type SecretProvider } from '@handstack/core';
 import type { IdentityProvider } from '@handstack/identity';
 import {
   IdentityAuditService,
   IdentityProviderAdministrationService,
 } from '@handstack/identity-service';
 import { GenericOidcPlugin } from '@handstack/plugin-oidc';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { IdentityTelemetry } from '@handstack/telemetry';
 import { AuthRuntimeService } from './auth-runtime.service.js';
+import { SecretRuntimeService } from '../secrets/secret-runtime.service.js';
+import { DatabaseService } from '../database/database.service.js';
 
 export type OidcConnectionTestStage = 'DISCOVERY' | 'JWKS' | 'COMPLETE';
 export type OidcConnectionTestCode =
@@ -169,16 +170,7 @@ export async function testOidcConnection(
   }
 }
 
-class EnvironmentSecretProvider implements SecretProvider {
-  get(reference: string): Promise<string | undefined> {
-    const match = /^env:\/\/(HANDSTACK_SECRET_[A-Z0-9_]+)$/.exec(reference);
-    if (match?.[1] === undefined) throw new TypeError('Unsupported secret reference');
-    return Promise.resolve(process.env[match[1]]);
-  }
-}
-
-function statePepper(): string {
-  const value = process.env.HANDSTACK_OIDC_STATE_PEPPER;
+function statePepper(value?: string): string {
   if (value !== undefined) return value;
   if (process.env.NODE_ENV === 'production') {
     throw new Error('HANDSTACK_OIDC_STATE_PEPPER is required in production');
@@ -191,9 +183,12 @@ export class OidcRuntimeService {
   readonly providers: IdentityProviderAdministrationService;
   readonly audit: IdentityAuditService;
   readonly telemetry = new IdentityTelemetry();
-  private readonly secrets = new EnvironmentSecretProvider();
 
-  constructor(@Inject(AuthRuntimeService) private readonly auth: AuthRuntimeService) {
+  constructor(
+    @Inject(AuthRuntimeService) private readonly auth: AuthRuntimeService,
+    @Inject(SecretRuntimeService) private readonly secretRuntime: SecretRuntimeService,
+    @Optional() @Inject(DatabaseService) private readonly database?: DatabaseService,
+  ) {
     this.providers = new IdentityProviderAdministrationService(auth.storage);
     this.audit = new IdentityAuditService(auth.storage);
   }
@@ -204,12 +199,13 @@ export class OidcRuntimeService {
       issuer: provider.configuration.issuer,
       clientId: provider.configuration.clientId,
       scopes: provider.configuration.scopes,
-      statePepper: statePepper(),
+      statePepper: statePepper(this.database?.config.security.oidcStatePepper),
       fetch: (input, init) => fetch(input, init),
-      resolveClientSecret: scopedSecretResolver(this.secrets, provider.clientSecretReference, {
-        organizationId: provider.organizationId,
-        pluginId: provider.pluginId,
-      }),
+      resolveClientSecret: async () => {
+        const reference = provider.clientSecretReference;
+        if (reference === undefined) return undefined;
+        return this.secretRuntime.resolve(reference, provider.organizationId, provider.pluginId);
+      },
       resolvePrincipal: (input) => this.providers.resolvePrincipal(input),
     });
   }

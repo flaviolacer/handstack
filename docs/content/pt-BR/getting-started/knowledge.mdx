@@ -38,6 +38,13 @@ substituíveis, permitindo pgvector, Mongo/Qdrant ou store local sem trocar o ad
    durável e execute-o até `SUCCEEDED`; publique o modelo ativo somente após todos os checkpoints.
    Jobs falhos retomam do cursor persistido; cancelamentos são duráveis e nunca publicam trabalho parcial.
 
+Para administrar a migração pelo API, `POST /api/v1/organizations/{organizationId}/knowledge/reindex-jobs`
+cria um job durável recebendo `knowledgeBaseId` e `embeddingModel`. Em deployment distribuído o job
+é enfileirado para o worker `indexing`; use `GET .../reindex-jobs/{jobId}` para acompanhar e
+`POST .../reindex-jobs/{jobId}/cancel` para cancelar. No perfil compacto, `POST
+.../reindex-jobs/{jobId}/run` executa a migração localmente. O modelo da base só muda após a
+reindexação concluir; jobs falhos retomam do cursor salvo.
+
 Documento, chunk e embedding carregam id/versão da fonte, digest do conteúdo, snapshot de ACL,
 classificação, residência, timestamps de ingestão/verificação, política de retenção e status de
 exclusão. O `RagPolicyProvider` padrão rejeita marcadores de prompt injection e PII/segredos comuns
@@ -70,3 +77,16 @@ VectorStore independentemente do adapter de banco principal. Confirme também qu
   de publicar o novo modelo.
 - Um token de conector repetido é reconhecido pelo cursor durável sem reaplicar a mutação; um token
   novo só é persistido depois que a propagação para vetores termina com sucesso.
+
+O scheduler periódico de sincronização de fontes vem desativado. Defina
+`HANDSTACK_KNOWLEDGE_SYNC_ENABLED=true` e configure `HANDSTACK_KNOWLEDGE_SYNC_INTERVAL_MS` para
+ativá-lo. Sem uma allow-list em `HANDSTACK_KNOWLEDGE_SYNC_ORGANIZATIONS`, ele descobre organizações
+ativas; leases no banco impedem que réplicas da API sincronizem a mesma organização ao mesmo tempo.
+
+As credenciais do vector store configurado usam `HANDSTACK_VECTOR_STORE_CREDENTIAL_REFERENCE` como
+referência de segredo. A referência é validada pelo layer tipado e resolvida somente pelo broker de
+segredos tenant-scoped; o valor da credencial nunca é armazenado na configuração ou nos vetores.
+
+As URLs remotas do Knowledge são restringidas pela allow-list tipada
+`HANDSTACK_KNOWLEDGE_ALLOWED_HOSTS`, aplicada de forma consistente pelos conectores da API. Uma
+lista vazia mantém as verificações de DNS/SSRF sem adicionar restrição de hostname.

@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@handstack/docs-engine": "file:../../packages/docs-engine",
-    "next": "^15.5.2",
+    "next": "^16.3.5",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0"

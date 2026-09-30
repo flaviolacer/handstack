@@ -23,6 +23,57 @@ function runtime(events: readonly ChatEvent[] | Error): ConversationModelRuntime
 }
 
 describe('chat model execution', () => {
+  it('uses an unpersisted prompt only as transient execution context', async () => {
+    const adapter = createDatabaseAdapter(
+      defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),
+    );
+    await adapter.initialize();
+    try {
+      const chat = new ChatService(adapter, () => new Date(), { storePrompts: false });
+      const conversation = await chat.createConversation({
+        organizationId,
+        title: 'Transient prompt',
+        createdBy: 'owner',
+      });
+      await chat.appendMessage({
+        organizationId,
+        conversationId: conversation.id,
+        branchId: conversation.activeBranchId,
+        role: 'user',
+        createdBy: 'owner',
+        parts: [{ id: 'private-question', type: 'text', text: 'transient question' }],
+      });
+      let receivedMessages: readonly { readonly content: string }[] = [];
+      const execution = new ChatExecutionService(chat, {
+        ...runtime([{ type: 'done', finishReason: 'stop' }]),
+        async *stream(input) {
+          await Promise.resolve();
+          receivedMessages = input.messages;
+          yield { type: 'done', finishReason: 'stop' };
+        },
+      });
+      await execution.execute({
+        organizationId,
+        conversationId: conversation.id,
+        branchId: conversation.activeBranchId,
+        createdBy: 'owner',
+        model: 'smart',
+        dataClassification: 'PUBLIC',
+        idempotencyKey: 'transient-prompt-execution',
+      });
+
+      const stored = await chat.history(
+        organizationId,
+        conversation.id,
+        conversation.activeBranchId,
+      );
+      expect(JSON.stringify(stored)).not.toContain('transient question');
+      expect(JSON.stringify(receivedMessages)).toContain('transient question');
+    } finally {
+      await adapter.close();
+    }
+  });
+
   it('returns a streaming handle before the provider completes', async () => {
     const adapter = createDatabaseAdapter(
       defineConfig({ database: { adapter: 'sqlite', url: 'file::memory:' } }),

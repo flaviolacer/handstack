@@ -14,6 +14,33 @@ export interface Organization extends Omit<TenantEntity, 'tenantId'> {
   readonly status: IdentityStatus;
 }
 
+export interface Branding {
+  readonly displayName: string;
+  readonly productName: string;
+  readonly logo?: string;
+  readonly favicon?: string;
+  readonly primaryColor: string;
+  readonly secondaryColor: string;
+  readonly accentColor: string;
+  readonly backgroundColor: string;
+  readonly font?: string;
+  readonly loginBackground?: string;
+  readonly customCss?: string;
+  readonly customDomain?: string;
+  readonly welcomeMessage?: string;
+  readonly legalLinks: readonly { readonly label: string; readonly url: string }[];
+  readonly supportUrl?: string;
+}
+
+export interface OrganizationSettings extends OrganizationOwnedEntity {
+  readonly branding: Branding;
+  readonly locale: string;
+  readonly timezone: string;
+  readonly theme: 'light' | 'dark' | 'system' | 'custom';
+  /** Optional tenant-scoped runtime overrides; primary database selection is never accepted here. */
+  readonly configuration?: Readonly<Record<string, unknown>>;
+}
+
 export interface Principal extends OrganizationOwnedEntity {
   readonly type: PrincipalType;
   readonly status: IdentityStatus;

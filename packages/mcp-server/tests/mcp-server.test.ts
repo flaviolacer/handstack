@@ -59,6 +59,22 @@ describe('MCP server', () => {
       metadata: {},
       handler: (input) => Promise.resolve(input),
     });
+    await registry.register({
+      organizationId: 'org',
+      slug: 'restricted',
+      name: 'Restricted',
+      description: 'Restricted input',
+      type: 'TOOL',
+      inputSchema: { type: 'object' },
+      outputSchema: {},
+      requiredPermissions: ['mcp.restricted'],
+      allowedChannels: ['MCP'],
+      timeoutMs: 1000,
+      visibility: 'ORGANIZATION',
+      ownerId: 'owner',
+      metadata: {},
+      handler: (input) => Promise.resolve(input),
+    });
     const engine = new CapabilityExecutionEngine(registry, {
       authorize: ({ capability, context }) =>
         capability.requiredPermissions.every((permission) =>
@@ -74,6 +90,15 @@ describe('MCP server', () => {
         {
           organizationId: 'org',
           principal: { organizationId: 'org', subject: 'user', permissions: ['mcp.echo'] },
+        },
+      ),
+    ).resolves.toMatchObject({ result: { tools: [{ name: 'echo' }] } });
+    await expect(
+      server.handle(
+        { jsonrpc: '2.0', id: 4, method: 'tools/list' },
+        {
+          organizationId: 'org',
+          principal: { organizationId: 'org', subject: 'limited-user', permissions: ['mcp.echo'] },
         },
       ),
     ).resolves.toMatchObject({ result: { tools: [{ name: 'echo' }] } });
@@ -116,6 +141,9 @@ describe('MCP server', () => {
       server.handle({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, { organizationId: 'org' }),
     ).resolves.toMatchObject({ error: { code: -32001 } });
     await expect(
+      server.handle({ jsonrpc: '2.0', id: 4, method: 'initialize' }, { organizationId: 'org' }),
+    ).resolves.toMatchObject({ error: { code: -32001 } });
+    await expect(
       server.handle(
         { jsonrpc: '2.0', id: 2, method: 'resources/list' },
         {
@@ -133,5 +161,37 @@ describe('MCP server', () => {
         },
       ),
     ).resolves.toMatchObject({ result: { prompts: [{ name: 'summarize' }] } });
+  });
+
+  it('does not announce an unpublished administrative descriptor as an MCP tool', async () => {
+    const registry = new InMemoryCapabilityRegistry();
+    const engine = new CapabilityExecutionEngine(registry, { authorize: () => Promise.resolve() });
+    await registry.registerDescriptor({
+      organizationId: 'org',
+      slug: 'admin-tool',
+      name: 'Admin tool',
+      description: 'Managed descriptor',
+      type: 'TOOL',
+      inputSchema: {},
+      outputSchema: {},
+      requiredPermissions: [],
+      allowedChannels: ['MCP'],
+      timeoutMs: 1000,
+      visibility: 'ORGANIZATION',
+      ownerId: 'admin',
+      metadata: {},
+    });
+    const server = new McpServer(registry, engine);
+    const context = {
+      organizationId: 'org',
+      principal: { organizationId: 'org', subject: 'u', permissions: [] },
+    };
+    await expect(
+      server.handle({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, context),
+    ).resolves.toMatchObject({ result: { tools: [] } });
+    await registry.publish('org', 'admin-tool');
+    await expect(
+      server.handle({ jsonrpc: '2.0', id: 2, method: 'tools/list' }, context),
+    ).resolves.toMatchObject({ result: { tools: [{ name: 'admin-tool' }] } });
   });
 });

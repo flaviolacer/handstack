@@ -47,6 +47,18 @@ export class BudgetExceededError extends HandStackError {
 export class RateLimitError extends HandStackError {
   readonly code = 'rate_limit_exceeded';
   readonly status = 429;
+
+  constructor(
+    message: string,
+    readonly retryAfterSeconds?: number,
+  ) {
+    super(message);
+    if (
+      retryAfterSeconds !== undefined &&
+      (!Number.isSafeInteger(retryAfterSeconds) || retryAfterSeconds < 0)
+    )
+      throw new RangeError('retryAfterSeconds must be a non-negative integer');
+  }
 }
 
 export class CapabilityNotFoundError extends HandStackError {

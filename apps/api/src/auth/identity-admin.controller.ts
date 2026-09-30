@@ -84,6 +84,79 @@ export class IdentityAdminController {
     return (await this.oidc.providers.list(organizationId)).map(publicProvider);
   }
 
+  @Get('users')
+  async listUsers(
+    @Param('organizationId') organizationId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    await this.authorize(organizationId, request);
+    return this.administration.listUsers(organizationId);
+  }
+
+  @Post('users')
+  async createUser(
+    @Param('organizationId') organizationId: string,
+    @Req() request: AuthenticatedRequest,
+    @Body() value: unknown,
+  ) {
+    await this.authorize(organizationId, request);
+    const body = objectBody(value);
+    return this.administration.createUser(organizationId, {
+      ...(body.id === undefined ? {} : { id: stringValue(body, 'id') }),
+      username: stringValue(body, 'username'),
+      displayName: stringValue(body, 'displayName'),
+      ...(body.email === undefined ? {} : { email: stringValue(body, 'email') }),
+    });
+  }
+
+  @Get('groups')
+  async listGroups(
+    @Param('organizationId') organizationId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    await this.authorize(organizationId, request);
+    return this.administration.listGroups(organizationId);
+  }
+
+  @Post('groups')
+  async createGroup(
+    @Param('organizationId') organizationId: string,
+    @Req() request: AuthenticatedRequest,
+    @Body() value: unknown,
+  ) {
+    await this.authorize(organizationId, request);
+    const body = objectBody(value);
+    return this.administration.createGroup(organizationId, {
+      ...(body.id === undefined ? {} : { id: stringValue(body, 'id') }),
+      name: stringValue(body, 'name'),
+      ...(body.description === undefined ? {} : { description: stringValue(body, 'description') }),
+    });
+  }
+
+  @Get('roles')
+  async listRoles(
+    @Param('organizationId') organizationId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    await this.authorize(organizationId, request);
+    return this.administration.listRoles(organizationId);
+  }
+
+  @Post('roles')
+  async createRole(
+    @Param('organizationId') organizationId: string,
+    @Req() request: AuthenticatedRequest,
+    @Body() value: unknown,
+  ) {
+    await this.authorize(organizationId, request);
+    const body = objectBody(value);
+    return this.administration.createRole(organizationId, {
+      ...(body.id === undefined ? {} : { id: stringValue(body, 'id') }),
+      name: stringValue(body, 'name'),
+      ...(body.description === undefined ? {} : { description: stringValue(body, 'description') }),
+    });
+  }
+
   @Post('providers')
   async createProvider(
     @Param('organizationId') organizationId: string,

@@ -62,6 +62,13 @@ export const createModelSchema = z
   })
   .strict();
 
+export const modelApprovalOverrideSchema = z
+  .object({
+    justification: z.string().trim().min(1).max(4000),
+    expiresAt: z.iso.datetime(),
+  })
+  .strict();
+
 export const createPromptSchema = z
   .object({
     name: z.string().trim().min(1).max(160),
@@ -188,6 +195,73 @@ export const recordEvaluationGateSchema = z
       .regex(/^[a-f0-9]+$/),
   })
   .strict();
+
+export const redTeamVectorSchema = z.enum([
+  'jailbreak',
+  'indirect_prompt_injection',
+  'data_exfiltration',
+  'cross_tenant_access',
+  'unsafe_tool_use',
+  'excessive_agency',
+  'denial_of_wallet',
+  'rag_poisoning',
+]);
+
+const redTeamScenarioInputSchema = z
+  .object({
+    prompt: z.string().trim().min(1).max(100_000),
+    expected: z
+      .object({
+        mustContain: z.array(z.string().trim().min(1).max(2_000)).max(100).default([]),
+        mustNotContain: z.array(z.string().trim().min(1).max(2_000)).max(100).default([]),
+      })
+      .strict()
+      .superRefine((expected, context) => {
+        if (expected.mustContain.length === 0 && expected.mustNotContain.length === 0)
+          context.addIssue({
+            code: 'custom',
+            message: 'At least one red-team output assertion is required',
+          });
+      }),
+  })
+  .strict();
+
+export const createRedTeamCampaignSchema = z
+  .object({
+    targetKind: z.enum(['MODEL', 'PROMPT', 'AGENT', 'WORKFLOW']),
+    targetId: z.string().trim().min(1).max(200),
+    campaignVersion: z.string().trim().min(1).max(100),
+    scenarios: z
+      .array(
+        z
+          .object({
+            id: z.string().trim().min(1).max(200),
+            vector: redTeamVectorSchema,
+            input: redTeamScenarioInputSchema,
+          })
+          .strict(),
+      )
+      .min(8)
+      .max(10_000),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (new Set(value.scenarios.map(({ id }) => id)).size !== value.scenarios.length)
+      context.addIssue({
+        code: 'custom',
+        path: ['scenarios'],
+        message: 'Scenario IDs must be unique',
+      });
+    const vectors = new Set(value.scenarios.map(({ vector }) => vector));
+    for (const vector of redTeamVectorSchema.options) {
+      if (!vectors.has(vector))
+        context.addIssue({
+          code: 'custom',
+          path: ['scenarios'],
+          message: `Missing red-team vector: ${vector}`,
+        });
+    }
+  });
 
 export const emptyOperationSchema = z.object({}).strict();
 
@@ -349,6 +423,33 @@ export const promptEvaluationGateRecordResponseSchema = z.object({
   promptVersion: publicPromptVersionSchema,
 });
 
+export const publicRedTeamCampaignSchema = z.object({
+  ...entityMetadataSchema,
+  organizationId: z.string(),
+  targetKind: z.enum(['MODEL', 'PROMPT', 'AGENT', 'WORKFLOW']),
+  targetId: z.string(),
+  campaignVersion: z.string(),
+  status: z.enum(['DRAFT', 'RUNNING', 'PASSED', 'FAILED']),
+  scenarioCount: z.number().int().nonnegative(),
+  findings: z.array(
+    z.object({
+      scenarioId: z.string(),
+      vector: redTeamVectorSchema,
+      passed: z.boolean(),
+      severity: z.enum(['NONE', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+      evidenceDigest: z.string(),
+    }),
+  ),
+  executedAt: z.string().pipe(z.iso.datetime()).optional(),
+  executionErrorDigest: z.string().optional(),
+});
+
+export const redTeamCampaignPageSchema = z.object({
+  items: z.array(publicRedTeamCampaignSchema),
+  nextCursor: z.string().optional(),
+  previousCursor: z.string().optional(),
+});
+
 export const modelResponseSchema = z.object({
   content: z.string(),
   finishReason: z.enum(['stop', 'length', 'tool_call', 'error']),
@@ -374,4 +475,5 @@ export type CreatePromptVersionInput = z.infer<typeof createPromptVersionSchema>
 export type CreateEvaluationDatasetInput = z.infer<typeof createEvaluationDatasetSchema>;
 export type CreateEvaluationSuiteInput = z.infer<typeof createEvaluationSuiteSchema>;
 export type CreateEvaluationRunInput = z.infer<typeof createEvaluationRunSchema>;
+export type CreateRedTeamCampaignInput = z.infer<typeof createRedTeamCampaignSchema>;
 export type CreateModelResponseInput = z.infer<typeof createModelResponseSchema>;

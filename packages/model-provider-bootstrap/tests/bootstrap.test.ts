@@ -4,7 +4,7 @@ import { AnthropicProvider } from '@handstack/provider-anthropic';
 import { BedrockProvider } from '@handstack/provider-bedrock';
 import { GeminiProvider } from '@handstack/provider-gemini';
 import { OpenAICompatibleProvider } from '@handstack/provider-openai-compatible';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createOfficialProviderFactories } from '../src/index.js';
 
 const adapters: readonly ProviderDefinition['adapter'][] = [
@@ -68,6 +68,10 @@ function context(adapter: ProviderDefinition['adapter']): ProviderFactoryContext
 }
 
 describe('official provider bootstrap', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('registers every initial adapter and constructs the expected provider without resolving secrets', () => {
     let resolutions = 0;
     const registry = createOfficialProviderFactories({
@@ -119,5 +123,39 @@ describe('official provider bootstrap', () => {
         definition: { ...context('aws-bedrock').definition, secretReference: 'vault://aws' },
       }),
     ).toThrow(/workload identity/);
+  });
+
+  it('resolves the configured provider timeout when constructing each provider', async () => {
+    vi.useFakeTimers();
+    let timeoutMs = 15;
+    const stalledFetch = vi.fn<typeof fetch>(
+      (_input, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            'abort',
+            () => {
+              reject(new Error('timed out'));
+            },
+            { once: true },
+          );
+        }),
+    );
+    const factories = createOfficialProviderFactories({
+      fetch: stalledFetch,
+      timeoutMs: () => timeoutMs,
+    });
+    const provider = factories.create('openai-compatible', context('openai-compatible'));
+    const pending = provider.listModels();
+    const assertion = expect(pending).rejects.toMatchObject({ code: 'TIMEOUT' });
+    await vi.advanceTimersByTimeAsync(timeoutMs);
+    await assertion;
+
+    timeoutMs = 25;
+    const updatedProvider = factories.create('openai-compatible', context('openai-compatible'));
+    const updatedPending = updatedProvider.listModels();
+    const updatedAssertion = expect(updatedPending).rejects.toMatchObject({ code: 'TIMEOUT' });
+    await vi.advanceTimersByTimeAsync(timeoutMs);
+    await updatedAssertion;
+    expect(stalledFetch).toHaveBeenCalledTimes(2);
   });
 });

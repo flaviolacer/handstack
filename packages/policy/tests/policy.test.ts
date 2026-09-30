@@ -1,6 +1,7 @@
 import {
   InMemoryApprovalService,
   InMemoryPolicyEngine,
+  PersistentPolicyEngine,
   parsePermission,
   type AuthorizationPolicy,
 } from '../src/index.js';
@@ -18,6 +19,51 @@ const allowPolicy: AuthorizationPolicy = {
 const policies: AuthorizationPolicy[] = [allowPolicy];
 
 describe('policy engine', () => {
+  it('loads policies by tenant and preserves explicit deny precedence', async () => {
+    const engine = new PersistentPolicyEngine((organizationId) =>
+      Promise.resolve(
+        organizationId === 'organization-a'
+          ? [
+              {
+                id: 'allow-production',
+                organizationId: 'organization-a',
+                principalIds: ['user-a'],
+                resource: allowPolicy.resource,
+                action: allowPolicy.action,
+                effect: 'allow',
+              },
+              {
+                id: 'deny-production',
+                organizationId: 'organization-a',
+                principalIds: ['user-a'],
+                resource: allowPolicy.resource,
+                action: allowPolicy.action,
+                effect: 'deny',
+              },
+              {
+                id: 'foreign',
+                organizationId: 'organization-b',
+                principalIds: ['user-a'],
+                resource: allowPolicy.resource,
+                action: allowPolicy.action,
+                effect: 'allow',
+              },
+            ]
+          : [],
+      ),
+    );
+    await expect(
+      engine.authorize({
+        organizationId: 'organization-a',
+        principalId: 'user-a',
+        resource: allowPolicy.resource,
+        action: allowPolicy.action,
+        groupIds: [],
+        evaluatedAt: new Date('2026-09-15T12:00:00.000Z'),
+      }),
+    ).resolves.toMatchObject({ allowed: false, reason: 'explicit deny' });
+  });
+
   it('allows a matching tenant, principal, group, resource, action and time', async () => {
     const decision = await new InMemoryPolicyEngine(policies).authorize({
       organizationId: 'organization-a',

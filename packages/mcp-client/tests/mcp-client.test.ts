@@ -3,6 +3,63 @@ import { CapabilityExecutionEngine, InMemoryCapabilityRegistry } from '@handstac
 import { McpClientRegistry } from '../src/index.js';
 
 describe('MCP client registry', () => {
+  it('uses and purges the configured cache namespace', async () => {
+    const registry = new McpClientRegistry(undefined, 30_000, 'tenant-cache');
+    registry.register({
+      id: 'cached',
+      organizationId: 'org',
+      name: 'Cached MCP server',
+      transport: 'STREAMABLE_HTTP',
+      url: 'https://mcp.example.test',
+      allowedPermissions: [],
+    });
+    registry.restoreTools('org', 'cached', [
+      { name: 'ping', inputSchema: {}, requiredPermissions: [] },
+    ]);
+    expect(registry.listTools('org', 'cached')).toHaveLength(1);
+    await registry.purgeOrganization('org');
+    expect(registry.listTools('org', 'cached')).toHaveLength(0);
+  });
+
+  it('aborts remote requests at the configured timeout', async () => {
+    let requestSignal: AbortSignal | undefined;
+    const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      const signal = init?.signal;
+      if (signal === undefined || signal === null)
+        throw new Error('MCP request signal was not provided');
+      requestSignal = signal;
+      return new Promise<Response>((_resolve, reject) => {
+        const abort = () => {
+          reject(
+            signal.reason instanceof Error
+              ? signal.reason
+              : new Error('MCP request aborted', { cause: signal.reason }),
+          );
+        };
+        signal.addEventListener('abort', abort, { once: true });
+        if (signal.aborted) abort();
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const registry = new McpClientRegistry(undefined, 20);
+      registry.register({
+        id: 'slow',
+        organizationId: 'org',
+        name: 'Slow MCP server',
+        transport: 'STREAMABLE_HTTP',
+        url: 'https://mcp.example.test',
+        allowedPermissions: [],
+      });
+      await expect(registry.discover('org', 'slow')).rejects.toMatchObject({
+        name: 'TimeoutError',
+      });
+      expect(requestSignal?.aborted).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('emits safe observations for discovery, calls and failures', async () => {
     const observations: {
       operation: string;
@@ -115,6 +172,43 @@ describe('MCP client registry', () => {
     vi.unstubAllGlobals();
   });
 
+  it('applies custom header credentials to HTTP tool calls', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          result:
+            fetchMock.mock.calls.length === 1
+              ? { tools: [{ name: 'ping', inputSchema: {} }] }
+              : { ok: true },
+        }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const registry = new McpClientRegistry();
+    registry.register({
+      id: 'headers',
+      organizationId: 'org',
+      name: 'Headers',
+      transport: 'STREAMABLE_HTTP',
+      url: 'https://mcp.example.test',
+      auth: { type: 'CUSTOM_HEADERS', headers: { 'x-api-key': 'secret' } },
+      allowedPermissions: [],
+    });
+    await registry.discover('org', 'headers');
+    await registry.execute(
+      'org',
+      'headers',
+      'ping',
+      {},
+      { organizationId: 'org', principalId: 'user', permissions: [] },
+    );
+    const last = fetchMock.mock.calls.at(-1) as unknown as
+      readonly [unknown, RequestInit] | undefined;
+    expect(last?.[1].headers).toEqual(expect.objectContaining({ 'x-api-key': 'secret' }));
+    vi.unstubAllGlobals();
+  });
+
   it('uses newline-delimited JSON-RPC over stdio', async () => {
     const script =
       "process.stdin.setEncoding('utf8'); let b=''; process.stdin.on('data',c=>{b+=c; const i=b.indexOf('\\n'); if(i<0)return; const r=JSON.parse(b.slice(0,i)); b=b.slice(i+1); const result=r.method==='tools/list'?{tools:[{name:'ping',inputSchema:{}}]}:{content:[{type:'text',text:'pong'}]}; process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:r.id,result})+'\\n');});";
@@ -145,6 +239,27 @@ describe('MCP client registry', () => {
       ),
     ).resolves.toEqual({ content: [{ type: 'text', text: 'pong' }] });
     await registry.close('org', 'stdio');
+  });
+
+  it('reconnects lazily after an MCP stdio server restart', async () => {
+    const script =
+      "process.stdin.setEncoding('utf8'); let b=''; process.stdin.on('data',c=>{b+=c; const i=b.indexOf('\\n'); if(i<0)return; const r=JSON.parse(b.slice(0,i)); b=b.slice(i+1); const result={tools:[{name:'ping',inputSchema:{}}]}; process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:r.id,result})+'\\n');});";
+    const registry = new McpClientRegistry();
+    registry.register({
+      id: 'restartable',
+      organizationId: 'org',
+      name: 'Restartable',
+      transport: 'STDIO',
+      command: process.execPath,
+      args: ['-e', script],
+      allowedPermissions: [],
+    });
+    await expect(registry.discover('org', 'restartable')).resolves.toHaveLength(1);
+    await registry.reconnect('org', 'restartable');
+    await expect(registry.discover('org', 'restartable')).resolves.toEqual([
+      { name: 'ping', inputSchema: {}, requiredPermissions: [] },
+    ]);
+    await registry.close('org', 'restartable');
   });
 
   it('discovers resources and prompts and resolves a per-user credential', async () => {
@@ -250,5 +365,42 @@ describe('MCP client registry', () => {
     ).rejects.toThrow('credential unavailable');
     expect(observations.at(-1)).toMatchObject({ method: 'tools/call', outcome: 'error' });
     vi.unstubAllGlobals();
+  });
+
+  it('runs an authorization-code OAuth flow with bound state', async () => {
+    const registry = new McpClientRegistry();
+    registry.register({
+      id: 'oauth',
+      organizationId: 'org',
+      name: 'OAuth server',
+      transport: 'STREAMABLE_HTTP',
+      url: 'https://mcp.example.test',
+      oauth: {
+        authorizationUrl: 'https://idp.example.test/authorize',
+        tokenUrl: 'https://idp.example.test/token',
+        clientId: 'client-id',
+        redirectUri: 'https://handstack.example.test/mcp/callback',
+        scopes: ['mcp:use'],
+      },
+      allowedPermissions: [],
+    });
+    const authorization = registry.beginOAuth('org', 'oauth', 'user');
+    expect(authorization.authorizationUrl).toContain('client_id=client-id');
+    expect(authorization.authorizationUrl).toContain('scope=mcp%3Ause');
+    const request = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ access_token: 'issued-token', token_type: 'Bearer' }),
+    });
+    await expect(
+      registry.completeOAuth('org', 'oauth', 'user', authorization.state, 'auth-code', request),
+    ).resolves.toEqual({ type: 'OAUTH2', secret: 'issued-token' });
+    const firstCall = request.mock.calls[0] as unknown as readonly [string, RequestInit];
+    expect(firstCall[0]).toBe('https://idp.example.test/token');
+    expect(firstCall[1].method).toBe('POST');
+    expect(firstCall[1].body).toContain('code=auth-code');
+    await expect(
+      registry.completeOAuth('org', 'oauth', 'user', authorization.state, 'auth-code', request),
+    ).rejects.toThrow(/state/);
   });
 });

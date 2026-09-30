@@ -7,7 +7,7 @@ permissions: [capability.execute]
 features: [capabilities, policy, api]
 deploymentProfiles: [compact, distributed]
 introducedIn: 0.6.0
-lastReviewedAt: 2026-09-09
+lastReviewedAt: 2026-09-28
 owner: platform-team
 tags: [capability, authorization, execution]
 ---
@@ -29,6 +29,11 @@ execution engine.
 2. Resolve it with `GET /api/v1/organizations/{organizationId}/capabilities`.
 3. Execute it with `POST /api/v1/organizations/{organizationId}/capabilities/{slug}/run`.
 
+For a capability that handles personal data, set `metadata.consentPurposeId` to a persisted
+privacy purpose ID. The engine checks the latest consent for the authenticated principal before
+execution and fails closed after withdrawal. External destinations still require the explicit
+classification, provider and residency metadata.
+
 ## Verify
 
 Confirm an authorized API call returns the handler result and a cross-organization or missing
@@ -39,3 +44,5 @@ permission call returns 403. Confirm a channel not listed by the capability fail
 - `capability.execute permission is required` means the caller lacks the required permission.
 - `Capability is unavailable` means the slug is not published for the requested channel.
 - Timeout and aborted requests release any budget reservation before returning the error.
+- `Consent is not granted for purpose ...` means the principal must grant the declared privacy
+  purpose before this capability can execute.

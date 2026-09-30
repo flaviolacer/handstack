@@ -2,6 +2,8 @@ import type { HandStackConfig } from '@handstack/config';
 import { MongoAdapter } from '@handstack/database-mongodb';
 import { TypeOrmAdapter } from '@handstack/database-typeorm';
 import type {
+  Page,
+  PageRequest,
   Repository,
   RepositoryName,
   TenantEntity,
@@ -11,6 +13,8 @@ import type {
 export interface DatabaseAdapter extends TransactionManager {
   initialize(): Promise<this>;
   repository<T extends TenantEntity>(name: RepositoryName): Repository<T>;
+  /** Lists records across tenants for platform-owned discovery tasks only. */
+  listAll?<T extends TenantEntity>(name: RepositoryName, page: PageRequest): Promise<Page<T>>;
   close(): Promise<void>;
 }
 

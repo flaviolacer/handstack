@@ -16,12 +16,12 @@
   "dependencies": {
     "@handstack/models": "file:../models",
     "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/auto-instrumentations-node": "^0.67.2",
-    "@opentelemetry/exporter-metrics-otlp-proto": "^0.207.0",
-    "@opentelemetry/exporter-trace-otlp-proto": "^0.207.0",
-    "@opentelemetry/resources": "^2.1.0",
-    "@opentelemetry/sdk-metrics": "^2.2.0",
-    "@opentelemetry/sdk-node": "^0.207.0",
+    "@opentelemetry/auto-instrumentations-node": "0.80.0",
+    "@opentelemetry/exporter-metrics-otlp-proto": "0.222.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "0.222.0",
+    "@opentelemetry/resources": "2.11.0",
+    "@opentelemetry/sdk-metrics": "2.11.0",
+    "@opentelemetry/sdk-node": "0.222.0",
     "@opentelemetry/semantic-conventions": "^1.37.0",
     "pino": "^9.9.4"
   }

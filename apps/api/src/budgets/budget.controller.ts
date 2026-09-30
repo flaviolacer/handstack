@@ -10,6 +10,7 @@ import {
   type AuthenticatedRequest,
 } from '../auth/authentication-context.js';
 import { IdentityAdministrationService } from '@handstack/identity-service';
+import { ChatRuntimeService } from '../chat/chat-runtime.service.js';
 
 const createSchema = z.object({
   scopeType: z.enum([
@@ -49,6 +50,7 @@ export class BudgetController {
   constructor(
     @Inject(BudgetRuntimeService) private readonly runtime: BudgetRuntimeService,
     @Inject(AuthRuntimeService) auth: AuthRuntimeService,
+    @Inject(ChatRuntimeService) private readonly chat: ChatRuntimeService,
   ) {
     this.administration = new IdentityAdministrationService(auth.storage);
   }
@@ -93,7 +95,9 @@ export class BudgetController {
     @Req() request: AuthenticatedRequest,
   ) {
     await this.authorize(organizationId, request);
-    return this.runtime.engine.listUsage(organizationId);
+    const persisted = await this.runtime.engine.listUsage(organizationId);
+    const chatUsage = await this.chat.chat.listUsage(organizationId);
+    return { items: [...persisted.items, ...chatUsage] };
   }
 
   @Post('pricing/models')
@@ -117,6 +121,16 @@ export class BudgetController {
       effectiveFrom: parsed.data.effectiveFrom,
       ...(parsed.data.effectiveTo === undefined ? {} : { effectiveTo: parsed.data.effectiveTo }),
     });
+  }
+
+  @Get('pricing/models')
+  @ApiOperation({ summary: 'List versioned model pricing records' })
+  async listPricing(
+    @Param('organizationId') organizationId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    await this.authorize(organizationId, request);
+    return this.runtime.pricing.listModelPricing(organizationId);
   }
 
   private async authorize(organizationId: string, request: AuthenticatedRequest) {

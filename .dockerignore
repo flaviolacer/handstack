@@ -7,6 +7,15 @@ coverage
 dist
 graphify-out
 node_modules
+.pnpm-store
+.pnpm-store-incomplete
+.dependency-backup-*
+handstack.db
+*.db
+test-results
+playwright-report
+.handstack-data
+coverage
 *.log
 .env*
 !.env.example

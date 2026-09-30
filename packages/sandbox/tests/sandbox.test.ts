@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ContainerSandboxProvider,
   FailClosedSandboxProvider,
+  NodeProcessSandboxExecutor,
   ProcessIsolatedSandboxProvider,
   SandboxError,
   enforceOutputLimits,
@@ -145,6 +146,43 @@ describe('output bounding', () => {
 });
 
 describe('process-isolated sandbox provider', () => {
+  it('executes a real child process with bounded output', async () => {
+    const executor = new NodeProcessSandboxExecutor();
+    const result = await executor.run({
+      argv: [process.execPath, '-e', "process.stdout.write('sandbox-ok')"],
+      profile: profile({
+        resourceLimits: { executionTimeoutMs: 2_000, maxOutputBytes: 64, maxLogBytes: 64 },
+      }),
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('sandbox-ok');
+    expect(result.timedOut).toBe(false);
+  });
+
+  it('brokers one request and response over the isolated child stdio channel', async () => {
+    const executor = new NodeProcessSandboxExecutor();
+    const script = [
+      "let input='';process.stdin.setEncoding('utf8');",
+      "process.stdin.on('data',chunk=>{input+=chunk;const end=input.indexOf('\\n');if(end>=0){const response=JSON.parse(input.slice(0,end));process.stdout.write(JSON.stringify({received:response.result}));process.stdin.destroy();}});",
+      "process.stdout.write(JSON.stringify({type:'handstack_rpc_request',id:'1',request:{method:'secrets.get',params:{reference:'secret://test'}}})+'\\n');",
+    ].join('');
+    const result = await executor.run({
+      argv: [process.execPath, '-e', script],
+      profile: profile({
+        resourceLimits: { executionTimeoutMs: 2_000, maxOutputBytes: 256, maxLogBytes: 64 },
+      }),
+      rpcHandler: (request) =>
+        Promise.resolve(
+          (request as { method?: string }).method === 'secrets.get' ? 'rpc-secret' : undefined,
+        ),
+    });
+    expect(result).toMatchObject({
+      exitCode: 0,
+      stdout: '{"received":"rpc-secret"}',
+      timedOut: false,
+    });
+  });
+
   const executor: SandboxExecutor = {
     run: (input) =>
       Promise.resolve({

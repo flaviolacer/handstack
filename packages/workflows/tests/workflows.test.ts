@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   RepositoryWorkflowStore,
   WorkflowRuntime,
+  type WorkflowCompensation,
   type Workflow,
   type WorkflowExecution,
   type WorkflowStepExecution,
@@ -65,6 +66,81 @@ const workflow: Workflow = {
 };
 
 describe('Workflow runtime', () => {
+  it('materializes version, trigger and compensation entities in the durable store', async () => {
+    const repositories = new Map<string, FakeRepository<TenantEntity>>();
+    const store = new RepositoryWorkflowStore((name) => {
+      const key = String(name);
+      const existing = repositories.get(key);
+      if (existing !== undefined) return existing as never;
+      const created = new FakeRepository<TenantEntity>();
+      repositories.set(key, created);
+      return created as never;
+    });
+    const versioned: Workflow = {
+      ...workflow,
+      id: 'versioned-flow',
+      nodes: [
+        {
+          id: 'step',
+          kind: 'Tool',
+          config: {},
+          compensation: { kind: 'Capability', config: { slug: 'undo.step' } },
+        },
+      ],
+      edges: [],
+    };
+    await store.saveWorkflow(versioned);
+    expect(
+      (await repositories.get('workflow-versions')?.list('org', { limit: 10 }))?.items,
+    ).toHaveLength(1);
+    expect(
+      (await repositories.get('workflow-triggers')?.list('org', { limit: 10 }))?.items,
+    ).toHaveLength(1);
+    const compensations = (
+      await repositories.get('workflow-compensations')?.list('org', { limit: 10 })
+    )?.items as WorkflowCompensation[] | undefined;
+    expect(compensations).toMatchObject([
+      { workflowId: 'versioned-flow', nodeId: 'step', kind: 'Capability' },
+    ]);
+  });
+
+  it('runs compensations in reverse completion order when a later step fails', async () => {
+    const compensated: string[] = [];
+    const runtime = new WorkflowRuntime(
+      (node, input) =>
+        node.id === 'fail' ? Promise.reject(new Error('failure')) : Promise.resolve(input),
+      undefined,
+      (compensation, input) => {
+        compensated.push(
+          `${compensation.nodeId}:${String((input as { value?: string }).value ?? input)}`,
+        );
+        return Promise.resolve();
+      },
+    );
+    runtime.register({
+      ...workflow,
+      id: 'compensating-flow',
+      nodes: [
+        { id: 'first', kind: 'Tool', config: {}, compensation: { kind: 'Tool', config: {} } },
+        { id: 'second', kind: 'Tool', config: {}, compensation: { kind: 'Tool', config: {} } },
+        { id: 'fail', kind: 'Tool', config: {} },
+      ],
+      edges: [
+        { from: 'first', to: 'second' },
+        { from: 'second', to: 'fail' },
+      ],
+    });
+    const result = await runtime.start({
+      organizationId: 'org',
+      workflowId: 'compensating-flow',
+      principalId: 'user',
+      trigger: 'manual',
+      payload: { value: 'input' },
+    });
+    expect(result.status).toBe('FAILED');
+    expect(compensated.map((value) => value.split(':')[0])).toEqual(['second', 'first']);
+  });
+
   it('deduplicates a repeated execution idempotency key and rejects request reuse', async () => {
     let executions = 0;
     const runtime = new WorkflowRuntime((_node, input) => {
@@ -863,6 +939,34 @@ describe('Workflow runtime', () => {
       }),
     ).resolves.toMatchObject({ status: 'TIMED_OUT', error: 'workflow_step_timeout' });
     expect(aborted).toBe(true);
+  });
+
+  it('propagates trigger provenance into workflow node execution', async () => {
+    let received: { requestId?: string; traceId?: string; source?: string } | undefined;
+    const runtime = new WorkflowRuntime((_node, _input, context) => {
+      received = context;
+      return Promise.resolve('done');
+    });
+    runtime.register({
+      ...workflow,
+      id: 'provenance-flow',
+      trigger: 'api',
+      published: true,
+      nodes: [{ id: 'step', kind: 'Tool', config: {} }],
+      edges: [],
+    });
+
+    await expect(
+      runtime.start({
+        organizationId: 'org',
+        workflowId: 'provenance-flow',
+        principalId: 'user',
+        trigger: 'api',
+        payload: null,
+        context: { requestId: 'req-1', traceId: 'trace-1', source: 'API' },
+      }),
+    ).resolves.toMatchObject({ status: 'COMPLETED' });
+    expect(received).toMatchObject({ requestId: 'req-1', traceId: 'trace-1', source: 'API' });
   });
 
   it('fails a step when its serialized output exceeds the configured limit', async () => {

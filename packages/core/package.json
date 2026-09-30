@@ -11,6 +11,10 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint src tests",
     "test": "vitest run",
+    "test:redis": "vitest run --config vitest.redis.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "redis": "^5.8.2"
   }
 }

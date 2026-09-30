@@ -12,3 +12,90 @@ targets:
   - surface: apps/web/app/help/search/page.tsx
     route: /help/search
     articleId: user/help-center
+  - surface: apps/web/app/agents/page.tsx
+    route: /agents
+    articleId: getting-started/agents
+  - surface: apps/web/app/capabilities/page.tsx
+    route: /capabilities
+    articleId: getting-started/capabilities
+  - surface: apps/web/app/models/page.tsx
+    route: /models
+    articleId: getting-started/model-registry
+  - surface: apps/web/app/knowledge/page.tsx
+    route: /knowledge
+    articleId: getting-started/knowledge
+  - surface: apps/web/app/workflows/page.tsx
+    route: /workflows
+    articleId: getting-started/governance-workflows
+  - surface: apps/web/app/access-requests/page.tsx
+    route: /access-requests
+    articleId: getting-started/access-requests
+  - surface: apps/web/app/access-grants/page.tsx
+    route: /access-grants
+    articleId: getting-started/access-requests
+  - surface: apps/web/app/red-team/page.tsx
+    route: /red-team
+    articleId: getting-started/red-team
+  - surface: apps/web/app/mcp/page.tsx
+    route: /mcp
+    articleId: getting-started/mcp-client
+  - surface: apps/web/app/plugins/page.tsx
+    route: /plugins
+    articleId: getting-started/plugins
+  - surface: apps/web/app/providers/page.tsx
+    route: /providers
+    articleId: getting-started/model-registry
+  - surface: apps/web/app/routing/page.tsx
+    route: /routing
+    articleId: getting-started/model-routing
+  - surface: apps/web/app/users/page.tsx
+    route: /users
+    articleId: getting-started/authentication-sessions
+  - surface: apps/web/app/groups/page.tsx
+    route: /groups
+    articleId: getting-started/authentication-sessions
+  - surface: apps/web/app/roles/page.tsx
+    route: /roles
+    articleId: getting-started/authentication-sessions
+  - surface: apps/web/app/permissions/page.tsx
+    route: /permissions
+    articleId: getting-started/authentication-sessions
+  - surface: apps/web/app/policies/page.tsx
+    route: /policies
+    articleId: getting-started/governance-workflows
+  - surface: apps/web/app/budgets/page.tsx
+    route: /budgets
+    articleId: getting-started/budgets
+  - surface: apps/web/app/api-keys/page.tsx
+    route: /api-keys
+    articleId: getting-started/gateway
+  - surface: apps/web/app/service-accounts/page.tsx
+    route: /service-accounts
+    articleId: getting-started/service-accounts
+  - surface: apps/web/app/secrets/page.tsx
+    route: /secrets
+    articleId: getting-started/encryption-secrets
+  - surface: apps/web/app/audit/page.tsx
+    route: /audit
+    articleId: getting-started/audit-observability
+  - surface: apps/web/app/incidents/page.tsx
+    route: /incidents
+    articleId: getting-started/incidents
+  - surface: apps/web/app/webhooks/page.tsx
+    route: /webhooks
+    articleId: getting-started/webhooks
+  - surface: apps/web/app/operations/dead-letters/page.tsx
+    route: /operations/dead-letters
+    articleId: getting-started/operations-api
+  - surface: apps/web/app/pricing/page.tsx
+    route: /pricing
+    articleId: getting-started/pricing
+  - surface: apps/web/app/usage/page.tsx
+    route: /usage
+    articleId: getting-started/observability-and-alerts
+  - surface: apps/web/app/settings/page.tsx
+    route: /settings
+    articleId: getting-started/overview
+  - surface: apps/web/app/privacy/page.tsx
+    route: /privacy
+    articleId: getting-started/privacy-lifecycle

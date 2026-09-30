@@ -32,8 +32,8 @@
     "vectorStores": {
       "min": "adapter-contract-v1",
       "maxExclusive": "adapter-contract-v2",
-      "adapters": ["pgvector", "qdrant", "weaviate"],
-      "tested": ["pgvector"],
+      "adapters": ["pgvector", "mongodb-atlas", "qdrant", "pinecone", "weaviate", "chroma"],
+      "tested": ["adapter-contract-v1"],
       "compatibility": "adapter-specific"
     },
     "objectStorage": {
@@ -71,7 +71,7 @@
     }
   },
   "verification": {
-    "dependencyScan": { "status": "required", "tool": "pnpm audit", "evidence": "ci" },
+    "dependencyScan": { "status": "required", "tool": "npm audit", "evidence": "ci" },
     "malwareScan": { "status": "required", "evidence": "ci" },
     "secretScan": { "status": "required", "evidence": "ci" },
     "threatModelReview": { "status": "required", "evidence": "docs/security" },

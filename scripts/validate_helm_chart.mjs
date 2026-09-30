@@ -24,9 +24,11 @@ for (const relative of required) {
 
 const values = await readFile(join(root, 'values.yaml'), 'utf8');
 const deployment = await readFile(join(root, 'templates', 'deployments.yaml'), 'utf8');
+const helpers = await readFile(join(root, 'templates', '_helpers.tpl'), 'utf8');
 const keda = await readFile(join(root, 'templates', 'keda.yaml'), 'utf8');
 const chart = await readFile(join(root, 'Chart.yaml'), 'utf8');
 const templates = await readdir(join(root, 'templates'));
+const secretTemplate = await readFile(join(root, 'templates', 'secret.yaml'), 'utf8');
 
 const requiredValues = [
   'deploymentProfile: distributed',
@@ -60,6 +62,7 @@ for (const worker of [
   'webhooks',
   'auditBilling',
   'maintenance',
+  'workflows',
 ]) {
   if (!values.includes(`${worker}:`)) throw new Error(`missing worker class: ${worker}`);
 }
@@ -86,6 +89,27 @@ if (!deployment.includes('include "handstack.serviceAccountName"')) {
 if (!deployment.includes('include "handstack.env"')) {
   throw new Error('deployments must inject canonical database and Redis environment variables');
 }
+for (const token of [
+  '$cfg.queue',
+  'HANDSTACK_WORKER_ORGANIZATION_ID',
+  'HANDSTACK_WORKER_HANDLER_MODULE',
+  'HANDSTACK_API_URL',
+]) {
+  if (!deployment.includes(token)) throw new Error(`worker deployment is missing ${token}`);
+}
+if (
+  !helpers.includes('HANDSTACK_INTERNAL_SERVICE_TOKEN') ||
+  !values.includes('queue: workflow-executions')
+) {
+  throw new Error('workflow worker deployment or internal service authentication is missing');
+}
+if (
+  !helpers.includes('HANDSTACK_MASTER_KEY') ||
+  !secretTemplate.includes('.Values.encryption.masterKey') ||
+  !values.includes('encryption:')
+) {
+  throw new Error('shared encryption master key is not wired through Helm Secret references');
+}
 if (deployment.includes('secretRef: { name: {{ include "handstack.secretName"')) {
   throw new Error('deployments must not import hyphenated Secret keys through envFrom');
 }
@@ -96,13 +120,21 @@ const helmCandidates = [
 ].filter(Boolean);
 const helm = helmCandidates.find((candidate) => candidate === 'helm' || existsSync(candidate));
 if (helm) {
-  const rendered = execFileSync(helm, ['template', 'handstack', root], { encoding: 'utf8' });
+  const renderOverrides = [
+    '--set',
+    'workerOrganizationId=validation-org',
+    '--set',
+    'workerHandlerModule=/app/dist/domain-handlers.js',
+  ];
+  const rendered = execFileSync(helm, ['template', 'handstack', root, ...renderOverrides], {
+    encoding: 'utf8',
+  });
   if (!rendered.includes('kind: Deployment') || !rendered.includes('kind: ScaledObject')) {
     throw new Error('rendered chart is missing workload or KEDA resources');
   }
   const disabledAccount = execFileSync(
     helm,
-    ['template', 'handstack', root, '--set', 'serviceAccount.create=false'],
+    ['template', 'handstack', root, '--set', 'serviceAccount.create=false', ...renderOverrides],
     { encoding: 'utf8' },
   );
   if (!disabledAccount.includes('serviceAccountName: default')) {

@@ -39,6 +39,13 @@ primary database adapter.
    until `SUCCEEDED`, and publish the active model only after all checkpoints complete. Failed jobs
    resume from their persisted cursor; cancellation remains durable and never publishes partial work.
 
+To manage migrations through the API, `POST /api/v1/organizations/{organizationId}/knowledge/reindex-jobs`
+creates a durable job from `knowledgeBaseId` and `embeddingModel`. Distributed deployments enqueue
+it for the `indexing` worker; use `GET .../reindex-jobs/{jobId}` to monitor and
+`POST .../reindex-jobs/{jobId}/cancel` to cancel. In the compact profile,
+`POST .../reindex-jobs/{jobId}/run` runs the migration locally. The base's active embedding model
+changes only after reindexing succeeds; failed jobs resume from their saved cursor.
+
 Every document, chunk and embedding carries a source id/version, content digest, ACL snapshot,
 classification, residency, ingestion/verification timestamps, retention policy and deletion status.
 The built-in `RagPolicyProvider` rejects prompt-injection markers and common
@@ -71,3 +78,16 @@ source cursor is retained and replayed safely after connector restarts.
   publishing the new model.
 - A repeated connector token is acknowledged from the durable cursor without replaying its
   mutation; a new token is persisted only after vector propagation succeeds.
+
+The periodic source-sync scheduler is disabled by default. Set `HANDSTACK_KNOWLEDGE_SYNC_ENABLED=true`
+and configure `HANDSTACK_KNOWLEDGE_SYNC_INTERVAL_MS` to enable it. With no
+`HANDSTACK_KNOWLEDGE_SYNC_ORGANIZATIONS` allow-list, it discovers active organizations; database
+leases prevent API replicas from syncing the same organization concurrently.
+
+Configured vector-store credentials use `HANDSTACK_VECTOR_STORE_CREDENTIAL_REFERENCE` as a secret
+reference. The reference is validated by the typed configuration layer and resolved only through
+the tenant-scoped secret broker; the credential value is never stored in configuration or vectors.
+
+Remote Knowledge URLs are restricted by the typed `HANDSTACK_KNOWLEDGE_ALLOWED_HOSTS` allow-list,
+which is applied consistently by API connectors. An empty list keeps the existing DNS/SSRF checks
+without adding a hostname restriction.

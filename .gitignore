@@ -17,3 +17,8 @@ graphify-out/
 .DS_Store
 apps/web/test-results/
 apps/web/playwright-report/
+artifacts/certification/
+.handstack-codex/
+apps/api/.handstack-data/
+**/*.tsbuildinfo
+apps/web/tests/e2e/snapshots/

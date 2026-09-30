@@ -16,6 +16,10 @@ describe('durable agent runtime SQLite round-trip', () => {
     process.env.HANDSTACK_DATABASE_URL = 'file::memory:';
     database = new DatabaseService();
     await database.onModuleInit();
+    database.config = {
+      ...database.config,
+      timeouts: { ...database.config.timeouts, agent: 45_000 },
+    };
     const runtime = new AgentRuntimeService(database);
     const agent = await runtime.create({
       organizationId: 'agent-persist',
@@ -28,6 +32,7 @@ describe('durable agent runtime SQLite round-trip', () => {
       model: 'model-a',
       systemPrompt: 'A',
     });
+    expect(first.timeoutMs).toBe(45_000);
     await runtime.publish('agent-persist', agent.id, first.id);
     const secondRuntime = new AgentRuntimeService(database);
     const listed = await secondRuntime.list('agent-persist');
