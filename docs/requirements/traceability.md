@@ -4,11 +4,11 @@ This matrix is generated from the canonical `docs/requirements/catalog.yaml` and
 
 ## Crosswalk das seções normativas
 
-The catalog above remains canonical. The crosswalk below is the navigation layer for the 160
-numbered sections in `handstack-master-specification-v1.md`: contiguous section families point to
-the relevant catalog requirements and representative implementation, contract, test, and localized
-documentation evidence. A requirement can therefore appear in more than one normative family, while
-its acceptance criteria and status remain defined only once in `catalog.yaml`.
+The catalog above remains canonical. The crosswalk below is its navigation layer: contiguous
+requirement families point to the relevant catalog requirements and representative implementation,
+contract, test, and localized documentation evidence. A requirement can therefore appear in more
+than one normative family, while its acceptance criteria and status remain defined only once in
+`catalog.yaml`.
 
 | Seções  | Requisitos canônicos                                                                              | Código principal                                                                                              | Contrato                                                                   | Teste focal                                                                                                                                                 | Documentação                                                                                                            |
 | ------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |

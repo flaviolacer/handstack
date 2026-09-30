@@ -1,7 +1,7 @@
 # Auditoria de escopo HandStack
 
 Data da auditoria: 2026-09-29
-Especificação: `C:\Users\flavi\Desktop\handstack-master-specification-v1.md`
+Fonte normativa: `docs/requirements/catalog.yaml`
 
 ## Critério
 
@@ -15,9 +15,7 @@ especificação). `scopeGaps` é a união das duas listas.
 
 ### Reconciliação do catálogo
 
-A especificação original contém 160 seções numeradas, enquanto o catálogo interno contém 105
-requisitos rastreáveis. Portanto, os 105 itens do catálogo não podem ser interpretados como uma
-representação exaustiva das 160 seções. O catálogo agora declara `scopeStatus: partial`; a
+O catálogo interno contém 105 requisitos rastreáveis e declara `scopeStatus: partial`; a
 aderência integral depende também das obrigações de milestones e Definition of Done listadas
 neste relatório.
 
@@ -53,8 +51,8 @@ neste relatório.
 
 ### Revalidação incremental (28/09/2026)
 
-Após a execução de `retention.trace`, o `scope:audit` continua `PARTIAL`, com 160 seções,
-105 requisitos `verified`, 15 lacunas funcionais/cobertura e 6 certificações externas. O OpenAPI
+Após a execução de `retention.trace`, o `scope:audit` continua `PARTIAL`, com 105 requisitos
+`verified`, 15 lacunas funcionais/cobertura e 6 certificações externas. O OpenAPI
 foi regenerado e validado com 205 caminhos, incluindo a rota autenticada de reconexão MCP;
 `missingHandlers`, rotas administrativas, navegação e
 ajuda contextual continuam sem lacunas. Docker, Redis e MongoDB local estão disponíveis para
