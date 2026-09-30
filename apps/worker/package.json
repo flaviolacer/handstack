@@ -20,6 +20,6 @@
     "@handstack/telemetry": "file:../../packages/telemetry",
     "@handstack/webhooks": "file:../../packages/webhooks",
     "bullmq": "^5.81.4",
-    "ioredis": "5.11.1"
+    "ioredis": "6.0.0"
   }
 }
